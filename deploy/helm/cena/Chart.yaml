@@ -1,0 +1,12 @@
+apiVersion: v2
+name: cena
+description: Cena Platform — Math learning platform with migrator, student, and admin services
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - cena
+  - education
+  - math
+maintainers:
+  - name: Cena Platform Team

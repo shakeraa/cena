@@ -1,0 +1,96 @@
+doc_path: pre-release-review/finding_assessment_dr_rami.md
+reviewer: persona-sre
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr Rami's statistical-honesty pass: 9 PASS, 8 WARNING, 3 REJECT. Most operationally relevant: REJECTs for FD-003 (95% claim
+  fabricated), FD-008 (Yu et al 2026 non-existent), FD-011 (ES 1.16 cherry-picked); WARNING on FD-004 (RDY-080 risk).
+system_purpose_fit: 5
+  rationale:
+    - This doc is pure non-negotiable enforcement (honesty + RDY-080 + ADR-0003 + DPA §7).
+    - SRE lens: honesty-of-claim is a pre-requisite for truthful SLOs and runbooks.
+code_reality_check:
+  claims_verified_in_code:
+    - "ADR-0002 CAS oracle and ADR-0003 session-scope are the authoritative sources -> docs/adr/0002*, 0003*"
+    - "Shipgate scanner enforces banned copy -> docs/engineering/shipgate.md"
+  claims_contradicted_by_code: []
+  claims_unverifiable: []
+adr_alignment:
+  honored: [ADR-0002, ADR-0003, RDY-080]
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      FD-003 REJECT: The "95% misconception resolution" headline is fabricated. Any SLO / runbook / dashboard designed around that
+      number must be re-scoped to true reported range (~60-80%). Do not let the number propagate into docs/marketing during ops
+      design.
+    evidence: finding_assessment_dr_rami.md:L13 (FD-003 REJECT)
+    lens_note: Wrong numbers migrate from research notes into status pages if unchecked.
+  - severity: P0
+    finding: |
+      FD-008 REJECT: AI grading citation is fabricated. Do not begin grading-runbook work (already flagged in axis6 YAML) until
+      the claim basis is replaced. Additionally, DPA §7 assessment is required first.
+    evidence: finding_assessment_dr_rami.md:L20 (FD-008 REJECT)
+    lens_note: Operational investment follows research credibility.
+  - severity: P1
+    finding: |
+      FD-004 WARNING: IRT-CAT readiness scores without a concordance study are a RDY-080 violation. SRE should treat any
+      "Bagrut readiness" UI string as a ship-gate trigger until concordance evidence is documented.
+    evidence: finding_assessment_dr_rami.md:L17 (FD-004 WARNING)
+    lens_note: RDY-080 policing is an operational control; add to shipgate.
+  - severity: P1
+    finding: |
+      FD-006 WARNING: Foster 2021 null achievement finding must be disclosed. UI copy for confidence-calibration feature should
+      not market as achievement booster. Shipgate can scan for banned copy patterns.
+    evidence: finding_assessment_dr_rami.md:L15 (FD-006 WARNING)
+    lens_note: Marketing-to-research drift is a documentation incident in slow motion.
+already_built:
+  - feature: Shipgate copy-scanner
+    evidence: docs/engineering/shipgate.md; docs/engineering/ci-prohibited-metrics-rules.md
+    note: Extend for RDY-080 and confidence-calibration copy.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md and cena_dr_nadia_pedagogical_review_20_findings.md (overlapping FD ids)."
+extracted_tasks:
+  - title: Shipgate rules for RDY-080 (no Bagrut-prediction copy) + FD-006 framing
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Add regex rules to shipgate scanner that block PRs containing "predict your Bagrut score", "will get X in Bagrut",
+      "guaranteed to pass" and similar wording, plus confidence-calibration-as-achievement copy.
+      ## Files
+      docs/engineering/ci-prohibited-metrics-rules.md
+      .github/workflows/ci.yml
+      ## Definition of Done
+      - Sample violating PR blocked
+      - Rules documented + cross-referenced from RDY-080
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/rdy080-copy"
+    source_doc_lines: []
+  - title: Retire FD-003 / FD-008 / FD-011 headline numbers before ops design
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Strip fabricated / cherry-picked effect sizes (FD-003 95%, FD-008 Yu 2026, FD-011 ES 1.16) from any downstream doc or
+      queue task body. Replace with sourced ranges or mark feature as blocked on evidence.
+      ## Files
+      pre-release-review/reviews/SYNTHESIS.md (when authored by synth agent)
+      docs/engineering/shipgate.md
+      ## Definition of Done
+      - No ops task contains a rejected number
+      - Synthesis doc reflects retirement
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch:sre/retire-bad-numbers"
+    source_doc_lines: [L13, L20, L27]
+verdict: adopt
+verdict_reason: |
+  Dr Rami's honesty pass is the cleanest operational filter in the corpus; adopt as-is and wire into shipgate.
+cross_lens_handoff:
+  - to: persona-ministry
+    about: RDY-080 readiness-claim surface.
+  - to: persona-ethics
+    about: Marketing copy honesty (FD-006 null-result disclosure).

@@ -1,0 +1,124 @@
+doc_path: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md
+reviewer: persona-enterprise
+reviewed_at: 2026-04-20
+doc_summary: |
+  Collaboration/social features: peer "I'm confused too" signal, anonymized leaderboards,
+  classroom feed, peer-help request, study-group formation, mentor chat extensions.
+system_purpose_fit: 3
+  rationale:
+    - Social features introduce N:M writes across student streams (e.g. peer help). Event ordering + tenant isolation risk.
+    - MentorChat already event-sourced; most features should extend.
+    - Leaderboards without loss-aversion is achievable; anonymization design matters for PPD compliance.
+code_reality_check:
+  claims_verified_in_code:
+    - "Social event family exists -> src/actors/Cena.Actors/Events/SocialEvents.cs"
+    - "Mentor chat event family exists -> src/actors/Cena.Actors/Events/MentorChatEvents.cs (ADR-0012:61)"
+    - "Messaging bounded context exists -> src/actors/Cena.Actors/Messaging/"
+    - "Class feed projection -> src/actors/Cena.Actors/Projections/ClassFeedItemProjection.cs"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Current anonymization scheme for leaderboards (handle generator not located in this pass)"
+adr_alignment:
+  honored:
+    - "ADR-0003 (social signals must not leak cross-session misconception data)"
+  violated: []
+  missing_adr_needed:
+    - "Cross-student event ordering / saga pattern for peer-help flows"
+    - "Leaderboard anonymization retention policy"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Peer-help / study-group features imply writes that span multiple student streams (StudentA's help request
+      references StudentB's visibility). ADR-0012 splits sessions per-student-session stream; a cross-student saga
+      must exist. Doc is silent on the saga pattern, which is a recipe for dead-letter messages (see actor-system-review C2).
+    evidence: "AXIS_7_Collaboration_Social_Features_Cena.md:L~200-L~350 (peer-help, study-group); docs/actor-system-review.md:38-52 (C2 dead-letter pattern)"
+    lens_note: Enterprise — event ordering across aggregates requires explicit saga/process-manager design.
+  - severity: P1
+    finding: |
+      Classroom feed is already a projection (ClassFeedItemProjection). Doc proposes enriching it but omits that
+      projections are append-only read models — any new "edit feed item" UX is a new event + projection rebuild cost.
+    evidence: src/actors/Cena.Actors/Projections/ClassFeedItemProjection.cs
+    lens_note: Enterprise — projection edits require event-sourced semantics; no in-place updates.
+  - severity: P1
+    finding: |
+      "I'm confused too" signal risks becoming indirect misconception persistence if aggregated beyond session.
+      ADR-0003 mandates session-scope. A feed aggregation across sessions effectively persists misconception data.
+    evidence: "AXIS_7_Collaboration_Social_Features_Cena.md:L~120; docs/adr/0003-misconception-session-scope.md"
+    lens_note: Enterprise — respect ADR-0003 with a TTL on any cross-session aggregation.
+  - severity: P1
+    finding: |
+      Cross-classroom collaboration (students in different institutes or classrooms) needs a tenant-boundary decision.
+      Default to classroom-scope; any cross-classroom feature needs explicit opt-in and ADR.
+    evidence: "src/shared/Cena.Infrastructure/Tenancy/TenantScope.cs:16-76; AXIS_7_Collaboration_Social_Features_Cena.md"
+    lens_note: Enterprise — social mixing across tenants is a discovery-surface risk.
+  - severity: P2
+    finding: |
+      Mentor-chat extensions already have a dead-letter vulnerability (MentorChatMessageSent_V1 in ADR-0012 Session
+      context). Extending without fixing C2 propagates the defect.
+    evidence: "docs/adr/0012-aggregate-decomposition.md:60-61; docs/actor-system-review.md:38-52"
+    lens_note: Enterprise — don't extend a channel with known dead-letter defects.
+already_built:
+  - feature: "Social event family"
+    evidence: src/actors/Cena.Actors/Events/SocialEvents.cs
+    note: "Extend."
+  - feature: "Mentor chat event family + messaging context"
+    evidence: "src/actors/Cena.Actors/Events/MentorChatEvents.cs; src/actors/Cena.Actors/Messaging/"
+    note: "Chat extensions should reuse, not re-author."
+  - feature: "Class feed projection"
+    evidence: src/actors/Cena.Actors/Projections/ClassFeedItemProjection.cs
+    note: "Extend projection, do not replace."
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-030 ('I'm confused too')"
+  - "cena_axis5_teacher_workflow_features.md: class feed enhancements"
+extracted_tasks:
+  - title: "Design saga/process-manager pattern for cross-student flows"
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Before any peer-help or study-group feature ships, design the Proto.Actor saga pattern for cross-student
+      event flows (peer-help-requested -> peer-available -> peer-joined). Reference ADR-0012's saga scaffold.
+
+      ## Files
+      - docs/adr/ (new 0019-cross-student-sagas.md)
+      - docs/adr/0012-aggregate-decomposition.md (section: Saga/Process Manager Complexity)
+
+      ## Definition of Done
+      - ADR published; sample saga skeleton committed (no wire-up).
+      - Message-type + ordering rules explicit.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L~200-L~400]
+  - title: "TTL enforcement on any cross-session social signal aggregate"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Any social signal aggregate (confusion signal, peer tags) must honor ADR-0003 30-day max. Implement
+      time-based purge + test.
+
+      ## Files
+      - src/actors/Cena.Actors/ (social/messaging modules)
+
+      ## Definition of Done
+      - Purge job exists + test.
+      - Ship-gate scanner flags any new social aggregate lacking a TTL.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L~100-L~150]
+verdict: revise
+verdict_reason: |
+  Social features need explicit cross-aggregate saga design + TTL policy before any ship. Several features duplicate
+  already-built infrastructure and should be rewritten as extensions.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "Minor-to-minor social interaction consent matrix."
+  - to: persona-ethics
+    about: "Leaderboards without comparative-percentile shame — design walk-through."
+  - to: persona-redteam
+    about: "Peer-help as a vector for scraping student data across tenants."

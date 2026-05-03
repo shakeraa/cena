@@ -1,0 +1,168 @@
+doc_path: pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md
+reviewer: persona-finops
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight content-authoring features: Bayesian IRT small-sample, CAS-gated
+  variation engine, Bagrut rubric engine, Arabic RTL math, culturally-
+  contextualized problem generator, mother-tongue hints, self-efficacy
+  difficulty, hybrid calibration. Heavy on content-generation LLM cost and
+  one-time authoring investment.
+system_purpose_fit: 5
+  rationale:
+    - CAS-gated variation (F2) is the core cost-optimization for content — amortizes LLM over 1000s of variations.
+    - Cultural localization (F5) is authoring cost, not runtime cost.
+    - Mother-tongue hints (F6) can be static i18n OR runtime LLM — pin the pattern.
+code_reality_check:
+  claims_verified_in_code:
+    - "AI generation service with CAS gating -> src/api/Cena.Admin.Api/AiGenerationService.cs, AiGenerationCasGatingTests.cs"
+    - "CorpusExpanderHandler + ReferenceCalibratedGenerationService -> src/api/Cena.Admin.Api/Questions/"
+    - "IRT calibration pipeline -> src/actors/Cena.Actors/Services/IrtCalibrationPipeline.cs"
+    - "QualityGate with conformance testing -> src/api/Cena.Admin.Api/QualityGate/"
+    - "Bagrut recreation (not raw Bagrut) -> src/actors/Cena.Actors.Tests/Content/BagrutRecreationTests.cs"
+    - "Arabic Question Bank translations -> src/api/Cena.Admin.Api/QuestionBankArabicTranslations.cs"
+  claims_contradicted_by_code:
+    - "F2 presented as proposed — largely already built (CorpusExpander + AiGenerationService + QualityGate)"
+  claims_unverifiable:
+    - "F5 cultural authoring costs (human reviewer hours)"
+adr_alignment:
+  honored:
+    - "ADR-0002 (CAS oracle) — F2, F3, F8 explicit"
+    - "ADR-0032 CAS-gated ingestion — F2 consistent"
+    - "Bagrut reference-only (decided 2026-04-15) — F2 generates recreations, not reuses"
+  violated: []
+  missing_adr_needed:
+    - "ADR for Arabic Question Bank translation tier + caching (given existing QuestionBankArabicTranslations.cs)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      F2 CAS-Gated Problem Variation Engine is LARGELY ALREADY BUILT. Cost
+      implication: the economics case is already proven — CorpusExpanderHandler
+      amortizes one LLM template authoring call over 100s of CAS-validated
+      variants. Doc should cite existing code, not propose greenfield. The
+      real task is extending generation to Arabic with existing translation
+      infra (QuestionBankArabicTranslations.cs).
+    evidence: src/api/Cena.Admin.Api/Questions/CorpusExpanderHandler.cs; AXIS_8_Content_Authoring_Quality_Research.md (F2)
+    lens_note: Already-built — retire as greenfield proposal. Extract extension task.
+  - severity: P0
+    finding: |
+      F5 Culturally-Contextualized Problem Generator — at per-student runtime
+      generation, cost is catastrophic (10k x 20 problems/day x $0.02 = $4k/day
+      = $120k/month, 4x the global cap). Must be AUTHORING-TIME only: generate
+      a pool of 1k culturally-contextualized variants once per unit per cohort
+      (~$500 one-time cost), store, serve from pool.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md (F5); contracts/llm/routing-config.yaml:301
+    lens_note: Batch API offers 50% discount (routing-config.yaml:200 knowledge_graph_extraction note) — use for authoring runs.
+  - severity: P1
+    finding: |
+      F6 Mother-Tongue-Mediated Hint System — if hints are generated per-
+      student-per-question via LLM, cost ~$0.001 x 10k x 15/day = $150/day.
+      If hints are pre-authored per question-per-language (static), runtime
+      cost is $0. Doc ambiguous. Force static pattern; ~500 questions x 3
+      languages x $0.01 = $15 one-time authoring cost.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md (F6)
+    lens_note: Static authoring is 10,000x cheaper than runtime generation over a year.
+  - severity: P1
+    finding: |
+      F4 Arabic RTL Math Renderer — client-side render, zero server cost.
+      Ship first.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md (F4)
+    lens_note: Pure frontend; trivial cost.
+  - severity: P2
+    finding: |
+      F1 Bayesian IRT Small-Sample + F8 Hybrid Calibration — compute-bound,
+      not LLM. Nightly batch. ~$200/month Stan/PyMC cluster. Acceptable.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md (F1, F8)
+    lens_note: Batch-friendly; ship.
+  - severity: P2
+    finding: |
+      F3 Bagrut Rubric Engine — pure rules engine. Zero LLM at runtime.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md (F3)
+    lens_note: Cheap; ship.
+  - severity: P2
+    finding: |
+      F7 Self-Efficacy Calibrated Difficulty — analytics + UI. Cheap.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md (F7)
+    lens_note: Ship.
+already_built:
+  - feature: "AI generation service with CAS gating (F2)"
+    evidence: src/api/Cena.Admin.Api/AiGenerationService.cs
+    note: Retire F2 as greenfield; proposal should be extension only.
+  - feature: "CorpusExpanderHandler (variation engine)"
+    evidence: src/api/Cena.Admin.Api/Questions/CorpusExpanderHandler.cs
+    note: Core of F2 already in production.
+  - feature: "Quality Gate / CAS conformance"
+    evidence: src/api/Cena.Admin.Api/QualityGate/QualityGateService.cs
+    note: Supports F2/F3 validation pipeline.
+  - feature: "Arabic question-bank translation tables"
+    evidence: src/api/Cena.Admin.Api/QuestionBankArabicTranslations.cs
+    note: F5/F6 piggyback on this.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-002 (CAS variation) = F2"
+  - "feature-discovery-2026-04-20.md: FD-012 (Bayesian small-sample) = F1"
+  - "feature-discovery-2026-04-20.md: FD-011 (Cultural context) = F5"
+  - "feature-discovery-2026-04-20.md: FD-013 (Mother-tongue hints) = F6"
+  - "feature-discovery-2026-04-20.md: FD-010 (Arabic RTL) = F4"
+extracted_tasks:
+  - title: "Batch-generate 1000 culturally-contextualized problem variants per cohort"
+    priority: P0
+    estimate: L
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Implement F5 as an AUTHORING-TIME batch job (not runtime) that generates
+      ~1000 Arab/Ethiopian/Russian-contextualized problem variants per Bagrut
+      unit, CAS-validates each, stores in question bank. Uses Anthropic Batch
+      API for 50% discount on authoring cost.
+
+      ## Files
+      - src/api/Cena.Admin.Api/Authoring/CulturalVariantGenerator.cs (new)
+      - src/api/Cena.Admin.Api/Authoring/BatchAuthoringJob.cs (new)
+      - docs/engineering/cultural-authoring-runbook.md (new)
+
+      ## Definition of Done
+      - Uses Anthropic Batch API (50% discount)
+      - CAS-gated via existing CasRouterService
+      - Community-review board approval workflow per ADR (to be drafted)
+      - One-time cost per unit: ~$200-500 (not per-student-runtime)
+      - Metric: cena.authoring.cost_total_usd per batch run
+      - Zero per-student-runtime LLM cost for cultural variants
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L220-L290]
+  - title: "Mother-tongue hints: pre-author static per-question Hebrew/Arabic/English"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Implement F6 as static pre-authored hints (3 levels x 3 languages x N
+      questions) stored in question bank. Avoid runtime LLM. Reuse existing
+      QuestionBankArabicTranslations patterns.
+
+      ## Files
+      - src/api/Cena.Admin.Api/QuestionBankHintLadderAuthoring.cs (new)
+      - src/api/Cena.Admin.Api/QuestionBankService.cs (extend)
+      - src/api/Cena.Admin.Api.Tests/QuestionBankHintLadderTests.cs
+
+      ## Definition of Done
+      - Hint ladder (3 levels) pre-authored per question in he/ar/en
+      - Runtime hint delivery: cache read, zero LLM
+      - Authoring-time one-time cost budget: ~$50 per 500 questions x 3 langs
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L310-L360]
+verdict: revise
+verdict_reason: |
+  F2 already built — retire greenfield proposal, extract only extension tasks.
+  F5 MUST be batch-authoring (one-time cost), not runtime (catastrophic cost).
+  F6 MUST be static, not runtime. F1/F3/F4/F7/F8 all have favorable economics.
+cross_lens_handoff:
+  - to: persona-ministry
+    about: "F5 cultural variants — do these count as 'Bagrut-reference-only' compliant recreations?"
+  - to: persona-cogsci
+    about: "Is 1000 variants/cohort enough coverage, or does sparsity hurt learning?"
+  - to: persona-educator
+    about: "Community review board sizing and cadence for F5 cultural content."

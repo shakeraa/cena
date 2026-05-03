@@ -1,0 +1,56 @@
+# prr-200 example — deterministic parametric template (Strategy 1, no-LLM).
+# Conforms to contracts/questions/parametric-template.schema.json.
+#
+# Solve for x:  a*x + b = c   →   x = (c - b) / a
+#
+# The compiler draws (a, b, c) from the declared ranges, runs the substituted
+# solution expression through SymPy via the CAS router, rejects slot combos
+# that would yield non-integer x (accept_shapes=[integer]), and emits the
+# variant through the standard CAS-gated ingestion path.
+
+id: linear_eq_two_step
+version: 1
+subject: math
+topic: algebra.linear_equations
+track: FourUnit
+difficulty: Medium
+methodology: Halabi
+bloomsLevel: 3
+language: en
+
+stemTemplate: "Solve for x: {a}x + {b} = {c}"
+solutionExpr: "(c - b) / a"
+variableName: x
+
+acceptShapes:
+  - integer
+
+slots:
+  - name: a
+    kind: integer
+    integerMin: 2
+    integerMax: 9
+    integerExclude: [0]
+  - name: b
+    kind: integer
+    integerMin: -20
+    integerMax: 20
+  - name: c
+    kind: integer
+    integerMin: -50
+    integerMax: 50
+
+constraints:
+  - description: "coefficient a must be non-zero"
+    predicateExpr: "a != 0"
+
+distractorRules:
+  - misconceptionId: SIGN-FLIP-INEQ
+    formulaExpr: "(c + b) / a"
+    labelHint: "adds b instead of subtracting"
+  - misconceptionId: CANCEL-COMMON
+    formulaExpr: "c - b"
+    labelHint: "forgets to divide by a"
+  - misconceptionId: DIST-EXP-SUM
+    formulaExpr: "(c - b) * a"
+    labelHint: "multiplies instead of dividing"

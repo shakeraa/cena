@@ -1,0 +1,287 @@
+doc_path: pre-release-review/cena_cross_domain_feature_innovation.md
+reviewer: persona-ethics
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 features from non-EdTech domains (Obsidian concept graph,
+  Calm/Headspace breathing ritual, Fabulous habit journeys, Tetris-style
+  flow difficulty, Woebot-style companion bot, Discord study circles,
+  Sanvello mood tracker, Nike workout menu). Guardrail summary at
+  L213-225 shows each feature's screening.
+system_purpose_fit: 3
+  rationale:
+    - Cross-domain borrowing is a known dark-pattern vector (Duolingo
+      streaks come from addictive-game design)
+    - Author explicitly guardrail-checks each feature — good discipline
+    - Several features edge toward reward inflation, parasocial attachment,
+      or therapy-territory (F5 Companion Bot flagged BORDERLINE)
+    - F7 Learning Energy Tracker pattern of mood tracking on minors needs
+      stronger framing than the doc provides
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Woebot 2017 RCT effect sizes -> cogsci"
+    - "Fabulous behavioral science backing -> cogsci"
+adr_alignment:
+  honored:
+    - "GD-004 shipgate — each feature rule-checked at L22, L43, L65, L87, L109, L131, L153, L175"
+    - "ADR-0003 — session-local framing (F2 L43, F7 L153)"
+    - "COPPA under-13 consent gates noted throughout"
+  violated: []
+  missing_adr_needed:
+    - "ADR on 'companion bot / chat buddy' features — when does it cross
+      into therapy territory? Cena needs a clear boundary spec."
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F5 Cena Companion (L98-116) already flagged BORDERLINE by author
+      (L109) for therapy-territory risk. Ethics lens additional
+      concerns:
+      (a) Avatar with "5-6 emotional states" (L110) creates parasocial
+          attachment risk for minors — the companion appears to have
+          feelings about the student's performance.
+      (b) "You're on fire today! 🔥" template (L106) is reward inflation.
+      (c) "Struggle detection (3 wrong in a row): 'That topic is
+          tricky!'" (L110) — a bot reacting emotionally to struggle
+          is the exact pattern that generates over-reliance.
+      (d) "All responses are rule-based templates, not generative AI"
+          (L110) is good BUT template libraries of emotional response
+          still create parasocial dynamics.
+      Recommend:
+      - Remove avatar emotional states; use neutral icon only
+      - Replace emotional reactions with neutral navigation
+        ("Want a hint, a video, or try something different?" — just
+        the options, no "That topic is tricky!" framing)
+      - No fire emoji, no emotional-reaction copy
+      - Feature remains SHORTLIST pending full ethics+legal review
+    evidence: cena_cross_domain_feature_innovation.md:L98-L116
+    lens_note: |
+      Woebot's own research (Fitzpatrick 2017) is an anxiety/depression
+      study for college students, not a math-prep study for minors.
+      Transferring the "empathetic bot" pattern to minor-math-prep is
+      a category error that the BORDERLINE flag correctly catches.
+  - severity: P1
+    finding: |
+      F4 Adaptive Flow Sessions (L76-94) proposes (L88) "Great pace!
+      🔥" messaging and "Let's take it step by step 💡" feedback.
+      Emoji-fire and dopamine-response copy tied to pace is reward
+      inflation (shipgate Rule 5 inspired). Recommend: neutral copy,
+      no emoji with fire/energy connotations. "Moving quickly"
+      instead of "Great pace! 🔥."
+    evidence: cena_cross_domain_feature_innovation.md:L88
+    lens_note: |
+      Fire emoji 🔥 is the universal "you're on a streak" signifier.
+      Shipgate spirit bans the emoji even if the word "streak" isn't
+      present.
+  - severity: P1
+    finding: |
+      F7 Learning Energy Tracker (L142-161) asks minors to self-rate
+      mood after each session. Author frames this as "learning energy
+      and study optimization, not mental health" (L153). Ethics lens:
+      the framing is the ethics risk. If Cena collects mood data from
+      minors at scale, it is a mental-health-adjacent dataset
+      regardless of what Cena calls it. Safeguards required:
+      (a) Mood data never leaves session scope (author promises this
+          at L153 — must be architecturally enforced)
+      (b) No correlation surfaced that could be read as a mental-
+          health insight ("You're strongest at algebra on Sunday
+          mornings" is fine; "Your mood drops after 8 PM" is not)
+      (c) Hard delete on student request (author offers this at L154)
+      (d) No parent visibility
+      (e) Israeli PPA consultation before launch
+    evidence: cena_cross_domain_feature_innovation.md:L142-L161
+    lens_note: |
+      Framing does not change regulatory classification. A mood
+      dataset is a mood dataset. The feature may ship but needs
+      legal + PPA sign-off that framing survives.
+  - severity: P2
+    finding: |
+      F3 Learning Journeys (L54-72) is well-designed. One concern:
+      "animated character progresses along a visual path" (L62) +
+      "daily micro-sessions" (L62) + "Completion badge
+      (celebratory, not competitive)" (L66). Even without explicit
+      streak language, a daily animated-character path creates
+      implicit rhythm pressure. Mitigations:
+      - Character should be a simple marker, no animation
+      - "Daily" must be suggested, not required — "missing a day
+        simply means the next step waits" (L65) must be visible to
+        student ("no pressure — this pauses while you're away")
+      - Completion badge text-only, no animation or sound
+    evidence: cena_cross_domain_feature_innovation.md:L62-L66
+    lens_note: |
+      Fabulous / habit-tracker patterns are the inspiration. The
+      exact pattern that becomes a daily streak without the
+      vocabulary.
+  - severity: P2
+    finding: |
+      F2 Focus Ritual breathing opener (L32-50) is well-designed.
+      Concern: mood check-in "adjusts session opening difficulty"
+      (L40, L44) — 😰 routes to review, 🙂 routes to challenge.
+      Automatic difficulty routing based on mood tap is the same
+      silent-adjustment concern as Axis 3 F4 energy tracker. Recommend:
+      show "Want to warm up first? [Yes/No]" after low-mood tap,
+      not silently route.
+    evidence: cena_cross_domain_feature_innovation.md:L40, L44
+    lens_note: |
+      Same pattern, same fix. Autonomy requires the student to see
+      and confirm.
+  - severity: P2
+    finding: |
+      F8 Session Type Menu (L164-182) proposes "⚡ Challenge Round
+      (15 min, above-level problems with hints)" (L172). "Challenge
+      Round" + lightning emoji invokes game-show / high-stakes
+      framing. Recommend: "Stretch Session" or "Try-Something-
+      Harder" — avoid competitive/arena language.
+    evidence: cena_cross_domain_feature_innovation.md:L172
+    lens_note: |
+      Fitness-app metaphor is fine; game-show arena framing is not.
+  - severity: P2
+    finding: |
+      F6 Study Circles (L120-139) proposes "weekly 'most helpful
+      answer' celebrated with a non-competitive badge" (L132).
+      "Most helpful" is a comparison by definition. Badge framing
+      identical to Axis 7 F4 "helpfulness tokens" (P0 there).
+      Recommend: retire the weekly highlight entirely; surface-sort
+      by upvotes is enough.
+    evidence: cena_cross_domain_feature_innovation.md:L132
+    lens_note: |
+      "Non-competitive badge" is an oxymoron when it selects one
+      student out of many.
+already_built: []
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-049 through FD-052 covers same features"
+  - "axis3_accessibility_accommodations_findings.md: F4 here overlaps F4 there (energy tracking)"
+  - "AXIS_7_Collaboration_Social_Features_Cena.md: F6 Study Circles overlaps F4 there"
+extracted_tasks:
+  - title: "F5 Cena Companion: remove emotional states + fire emoji; ADR on companion-bot boundary"
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Before any companion-bot / study-buddy feature ships:
+      - ADR defines therapy-territory boundary (no mental health
+        claims, no emotional avatar states, no fire/celebration copy)
+      - F5 spec revised: neutral icon, rule-based navigation only,
+        no emotional language
+      - Legal + PPA review of companion pattern for minors
+      ## Files
+      - docs/adr/00NN-companion-bot-policy.md (new)
+      - pre-release-review/cena_cross_domain_feature_innovation.md (F5 revision)
+      ## Definition of Done
+      - ADR accepted
+      - Shipgate forbids 🔥 emoji and "you're on fire" in companion
+        and praise namespaces
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L98-L116]
+  - title: "Ban reward-inflation emoji (🔥, ⚡) in learning UI"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Shipgate scanner rejects 🔥 (U+1F525) and ⚡ (U+26A1) and "on
+      fire" / "fire streak" phrasing in any student-facing learning-
+      feedback locale namespace. Allowlist allowed only for literal
+      physics/chemistry content.
+      ## Files
+      - scripts/shipgate/banned.json
+      - scripts/shipgate/scan.mjs
+      ## Definition of Done
+      - Lint fails on banned unicode codepoints in non-content namespaces
+      - Allowlist requires justification per entry
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L88, L106, L172]
+  - title: "F7 Learning Energy Tracker: architectural scope lock + PPA review"
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Before F7 ships:
+      - Architecture: mood data stored in Redis session-scoped only;
+        cannot be queried across sessions; auto-purge on session end
+      - UI: no insight surfaced that reads as mental-health inference
+        (time-of-day / day-of-week correlations only, never mood
+        trends)
+      - No parent visibility
+      - Israeli PPA consultation documented
+      - Student-initiated full delete at any time
+      ## Files
+      - docs/adr/00NN-mood-data-scope.md (new)
+      - docs/privacy/mood-tracker-dpia.md (new)
+      ## Definition of Done
+      - ADR accepted; PPA sign-off recorded
+      - Architecture enforces scope
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L142-L161]
+  - title: "F2 breathing opener: confirm-before-route on mood tap"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F2 breathing opener mood tap: silent session-difficulty routing
+      replaced with explicit confirmation ("Want to warm up with
+      review problems? [Yes/No]") after low-mood tap.
+      ## Files
+      - src/student-web/src/features/focus-ritual/*
+      ## Definition of Done
+      - No difficulty adjustment without explicit Yes
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L40, L44]
+  - title: "Journey path: no animation, no sound, pause-friendly copy"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F3 Learning Journeys: static visual path (no character
+      animation), no sound effects on step completion, explicit
+      "no-pressure pause" copy visible.
+      ## Files
+      - src/student-web/src/features/journeys/*
+      - src/student-web/src/locales/*.json
+      ## Definition of Done
+      - No CSS/motion animation on journey path
+      - Pause messaging present and tested
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L62-L66]
+  - title: "Session type menu: rename 'Challenge Round'"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F8 Session Type Menu rename "⚡ Challenge Round" to "Stretch
+      Session" or equivalent; remove lightning emoji.
+      ## Files
+      - src/student-web/src/features/session-menu/*
+      - src/student-web/src/locales/*.json
+      ## Definition of Done
+      - No competitive/arena framing in session types
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L172]
+verdict: revise
+verdict_reason: |
+  Cross-domain inspiration is risky by nature — patterns that work
+  in gambling / social / wellness apps become dark when applied to
+  minor-education. Author self-screens well but several borderline
+  features need stronger guardrails (F5, F7) or copy/framing fixes
+  (F2, F3, F4, F6, F8). F1 ships clean.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: "F4 flow-theory claims (Tetris research) for math learning"
+  - to: persona-privacy
+    about: "F7 mood data architectural scope lock + DPIA"
+  - to: persona-a11y
+    about: "F3 animated character path motion-reduction compliance"
+  - to: persona-redteam
+    about: "F6 Discord-style anonymous posting moderation edge cases"

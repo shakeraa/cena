@@ -1,0 +1,81 @@
+# Bagrut Math 5 Units — Arabic-instruction stream (המגזר הערבי).
+# ADR-0050 Q1 + PRR-239: authored against Arab-stream שאלונים (corpus PRR-242).
+# Separate exam_code and item pool; shared topic taxonomy with Hebrew 5U.
+
+exam_code: BAGRUT_MATH_5U_ARAB_STREAM
+family: BAGRUT
+track: "5U"
+units: 5
+region: IL-Bagrut-Arabic
+regulator: ministry_of_education
+ministry_subject_code: "035"
+ministry_question_paper_codes:
+  - "035581"
+  - "035582"
+  - "035583"
+availability: launch
+item_bank_status: full
+passback_eligible: true
+default_lead_days: 180
+sittings:
+  - code: TASHPA_SUMMER_A
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: A
+    canonical_date: "2026-06-15"
+  - code: TASHPA_SUMMER_B
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: B
+    canonical_date: "2026-07-20"
+display:
+  en:
+    name: "Bagrut Math (5 units, Arab stream)"
+    short_description: "Israeli Bagrut mathematics, five-unit track, Arabic-instruction."
+  he:
+    name: "בגרות במתמטיקה (5 יחידות, המגזר הערבי)"
+    short_description: "בגרות מתמטיקה, 5 יחידות, המגזר הערבי."
+  ar:
+    name: "بجروت الرياضيات (5 وحدات، التعليم العربي)"
+    short_description: "بجروت الرياضيات، 5 وحدات، التعليم باللغة العربية."
+topics:
+  - topic_id: algebra.quadratics
+    display:
+      en: "Quadratic equations"
+      he: "משוואות ריבועיות"
+      ar: "المعادلات التربيعية"
+  - topic_id: algebra.sequences
+    display:
+      en: "Sequences and series"
+      he: "סדרות וטורים"
+      ar: "المتتاليات والمتسلسلات"
+  - topic_id: geometry.analytic
+    display:
+      en: "Analytic geometry"
+      he: "גיאומטריה אנליטית"
+      ar: "الهندسة التحليلية"
+  - topic_id: calculus.derivatives
+    display:
+      en: "Differential calculus"
+      he: "חשבון דיפרנציאלי"
+      ar: "حساب التفاضل"
+  - topic_id: calculus.integrals
+    display:
+      en: "Integral calculus"
+      he: "חשבון אינטגרלי"
+      ar: "حساب التكامل"
+  - topic_id: combinatorics
+    display:
+      en: "Combinatorics and probability"
+      he: "קומבינטוריקה והסתברות"
+      ar: "التوافيق والاحتمالات"
+  - topic_id: trigonometry
+    display:
+      en: "Trigonometry"
+      he: "טריגונומטריה"
+      ar: "علم المثلثات"
+  - topic_id: vectors
+    display:
+      en: "Vectors"
+      he: "וקטורים"
+      ar: "المتجهات"

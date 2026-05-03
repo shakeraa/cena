@@ -1,0 +1,15 @@
+{{- if .Values.actors.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "cena.fullname" . }}-actors
+  labels:
+    {{- include "cena.componentLabels" (dict "root" . "component" "actors") | nindent 4 }}
+spec:
+  # RDY-025: Cluster membership stability — at least N-1 pods must stay up
+  # during voluntary disruption (node drain, rolling update).
+  minAvailable: {{ .Values.actors.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "cena.selectorLabels" (dict "root" . "component" "actors") | nindent 6 }}
+{{- end }}

@@ -1,0 +1,225 @@
+doc_path: pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md
+reviewer: persona-ministry
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight content-authoring features: Bayesian IRT small-sample correction,
+  SymPy CAS-gated variation engine, Bagrut-aligned partial credit rubric,
+  Arabic RTL math renderer, culturally-contextualized problem generator,
+  mother-tongue hint system, self-efficacy-calibrated difficulty, hybrid
+  Elo+expert calibration. Ministry lens: this axis IS my lens — content
+  authoring is where Ministry syllabus + Bagrut scoring + reference-only
+  rules meet code. Every feature here is ministry-critical.
+system_purpose_fit: 5
+  rationale:
+    - F2 CAS-Gated Problem Variation Engine is the engine that makes
+      ADR-0002 + ADR-0032 + non-negotiable #4 ship at scale.
+    - F3 Bagrut-Aligned Partial Credit Rubric Engine is the single most
+      Ministry-defensibility-positive feature in the entire 15-doc
+      corpus — Ministry-published rules as code.
+    - F4 Arabic RTL Math Renderer is the bidi correctness precondition
+      for Arabic-cohort Bagrut prep.
+    - F5 Culturally-Contextualized Problem Generator uses AI-recreated
+      items (fine); Dr. Rami rightly flagged the ES=1.16 claim
+      (FD-011 REJECT). Ministry-lens adopts the feature but with the
+      revised effect-size claim.
+code_reality_check:
+  claims_verified_in_code:
+    - 'CAS gate + SymPy oracle landed: src/actors/Cena.Actors/Cas/, ADR-0002, ADR-0032'
+    - 'Bagrut recreation aggregate landed: src/actors/Cena.Actors/Content/BagrutRecreation.cs (RDY-072 Phase 1A per that file''s header)'
+    - 'Reference-calibrated generation service exists: src/api/Cena.Admin.Api/Content/ReferenceCalibratedGenerationService.cs'
+    - 'Arabic math lexicon + translation gap tracking: docs/content/arabic-math-lexicon.md, translation-gap-2026-04-19.md'
+    - 'Bagrut taxonomy + sign-off workflow: scripts/bagrut-taxonomy.json, docs/curriculum/bagrut-taxonomy-review.md'
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - 'F3 rubric engine — does not yet exist in code; this is a genuine greenfield feature (AXIS_6 F3 is the same feature)'
+    - 'F1 Bayesian IRT small-sample — not found in code; genuine new build'
+adr_alignment:
+  honored:
+    - 'ADR-0002 (F2 CAS-gated variation engine enforces it at generation time)'
+    - 'ADR-0032 (F2 flows through CasGatedQuestionPersister per §16.1 single-writer invariant)'
+    - 'Non-negotiable #4 (F5 cultural generator produces AI-recreated items, not raw Ministry text)'
+    - 'Non-negotiable #6 (F4 RTL renderer preserves math-inside-LTR via bdi)'
+  violated: []
+  missing_adr_needed:
+    - 'Rubric DSL ADR (covers F3 Bagrut partial credit) — see AXIS_6 task'
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 5 "Culturally-Contextualized Problem Generator" claims ES
+      1.16 (Zayyadi et al. 2024 meta-analysis). Dr. Rami rejected this
+      (FD-011) as an extreme upper-tail statistic. Ministry-lens: the
+      feature is defensible (AI-recreated items with cultural wrappers,
+      CAS-gated) but the claim is not. Revise to representative ES
+      0.4-0.6 per Brummair & Richter 2019 before any pitch deck.
+    evidence: 'AXIS_8_Content_Authoring_Quality_Research.md:L200, L388 (ES 1.16 claim); pre-release-review/finding_assessment_dr_rami.md:L27 (FD-011 REJECT)'
+    lens_note: |
+      Ministry lens: pitching inflated effect sizes at schools = trust
+      burn when a teacher Googles the meta-analysis.
+  - severity: P1
+    finding: |
+      Feature 3 Bagrut-Aligned Partial Credit Rubric Engine is flagged
+      SHIP (correctly) but doc does not make clear that the rubric DSL
+      must track Ministry-published rubric versions across exam years.
+      Ministry scoring rules evolve slowly but they evolve — the DSL
+      needs a version field tied to the Ministry-publication year, and
+      admin surfaces for per-track sign-off (parallel to bagrut-
+      taxonomy-review.md).
+    evidence: 'AXIS_8_Content_Authoring_Quality_Research.md:L104-L143 (F3 section); docs/curriculum/bagrut-taxonomy-review.md (template for sign-off doc pattern)'
+    lens_note: |
+      Ministry lens: a rubric frozen at v1.0.0 forever is a latent
+      defect; they change, and we must track it.
+  - severity: P1
+    finding: |
+      Feature 5 "culturally contextualized" scenarios must be community-
+      reviewed to avoid stereotyping (doc L228 notes this). From a
+      Ministry-lens, we need a paper trail: every cultural-wrapper
+      template should carry an explicit reviewer record (Arab educator
+      name, Ethiopian educator name, etc) — parallel to the taxonomy
+      review sign-off. Otherwise a parent complaint about a stereotype
+      has no auditable paper trail.
+    evidence: 'AXIS_8_Content_Authoring_Quality_Research.md:L222-L229 (cultural review mentioned but no sign-off pattern)'
+    lens_note: |
+      Ministry lens: stereotyping complaints reach Ministry inspectors.
+      We need records of who approved what, by track + context.
+  - severity: P2
+    finding: |
+      Feature 4 Arabic RTL Math Renderer is correctly SHIP but doc does
+      not note the existing non-negotiable #6 (math always LTR inside
+      RTL via bdi). This is already a rule; F4 is gap-closure, not
+      greenfield. Frame accordingly.
+    evidence: 'AXIS_8_Content_Authoring_Quality_Research.md:L146-L187 (F4 section); CLAUDE.md (non-negotiable #6); memory:feedback_math_always_ltr.md'
+    lens_note: |
+      Ministry lens: correct framing prevents re-litigating a rule
+      already locked.
+  - severity: P2
+    finding: |
+      Feature 8 "Hybrid Difficulty Calibration (Elo + Expert)" requires
+      Arab-cohort math teachers as raters (L353). Ministry-lens: this
+      is good (expert sign-off), but needs integration with the
+      bagrut-taxonomy sign-off flow — one curriculum expert, multiple
+      sign-off artefacts, one version-controlled trail.
+    evidence: 'AXIS_8_Content_Authoring_Quality_Research.md:L353; docs/curriculum/bagrut-taxonomy-review.md'
+    lens_note: |
+      Ministry lens: consolidate expert-review artefacts for a single
+      auditable trail.
+already_built:
+  - feature: CAS-gated question ingestion
+    evidence: docs/adr/0032-cas-gated-question-ingestion.md + src/actors/Cena.Actors/Cas/
+    note: |
+      F2 variation engine rides the existing gate — the ICasGatedQuestionPersister
+      single-writer invariant (§16.1) is the right place for generation output.
+  - feature: Bagrut recreation pipeline (Phase 1A)
+    evidence: src/actors/Cena.Actors/Content/BagrutRecreation.cs (RDY-072)
+    note: |
+      F5 cultural-wrapper generator should sit on top of the
+      BagrutRecreation aggregate + workflow state machine, not greenfield.
+  - feature: Reference-calibrated generation service
+    evidence: src/api/Cena.Admin.Api/Content/ReferenceCalibratedGenerationService.cs
+    note: |
+      F5 cultural contextualization is a wrapping layer on this existing
+      service.
+  - feature: Bagrut-taxonomy sign-off workflow template
+    evidence: docs/curriculum/bagrut-taxonomy-review.md
+    note: |
+      F3 rubric sign-off and F5 cultural-review sign-off should adopt
+      this pattern.
+duplicates_of_other_docs:
+  - 'AXIS_6_Assessment_Feedback_Research.md: F3 partial credit rubric = AXIS_8 F3 (same feature)'
+  - 'axis3_accessibility_accommodations_findings.md: F7 Arabic RTL renderer = AXIS_8 F4'
+  - 'feature-discovery-2026-04-20.md: FD-002 (F2), FD-010 (F4), FD-011 (F5), FD-012 (F1), FD-013 (F6), FD-020 (F3) — canonical index entries'
+extracted_tasks:
+  - title: Add rubric version field + per-track sign-off artefact for F3 Bagrut rubric DSL
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Augment F3 Bagrut partial-credit rubric DSL spec with:
+      (a) a `ministry_version` field per rule (e.g. "2024", "2025")
+      tracking which Ministry rubric publication the rule reflects;
+      (b) a sign-off doc per track (docs/curriculum/bagrut-rubric-3u-
+      review.md, -4u-, -5u-) mirroring bagrut-taxonomy-review.md.
+
+      ## Files
+      - config/rubrics/bagrut-5u.yaml (add ministry_version)
+      - docs/curriculum/bagrut-rubric-3u-review.md (new)
+      - docs/curriculum/bagrut-rubric-4u-review.md (new)
+      - docs/curriculum/bagrut-rubric-5u-review.md (new)
+
+      ## Definition of Done
+      - YAML schema includes ministry_version per-rule and per-track
+      - Sign-off docs mirror bagrut-taxonomy-review.md template
+      - Architecture test: every RubricRuleVersion event has a
+        ministry_version field
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L104-L143]
+  - title: Cultural-context sign-off workflow for F5 problem generator
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Add a cultural-wrapper review sign-off doc that names the
+      reviewer (Arab, Ethiopian, Russian educator per cohort), context
+      reviewed, and approval SHA. Mirrors bagrut-taxonomy-review.md
+      pattern.
+
+      ## Files
+      - docs/curriculum/cultural-context-review.md (new)
+      - config/contexts/arab-cohort-templates.yaml (new — or wherever
+        templates live in code; check first)
+      - Schema: ContextTemplate requires approved_by + approved_sha
+
+      ## Definition of Done
+      - Sign-off doc written, tracks per-cohort reviewer record
+      - Architecture test: ContextTemplate without approval fails build
+      - RDY-072 BagrutRecreation workflow extended to require cultural
+        sign-off where a cultural wrapper is applied
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L222-L229]
+  - title: Revise F5 effect-size claim from 1.16 to representative 0.4-0.6
+    priority: P2
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Replace the ES=1.16 meta-analytic claim in F5 with a
+      representative ES 0.4-0.6 per Brummair & Richter 2019. Per Dr.
+      Rami''s FD-011 REJECT. Prevents overclaiming to school buyers.
+
+      ## Files
+      - pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md
+        (L200, L388)
+
+      ## Definition of Done
+      - Doc edited, citation anchor updated
+      - Change noted in a dated changelog entry at doc foot
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L200, L388]
+verdict: adopt
+verdict_reason: |
+  Highest-Ministry-fit axis. All eight features are defensible with the
+  rubric-versioning + cultural-sign-off paper trail + ES-claim revision
+  on F5. F2 is already partially built; frame as extension.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: |
+      F5 ES=1.16 claim (Dr. Rami FD-011), F1 Bayesian IRT 84% claim
+      (FD-012 Koenig misattribution) — cogsci is canonical for
+      evidence audits.
+  - to: persona-a11y
+    about: |
+      F4 Arabic RTL math notation specifics (Arabic-Indic numerals,
+      mirrored symbols, per-country profile) — a11y/bidi lens owns
+      these.
+  - to: persona-privacy
+    about: |
+      F7 "self-efficacy" behavioral signals — privacy lens for whether
+      those signals become a psych profile.

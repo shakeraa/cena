@@ -1,0 +1,163 @@
+doc_path: pre-release-review/feature-discovery-2026-04-20.md
+reviewer: persona-sre
+reviewed_at: 2026-04-20
+doc_summary: |
+  Mega-index of 55 deduped findings across 10 axes (97 raw) with SHIP / SHORTLIST / DEFER / REJECT verdicts,
+  cross-examined by Dr Rami (statistics) and Dr Nadia (pedagogy). Doubles as the canonical merge point for axis docs.
+  SRE-relevant meta-features: offline/sync, Mashov sync, Google SSO, classroom passback, crisis-mode, misconception Redis TTL.
+system_purpose_fit: 4
+  rationale:
+    - Respects non-negotiables 1-3 (CAS oracle, 30-day scope, no dark patterns) in most SHIP-tagged items.
+    - Quick-wins list mixes truly quick (SSO) with infrastructure-heavy features (offline-first sync) without SRE cost breakout.
+    - Doc does not specify SLOs, rollback posture, or runbook ownership for a single feature; that is a gap every axis inherits.
+code_reality_check:
+  claims_verified_in_code:
+    - "Deploy runbook + schema-assert health checks + migrator job exist -> docs/operations/deploy-runbook.md:1; deploy/observability/alerting-rules.yaml:1; deploy/helm/cena/templates/migrator-job.yaml"
+    - "CAS gate is the oracle (ADR-0002 honored) -> docs/adr/0002-sympy-correctness-oracle.md"
+    - "CI has chaos + load harnesses for CAS -> .github/workflows/cas-chaos-nightly.yml, cas-load-nightly.yml, e2e-load-nightly.yml"
+    - "Existing runbooks for OCR sidecar, stuck-classifier, error-aggregator -> docs/ops/runbooks/*.md"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Redis-only misconception TTL architecture (FD-003) -> no Redis deployment manifest was found under deploy/helm/cena/templates/ — needs infrastructure ADR + runbook before SHIP"
+    - "Offline-first Service Worker + IndexedDB sync queue (FD) -> no production SW bundle referenced in deploy manifests"
+    - "Mashov credential encryption at rest + rotation -> no secrets/Vault manifest cited in doc or visible in helm chart"
+adr_alignment:
+  honored:
+    - ADR-0002 (CAS oracle)
+    - ADR-0003 (session-scoped misconceptions, 30-day)
+    - ADR-0001 (multi-institute tenancy — not violated, but not referenced)
+  violated: []
+  missing_adr_needed:
+    - "Redis misconception store lifecycle (eviction policy, TLS, tenant keyspace isolation)"
+    - "Offline sync conflict + replay semantics (idempotency keys, LWW vs CRDT)"
+    - "Third-party integration failure policy (Mashov unofficial API, Google Classroom, Twilio, Firebase)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Doc lists FD-003 Real-Time Misconception Tagging as SHIP but has no SLO, no Redis deployment plan, and no runbook for the case
+      where the session-scoped store is lost (Redis restart, failover). ADR-0003 requires 30-day scope — a silent persistence bug
+      would be an undetectable privacy breach. Need "misconception store health" alert before feature ships.
+    evidence: feature-discovery-2026-04-20.md:118-143; deploy/helm/cena/templates/ (no redis-* file)
+    lens_note: Any data-retention non-negotiable without a health check is an auto-P0 from an incident-commander view.
+  - severity: P0
+    finding: |
+      FD-003's claimed 95.4% misconception resolution is flagged as fabricated by Dr Rami (finding_assessment_dr_rami.md:REJECT).
+      Shipping a feature on fabricated outcome data creates a marketing-to-reality gap that will surface as an incident on day 1
+      of the exam-day spike. Retire the headline number before any runbook work.
+    evidence: feature-discovery-2026-04-20.md:126; finding_assessment_dr_rami.md:L13
+    lens_note: Honesty of stated SLOs/outcomes is the first SRE gate before runbook design.
+  - severity: P1
+    finding: |
+      FD-019 Mashov Gradebook Sync relies on an UNOFFICIAL API. The doc acknowledges this but treats it as "build defensively".
+      Without circuit-breaker + synthetic-probe + clear degradation path on the teacher dashboard, Mashov downtime on exam-morning
+      will be perceived as Cena downtime. Need SLO + fallback-UI runbook before SHIP.
+    evidence: feature-discovery-2026-04-20.md:L637 (FD-019 reference); AXIS_10_Operational_Integration_Features.md:L100-L128
+    lens_note: Third-party availability risk shifts to Cena's on-call unless we mark last-sync timestamp clearly in UI.
+  - severity: P1
+    finding: |
+      Quick-wins list bundles "Offline-First Practice Mode" (L, 6-8 wks, Service Workers + IndexedDB + sync) next to Google SSO (S).
+      This mis-sized bundle drives under-resourced estimates. Service Worker caching of Hebrew/Arabic fonts + RTL CSS + idempotency
+      + LWW tiebreakers = multiple weeks of ops + QA. Flag as its own ADR.
+    evidence: feature-discovery-2026-04-20.md:L19
+    lens_note: Offline-first sync is classic "looks cheap, becomes a long tail of data-loss bugs".
+  - severity: P1
+    finding: |
+      Crisis Mode (FD-007 / FD-021) implies an exam-day traffic spike (student load + parent load) but the doc does not reference
+      any capacity plan. Existing CI has cas-load-nightly but no documented peak-hour SLO (e.g. "sessions/sec at 99p < 250ms").
+    evidence: feature-discovery-2026-04-20.md:L649 (FD-021); .github/workflows/cas-load-nightly.yml
+    lens_note: Bagrut week is our Black Friday; SLOs must be declared pre-release, not learned post-incident.
+  - severity: P2
+    finding: |
+      Many SHIP items call for new LLM calls (FD-007 explain, FD-009 Socratic, FD-017 parent XAI, FD-026 conference prep) without
+      explicit ADR-026 tier routing. Each silent default to Sonnet/Opus is a cost+latency surprise.
+    evidence: feature-discovery-2026-04-20.md:L300 (FD-009); L527 (FD-017); CLAUDE.md (ADR-026 routing)
+    lens_note: Model routing is observable only if we mandate tier tags in request logs.
+already_built:
+  - feature: Deploy runbook + schema-assert health check + migrator job
+    evidence: docs/operations/deploy-runbook.md; deploy/helm/cena/templates/migrator-job.yaml
+    note: Operational baseline exists — do not re-propose.
+  - feature: CAS nightly + chaos + load CI gates
+    evidence: .github/workflows/cas-nightly.yml, cas-chaos-nightly.yml, cas-load-nightly.yml
+    note: Existing harness should be the acceptance gate for any CAS-adjacent feature.
+  - feature: OCR sidecar + stuck classifier + error aggregator runbooks
+    evidence: docs/ops/runbooks/ocr-sidecar-runbook.md; stuck-classifier-degraded.md; error-aggregator-degraded.md
+    note: Template for all new-feature runbooks.
+duplicates_of_other_docs:
+  - "axis1-axis10 axis docs duplicate findings — the index is canonical."
+  - "cena_dr_nadia_pedagogical_review_20_findings.md: pedagogy re-review of same items."
+  - "finding_assessment_dr_rami.md: statistical honesty re-review; PASS/REJECT column should drive SHIP status."
+extracted_tasks:
+  - title: Declare exam-day SLO and load-budget per host (student, admin, actors)
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Publish SLOs (availability, p99 latency, error rate) and an exam-week peak-capacity model (sessions/sec, CAS calls/sec,
+      SignalR fan-out), then wire them into deploy/observability/alerting-rules.yaml and a pre-exam runbook.
+      ## Files
+      deploy/observability/alerting-rules.yaml
+      docs/operations/deploy-runbook.md
+      docs/ops/runbooks/ (new: exam-day-capacity.md)
+      .github/workflows/cas-load-nightly.yml (tighten thresholds)
+      docs/engineering/shipgate.md (add exam-day SLO gate)
+      ## Definition of Done
+      - SLO numbers merged and referenced from at least one alert
+      - Load-test floor >= stated peak x 1.5 for a 60-min run
+      - Runbook entry "exam-morning spike" with rollback ladder
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch:sre/exam-day-slo"
+    source_doc_lines: [L19, L649]
+  - title: Add Redis session-store health + eviction alerts for misconception scope
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Before FD-003 real-time misconception tagging ships, provision the Redis tier with TLS + per-tenant keyspace,
+      30-day hard TTL verified by a probe, and alerts on eviction-policy violations.
+      ## Files
+      deploy/helm/cena/templates/ (new: redis-statefulset.yaml, redis-service.yaml)
+      deploy/observability/alerting-rules.yaml
+      docs/ops/runbooks/ (new: misconception-store.md)
+      ## Definition of Done
+      - Probe that writes key, advances clock, confirms auto-purge
+      - Alert fires on any key >31 days
+      - Helm values for TLS + AUTH
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/redis-misconception"
+    source_doc_lines: [L118-L143]
+  - title: Add Mashov sync circuit-breaker + synthetic probe + UI staleness badge
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Mashov API is unofficial; treat it as a flaky dependency. Add a synthetic probe, a circuit-breaker with
+      exponential backoff, and a visible staleness indicator on the teacher dashboard when last-sync > 24h.
+      ## Files
+      src/api/Cena.Admin.Api/ (new MashovSyncWorker)
+      src/admin/full-version/src/components/ (last-sync badge)
+      deploy/observability/alerting-rules.yaml
+      docs/ops/runbooks/ (new: mashov-sync-degraded.md)
+      ## Definition of Done
+      - Probe alert on 3 consecutive failures
+      - UI badge flips to "last synced <time>" on stale
+      - Credentials AES-256 at rest, redacted in logs
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/mashov-sync"
+    source_doc_lines: []
+verdict: revise
+verdict_reason: |
+  Index is valuable but must strip Dr-Rami-rejected outcome claims and add SRE gates (SLO, runbook, rollback) to every SHIP item
+  before it drives queue work.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: ADR-0003 Redis-only architecture for FD-003 — verify legal scoping + audit plan.
+  - to: persona-finops
+    about: Silent LLM usage across FD-007/FD-009/FD-017 — enforce ADR-026 tier routing in request logs.
+  - to: persona-redteam
+    about: Google SSO scope-creep (only openid email profile) and Mashov credential storage threat model.
+  - to: persona-enterprise
+    about: Offline-first sync conflict semantics (LWW vs CRDT) vs event-sourced aggregate consistency.

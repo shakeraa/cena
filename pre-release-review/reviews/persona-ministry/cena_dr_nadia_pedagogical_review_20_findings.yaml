@@ -1,0 +1,144 @@
+doc_path: pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md
+reviewer: persona-ministry
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr. Nadia''s pedagogical review of the 20 SHIP-recommended findings
+  (FD-001 through FD-020 from feature-discovery). 17 PASS, 3 WARNING
+  (FD-009, FD-014, FD-016), 0 REJECT. Cross-examines Rami''s assessment
+  from a pedagogical angle. Ministry lens: Dr. Nadia''s verdicts mostly
+  concern pedagogy soundness; Ministry lens overlays syllabus/ reference-
+  only/ prediction-risk filters.
+system_purpose_fit: 4
+  rationale:
+    - Dr. Nadia repeatedly flags "Bagrut-Specific Fit" per finding, so
+      Ministry-lens is already implicitly served.
+    - FD-003 (misconception) PASS with ADR-0003 caveat — consistent
+      with Ministry lens need for architecture-test enforcement.
+    - FD-004 (IRT-CAT) PASS — Ministry lens requires the RDY-080
+      reframing on UI copy, not pedagogy call.
+    - FD-020 (Bagrut Rubric Engine) PASS with "none significant" —
+      Ministry lens adds rubric-version tracking + per-track sign-off
+      as a P1.
+    - FD-011 (Cultural Generator) PASS from Dr. Nadia but Dr. Rami
+      REJECT on ES=1.16 — Ministry lens agrees with Rami on the claim,
+      with Nadia on the feature.
+code_reality_check:
+  claims_verified_in_code:
+    - 'Most features already covered in the axis reviews — Dr. Nadia''s doc is meta-review, not new feature proposals'
+  claims_contradicted_by_code: []
+  claims_unverifiable: []
+adr_alignment:
+  honored:
+    - 'ADR-0003 flagged per-finding by Dr. Nadia (e.g. FD-003 "ADR-0003 compliance is non-negotiable")'
+    - 'ADR-0002 flagged per-finding where relevant (FD-002)'
+  violated: []
+  missing_adr_needed:
+    - 'None new; Dr. Nadia''s review strengthens the case for ADRs already identified in other axes'
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Dr. Nadia passes FD-004 IRT-CAT with "XL effort; ensure Bayesian
+      small-sample correction paired with FD-012". Ministry lens adds:
+      the theta output must not be rendered as a Bagrut-readiness
+      score at any surface. Both concerns stack.
+    evidence: 'cena_dr_nadia_pedagogical_review_20_findings.md:L696; docs/adr/0034-syllabus-advancement-model.md (advancement model)'
+    lens_note: |
+      Ministry lens: agree with Dr. Nadia''s pedagogy call; add the
+      RDY-080 UI-copy enforcement layer.
+  - severity: P1
+    finding: |
+      Dr. Nadia passes FD-020 Bagrut Rubric Engine with "none
+      significant". Ministry-lens disagrees mildly: rubric DSL must
+      carry a ministry_version field per rule and be signed off per
+      track (3U/4U/5U) — not "none significant". See AXIS_8 review
+      task for this.
+    evidence: 'cena_dr_nadia_pedagogical_review_20_findings.md:L712 (FD-020 row)'
+    lens_note: |
+      Ministry lens: rubrics change. Version-track them or ship a
+      latent defect.
+  - severity: P1
+    finding: |
+      Dr. Nadia passes FD-011 Cultural Generator with "stereotyping
+      risk; require community review board". Dr. Rami REJECT on
+      ES=1.16 cherry-pick. Ministry-lens: keep feature (Nadia), revise
+      claim (Rami), add cultural-review sign-off doc (AXIS_8 task).
+    evidence: 'cena_dr_nadia_pedagogical_review_20_findings.md:L703; pre-release-review/finding_assessment_dr_rami.md:L27'
+    lens_note: |
+      Ministry lens: reconciled verdict = SHIP-with-revised-claim-and-
+      sign-off.
+  - severity: P2
+    finding: |
+      Dr. Nadia passes FD-007 Crisis Mode with "Avoid implying Bagrut
+      score prediction". Ministry-lens agrees strongly — this is the
+      exact RDY-080 compliance line. See AXIS_4 task (Crisis Mode
+      countdown reframing).
+    evidence: 'cena_dr_nadia_pedagogical_review_20_findings.md:L699'
+    lens_note: |
+      Ministry lens: full alignment with Dr. Nadia here.
+  - severity: P2
+    finding: |
+      Dr. Nadia flags FD-009 Socratic Tutor WARNING ("friction for
+      time-pressured Bagrut students; needs escape hatch"). Ministry-
+      lens adds: the escape hatch must not drop students off-syllabus.
+      Escape returns to a syllabus-valid alternative.
+    evidence: 'cena_dr_nadia_pedagogical_review_20_findings.md:L701'
+    lens_note: |
+      Ministry lens: good pedagogical call; strengthen the constraint.
+  - severity: P2
+    finding: |
+      Dr. Nadia''s verdict table does not cover findings FD-021+. This
+      is a finite-scope doc. Ministry lens notes no gap in the
+      reviewed 20 — all lens-relevant findings got a Nadia pass.
+    evidence: 'cena_dr_nadia_pedagogical_review_20_findings.md:L714 (totals)'
+    lens_note: |
+      Ministry lens: doc is bounded to 20; fine.
+already_built:
+  - feature: N/A — this is a review doc, not a feature proposal
+    evidence: Doc content is verdict table + rationales
+    note: |
+      No already-built items to retire from this doc. Instead, use it
+      as corroborating evidence for axis reviews.
+duplicates_of_other_docs:
+  - 'feature-discovery-2026-04-20.md: Dr. Nadia''s doc reviews all 20 FDs — fully redundant with the index; treat Nadia''s as a critique layer'
+extracted_tasks:
+  - title: Reconcile Nadia vs Rami verdicts on FD-011 (Cultural Generator ES)
+    priority: P2
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Produce a single reconciled verdict for FD-011 Culturally
+      Contextualized Problem Generator: SHIP (Nadia) with REVISED
+      effect-size claim (Rami). Document this reconciliation so
+      downstream readers don''t see conflicting signals.
+
+      ## Files
+      - pre-release-review/reviews/conflicts.md (synthesizer-owned;
+        this task records the persona-ministry position)
+
+      ## Definition of Done
+      - Position recorded: SHIP with ES 0.4-0.6 per Brummair & Richter
+        2019; no ES=1.16 claim in any surface
+      - Cross-reference to AXIS_8 F5 task (revise claim) and
+        AXIS_8 cultural-sign-off task
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L703]
+verdict: adopt
+verdict_reason: |
+  Dr. Nadia''s doc is a critique layer that largely confirms the axis-
+  lens findings. Ministry lens overlay adds only (a) RDY-080 UI-copy
+  enforcement (FD-004, FD-007), (b) rubric versioning (FD-020),
+  (c) Nadia/Rami reconciliation on FD-011.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: |
+      Dr. Nadia is effectively the cogsci-lens voice; cogsci persona
+      should cross-check her verdicts against evidence-integrity
+      lens.
+  - to: persona-educator
+    about: |
+      Dr. Nadia speaks the educator lens directly — educator persona
+      should agree or dispute verdict-by-verdict.

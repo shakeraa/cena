@@ -1,0 +1,166 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Cena Platform deployment health: migrator job, student host, admin host",
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Migrator Job Status",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "kube_job_status_succeeded{job_name=~\".*-migrator.*\"}",
+          "legendFormat": "Succeeded"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "text": "PENDING", "color": "yellow" } }, "type": "value" },
+            { "options": { "1": { "text": "OK", "color": "green" } }, "type": "value" }
+          ],
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Migrator Job Duration (last 24h)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "expr": "kube_job_status_completion_time{job_name=~\".*-migrator.*\"} - kube_job_status_start_time{job_name=~\".*-migrator.*\"}",
+          "legendFormat": "Duration (s)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "title": "Migrator Failure Rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "expr": "kube_job_status_failed{job_name=~\".*-migrator.*\"}",
+          "legendFormat": "Failed"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Time from Migrator Success to First Host Ready",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "description": "Measures how long after migrator completion the first student pod becomes ready",
+      "targets": [
+        {
+          "expr": "min(kube_pod_status_ready_time{pod=~\".*-student.*\"}) - max(kube_job_status_completion_time{job_name=~\".*-migrator.*\"})",
+          "legendFormat": "Gap (s)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "title": "Student Readiness Probe Pass/Fail",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(kube_pod_container_status_ready{container=\"student\"}) by (pod)",
+          "legendFormat": "{{ pod }} ready"
+        }
+      ]
+    },
+    {
+      "title": "Admin Readiness Probe Pass/Fail",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(kube_pod_container_status_ready{container=\"admin\"}) by (pod)",
+          "legendFormat": "{{ pod }} ready"
+        }
+      ]
+    },
+    {
+      "title": "Schema Assert Error Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "description": "Non-zero values indicate AssertDatabaseMatchesConfiguration failures on host startup",
+      "targets": [
+        {
+          "expr": "sum(rate(aspnetcore_healthcheck_status{name=\"schema_assert\", status=\"Unhealthy\"}[5m])) by (app)",
+          "legendFormat": "{{ app }} schema errors/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.01 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Pod Restart Count (CrashLoopBackOff detector)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum(kube_pod_container_status_restarts_total{container=~\"student|admin|migrator\"}) by (container, pod)",
+          "legendFormat": "{{ container }}/{{ pod }}"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["cena", "deployment", "health"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Cena Deploy Health",
+  "uid": "cena-deploy-health",
+  "version": 1
+}

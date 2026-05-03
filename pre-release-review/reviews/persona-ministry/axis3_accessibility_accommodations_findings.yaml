@@ -1,0 +1,178 @@
+doc_path: pre-release-review/axis3_accessibility_accommodations_findings.md
+reviewer: persona-ministry
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight accessibility/accommodations features (dyscalculia subitizing trainer,
+  interactive number line, digital graph paper, ADHD session builder, color-
+  blind palette, MathML screen reader, Arabic RTL math renderer, anxiety-
+  reducing UI). Ministry lens: accommodations are directly Bagrut-relevant
+  because the Bagrut exam itself grants extended-time / TTS / graph-paper
+  accommodations to students with recognized diagnoses — what Cena offers
+  should parallel what the exam allows, so prep mirrors conditions.
+system_purpose_fit: 4
+  rationale:
+    - Accommodations parity with Bagrut exam accommodations is a legitimate
+      defensibility argument — a Ministry inspector auditing our platform
+      would expect TTS + extended time + MathML (Feature 6) to mirror the
+      exam''s permitted accommodations.
+    - RTL math renderer (F7) is non-negotiable for Arabic-medium Bagrut
+      prep — it is arguably already a shipped requirement (math-always-LTR
+      inside RTL per memory:feedback_math_always_ltr.md).
+    - Features 1–3 (subitizing, number line, graph paper) are pedagogically
+      valuable but below Bagrut grade level (foundational number sense).
+      They are remediation, not exam prep. Not wrong — just clearly label
+      scope so we don''t confuse a 3U/4U/5U track student.
+code_reality_check:
+  claims_verified_in_code:
+    - 'Math-inside-RTL bdi-dir-ltr pattern is load-bearing: CLAUDE.md + memory:feedback_math_always_ltr.md'
+    - 'Arabic math lexicon doc exists: docs/content/arabic-math-lexicon.md'
+    - 'Translation gap tracking: docs/content/translation-gap-2026-04-15.md and translation-gap-2026-04-19.md'
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - 'F6 MathML-native screen-reader pipeline — code paths not inspected here; likely partial at best'
+    - 'F5 color-blind palette — Vuexy primary #7367F0 is locked; any palette work must respect that (memory:project_primary_color_locked)'
+adr_alignment:
+  honored:
+    - 'Bidi math (F7) aligns with memory:feedback_math_always_ltr rule (non-negotiable #6)'
+    - 'Session-scoped accommodation preferences don''t accumulate psych profile (ADR-0003)'
+  violated: []
+  missing_adr_needed:
+    - 'Accommodations-parity ADR — an explicit statement that Cena''s runtime accommodation set is a superset of Ministry-recognized Bagrut exam accommodations (extended time, TTS, graph paper, enlarged print). Without this, inspectors cannot map our offering to theirs.'
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 7 "Arabic RTL Math Renderer with Direction Isolation" is
+      Ministry-critical for Arabic-medium Bagrut prep but doc frames it as
+      one of eight co-equal features. It is not. It is a shippable
+      precondition for serving the Arabic cohort at all. Elevate from
+      SHIP to "already-committed / must-have", and verify the existing
+      `<bdi dir="ltr">` pattern (non-negotiable #6) is honored everywhere
+      math renders, not just KaTeX components.
+    evidence: 'axis3_accessibility_accommodations_findings.md:L166 (SHIP verdict); CLAUDE.md (non-negotiable #6); memory:feedback_math_always_ltr.md'
+    lens_note: |
+      Ministry lens: Arabic-medium Bagrut is a Ministry-recognized track.
+      If our renderer doesn''t handle it correctly, we cannot claim
+      Arabic-cohort parity. Everything else is secondary.
+  - severity: P1
+    finding: |
+      Feature 6 "MathML-Native Screen Reader Pipeline" is the accommodation
+      most closely mirroring what the Ministry allows in Bagrut exams for
+      blind / low-vision students. Its SHORTLIST verdict understates its
+      Ministry defensibility value. Without MathML + SpokenMath, we cannot
+      credibly say we support the Bagrut accommodations framework.
+    evidence: 'axis3_accessibility_accommodations_findings.md:L167 (SHORTLIST)'
+    lens_note: |
+      Ministry lens: the accommodation list on the Ministry side is
+      codified. We must match it to be defensibly "Bagrut prep".
+  - severity: P2
+    finding: |
+      Features 1–3 (subitizing trainer, number line, graph paper) are
+      below Bagrut grade level. They are valid remediation but must not
+      be presented to a 5U student as "practice" — that would be a mis-
+      targeting with Ministry-lens visibility. The doc does not specify
+      how these features are gated by student grade/track/diagnosed
+      dyscalculia.
+    evidence: 'axis3_accessibility_accommodations_findings.md:L174-L180 (Feature 1 description); axis3_accessibility_accommodations_findings.md:L180 (claim: "these are prerequisites for Bagrut-level mathematics, yet most platforms skip them")'
+    lens_note: |
+      Ministry lens: remediation content must be clearly labeled as
+      remediation. Mixing it into main progression confuses inspectors.
+  - severity: P2
+    finding: |
+      Accommodation preferences (extended time, TTS, graph paper) touch
+      student-profile data. Must they persist? Yes — these are not
+      misconception data; they are student-provided accommodation settings
+      mirroring a Ministry-recognized diagnosis. ADR-0003 does not ban
+      this but the doc does not explicitly distinguish. Ministry lens
+      wants a clear policy: accommodations = durable profile setting;
+      misconceptions = session-scoped.
+    evidence: 'axis3_accessibility_accommodations_findings.md (across Features 4, 8); docs/adr/0003-misconception-session-scope.md'
+    lens_note: |
+      Ministry lens: inspectors expect accommodations to be durable and
+      auditable. That is not a misconception leak — the categories must
+      be kept distinct in storage + audit log.
+already_built:
+  - feature: Arabic math lexicon + translation gap tracking
+    evidence: docs/content/arabic-math-lexicon.md, docs/content/translation-gap-2026-04-19.md
+    note: |
+      The terminology base for F7 renderer localization already exists —
+      doc should extend not duplicate.
+  - feature: LTR-math-inside-RTL rule as non-negotiable
+    evidence: CLAUDE.md non-negotiable #6 + memory:feedback_math_always_ltr.md
+    note: |
+      F7 is partly "already a rule we ship"; proposal should focus on
+      gap-closure (all math surfaces verified), not greenfield.
+duplicates_of_other_docs:
+  - 'AXIS_8_Content_Authoring_Quality_Research.md: F4 Arabic RTL Math Renderer — same feature, two framings'
+  - 'feature-discovery-2026-04-20.md: FD-010 Arabic RTL Math Renderer — canonical index entry'
+  - 'feature-discovery-2026-04-20.md: FD-025 TTS with highlighting overlaps F6 MathML pipeline'
+extracted_tasks:
+  - title: Author accommodations-parity ADR (Ministry exam alignment)
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Write an ADR stating Cena''s runtime accommodations are a superset
+      of the Ministry-recognized Bagrut exam accommodations (extended
+      time, TTS, MathML, enlarged print, graph-paper overlay). This gives
+      school buyers and Ministry inspectors a mappable parity claim.
+
+      ## Files
+      - docs/adr/00XX-accommodations-parity-ministry.md (new)
+
+      ## Definition of Done
+      - ADR lists each Ministry-recognized accommodation and the Cena
+        feature that implements it
+      - ADR specifies which accommodations are durable profile settings
+        (extended time, TTS) vs session-scoped (focus ritual)
+      - Linked from docs/adr/README index
+      - Flagged "Proposed" pending Ministry-alignment expert sign-off
+        (same role as bagrut-taxonomy-review.md Amjad-designated reviewer)
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L166-L170]
+  - title: Audit all math surfaces for LTR-inside-RTL bdi usage
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Non-negotiable #6 (math always LTR inside RTL) was caught via user
+      spot-check (memory:feedback_math_always_ltr.md — reversed equation
+      bug). Need a repeatable audit that fails CI when a math surface is
+      rendered without `<bdi dir="ltr">`.
+
+      ## Files
+      - tests/a11y/math-bidi-scanner.ts (new) OR extend existing
+        docs/engineering/shipgate.md scanner
+      - Wire into .github/workflows/ existing shipgate job
+
+      ## Definition of Done
+      - Scanner walks all Vue components + KaTeX rendering sites
+      - Fails build on any `<MathRender>`-equivalent that lacks the
+        bdi wrapper under RTL locale
+      - Passes current main branch (regression-only)
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L~480-L540]
+verdict: adopt
+verdict_reason: |
+  Accommodations axis is Ministry-aligned by nature; just needs (a) an
+  ADR codifying parity and (b) elevation of F6 MathML + F7 RTL from
+  SHORTLIST/SHIP to "committed precondition". No guardrail violations.
+cross_lens_handoff:
+  - to: persona-a11y
+    about: |
+      WCAG 2.2 AA specifics, bidi implementation details — a11y lens
+      owns these calls.
+  - to: persona-privacy
+    about: |
+      Whether accommodation flags are durable profile data vs session-
+      scoped — privacy lens is canonical for the data-lifetime call.
+  - to: persona-enterprise
+    about: |
+      Accommodations as durable profile attributes: bounded-context
+      placement (StudentProfile vs Accessibility service).

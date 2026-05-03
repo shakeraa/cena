@@ -1,0 +1,33 @@
+# FIND-ux-029: CI check for student app build integrity (manifest icons, etc.)
+name: Student Build Checks
+
+on:
+  push:
+    paths:
+      - 'src/student/full-version/**'
+  pull_request:
+    paths:
+      - 'src/student/full-version/**'
+
+defaults:
+  run:
+    working-directory: src/student/full-version
+
+jobs:
+  build-integrity:
+    name: Build integrity tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: src/student/full-version/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run build integrity tests (manifest icons, etc.)
+        run: npx vitest run --config vitest.build.config.ts

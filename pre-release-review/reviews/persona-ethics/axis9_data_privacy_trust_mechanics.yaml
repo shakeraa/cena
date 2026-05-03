@@ -1,0 +1,164 @@
+doc_path: pre-release-review/axis9_data_privacy_trust_mechanics.md
+reviewer: persona-ethics
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 privacy/trust features (explainable AI recommendation,
+  student data transparency dashboard, delete-my-journey erasure,
+  consent-revocation UX, age-appropriate privacy copy, data provenance
+  trail, differential privacy analytics, transparency report). Axis 9 is
+  the privacy-lens twin of the ethics lens.
+system_purpose_fit: 5
+  rationale:
+    - Axis 9 is structurally ethics-aligned — it's the "trust" axis. Every
+      feature increases transparency, autonomy, and informed consent.
+    - F4 Consent-Revocation UX (L142-178) directly enforces "as easy to
+      withdraw as to give" — Cialdini-consent ethical baseline.
+    - F5 Age-Appropriate Privacy Copy passes the informed-student test
+      by design.
+    - No shipgate violations, no dark patterns, no banned mechanics.
+    - The ethics lens can REINFORCE these proposals as non-negotiable
+      infrastructure, not "nice to have."
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable: []
+adr_alignment:
+  honored:
+    - "ADR-0003 session-scoped misconception (repeatedly cited)"
+    - "DPA §7 no-ML-training-on-student-data"
+    - "GD-004 shipgate (F4 cites 'as-easy-to-withdraw' principle directly)"
+  violated: []
+  missing_adr_needed:
+    - "ADR formalizing the 'informed student' test as a design review
+      checkpoint for all future features"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F3 "Delete My Journey" (L103-138) proposes 72h response time with
+      a 24-hour cooling-off period (L123). Ethics concern: cooling-off
+      periods on data deletion requests are a known dark pattern even
+      when well-intended (FTC scrutinized this in FTC v. Epic). For
+      minors' data, a cooling-off period reverses the "as easy to
+      delete as to create" principle. Recommend:
+      (a) No cooling-off period on deletion — honored immediately on
+          confirmation
+      (b) Restoration allowed within 7 days post-deletion via
+          separate parental request (for under-16)
+      (c) Deletion certificate sent immediately, not "within 72 hours"
+    evidence: axis9_data_privacy_trust_mechanics.md:L123
+    lens_note: |
+      ICO 2025 erasure guidance: deletion must be "without undue delay"
+      (typically 1 month max, immediate when feasible). Adding a
+      cooling-off period is friction that favors the platform over
+      the data subject.
+  - severity: P2
+    finding: |
+      F6 "How Did You Know That?" Data Provenance Trail (L220-255) is
+      ethically excellent. One note: the evidence sentences like "You
+      spent extra time on division with remainders — let's practice
+      more" (L223) are diagnostic pronouncements about the student's
+      learning state. Framing should be non-pronouncement ("the system
+      recommended this because you spent extra time on...") so the
+      student can disagree without confronting a judgment.
+    evidence: axis9_data_privacy_trust_mechanics.md:L223
+    lens_note: |
+      Provenance framing should be about the system's reasoning, not
+      about the student. Subtle but important.
+  - severity: P2
+    finding: |
+      F8 Cena Transparency Report (L298-332) proposes periodic
+      public reports. Excellent. Ethics lens adds: include a
+      dedicated section on banned-mechanic compliance — every
+      quarterly report should reaffirm that no streaks, no variable-
+      ratio rewards, no loss-aversion copy shipped in that period,
+      with CI scanner result summaries. This creates external
+      accountability for shipgate.
+    evidence: axis9_data_privacy_trust_mechanics.md:L300-L303
+    lens_note: |
+      Public transparency about what's NOT in the product is as
+      important as what is.
+already_built:
+  - feature: "Ship-gate CI scanner"
+    evidence: scripts/shipgate/scan.mjs
+    note: "Existing infrastructure directly supports F8 transparency report"
+  - feature: "ADR-0003 session-scope misconception"
+    evidence: docs/adr/0003-misconception-session-scope.md
+    note: "Already enforces retention policy F3 describes"
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-042 through FD-046 covers same axis"
+extracted_tasks:
+  - title: "Remove cooling-off period from data deletion flow"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F3 "Delete My Journey" must honor deletion requests without
+      cooling-off period. Allow post-deletion restoration within 7
+      days via a separate parental request for under-16 (not an
+      automatic delay before deletion).
+      ## Files
+      - src/actors/PrivacyActor/DeletionGrain.cs
+      - src/student-web/src/features/account-delete/*
+      ## Definition of Done
+      - Deletion scheduled immediately on confirmation
+      - Restoration endpoint requires separate parent request
+      - Deletion certificate emailed immediately
+      - E2E test: confirm -> 2 seconds later data is gone from student-facing surfaces
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L123]
+  - title: "Provenance trail copy: system-reasoning framing, not student-judgment"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F6 provenance sentences use "the system recommended this because
+      the data showed X" framing, never "you spent extra time" or
+      "you took longer than average" — student cannot disagree with
+      a judgment about themselves, only with a description of data.
+      ## Files
+      - src/student-web/src/features/why-this/*
+      - src/student-web/src/locales/*.json
+      ## Definition of Done
+      - Shipgate lint rejects "you spent / you took / you showed"
+        in why-this-problem namespace
+      - Copy reviewed with 3 sample students for tone
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L223]
+  - title: "Transparency report: add banned-mechanic compliance section"
+    priority: P2
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      F8 Transparency Report template includes a mandatory
+      banned-mechanic compliance section:
+      - CI shipgate scan results summary for the period
+      - Allowlist changes with justification
+      - Any incident where a banned pattern reached production
+      - Quarterly public reaffirmation: no streaks, no loss-aversion
+        copy, no variable-ratio rewards
+      ## Files
+      - docs/transparency-report-template.md (new)
+      ## Definition of Done
+      - Template drafted
+      - First report ready to publish at next milestone
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L300-L303]
+verdict: adopt
+verdict_reason: |
+  Axis 9 is ethics-aligned by construction. Adopt with two small
+  revisions (F3 cooling-off, F6 framing) and one enhancement (F8
+  banned-mechanic section). All 8 features ship under ethics lens.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "Primary lens for this entire axis — full detailed review"
+  - to: persona-enterprise
+    about: "F7 differential privacy budget ledger design"
+  - to: persona-redteam
+    about: "F2 transparency dashboard API — attack surface for data enumeration"

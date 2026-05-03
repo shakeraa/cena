@@ -1,0 +1,135 @@
+doc_path: pre-release-review/axis3_accessibility_accommodations_findings.md
+reviewer: persona-finops
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight accessibility features: subitizing trainer, audio-haptic number line,
+  digital graph paper, ADHD focus builder, color-blind palette, MathML screen
+  reader, Arabic RTL math renderer, predictable UI. All are client-side or
+  static-asset features — minimal LLM/cloud cost profile.
+system_purpose_fit: 5
+  rationale:
+    - Core accessibility is a non-negotiable. Economics are favorable — mostly client rendering.
+    - F6 MathML pipeline is a one-time authoring investment, then free to serve.
+    - No per-student-hour LLM spend drivers identified.
+code_reality_check:
+  claims_verified_in_code:
+    - "KaTeX LTR-in-RTL pattern required (user memory 'math always LTR') — any impl must preserve <bdi dir='ltr'>"
+    - "i18n bundles already present for he/ar/en -> src/student/full-version/src/plugins/i18n/locales/*.json"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Existing RTL math renderer status — doc treats as proposed; LTR-in-bdi pattern likely already deployed but not verified for all contexts"
+adr_alignment:
+  honored:
+    - "ADR-0001 (multi-institute) not impacted"
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F2 Interactive Number Line with Audio-Haptic Feedback — audio files must
+      be pre-recorded or TTS-generated. Runtime TTS via cloud API (Google, AWS
+      Polly) is ~$16/million chars = cheap but still per-use. Recommend: pre-
+      generate Hebrew/Arabic audio for fixed number sets (1-100 integers,
+      common fractions) and ship as static WAV/MP3 — zero runtime cost.
+    evidence: axis3_accessibility_accommodations_findings.md (F2)
+    lens_note: Pre-generation converts runtime OpEx to one-time CapEx; CDN-served audio is ~$0.085/GB.
+  - severity: P1
+    finding: |
+      F6 MathML Screen Reader Pipeline — MathML-to-SpokenMath is deterministic
+      (MathJax/SRE library, no LLM). Zero runtime LLM cost. But translation of
+      SpokenMath labels to Hebrew/Arabic math vocabulary is an authoring task
+      (could use LLM ONCE per term, stored). Doc implies runtime LLM — incorrect.
+    evidence: axis3_accessibility_accommodations_findings.md (F6)
+    lens_note: Build static Hebrew/Arabic speak-table once; ship as JSON.
+  - severity: P2
+    finding: |
+      F1 Subitizing Trainer and F4 ADHD Focus Session Builder are pure client-
+      side React/Vue components. Zero backend cost beyond CDN. Ship first —
+      highest ROI/$ in the doc.
+    evidence: axis3_accessibility_accommodations_findings.md (F1, F4)
+    lens_note: Fast wins, no cost ceiling concern.
+  - severity: P2
+    finding: |
+      F3 Digital Graph Paper with Smart Alignment — if "smart alignment"
+      uses LLM/CAS to interpret handwritten work, that's expensive. If pure
+      gesture + snap-to-grid, it's free. Doc vague — clarify before estimation.
+    evidence: axis3_accessibility_accommodations_findings.md (F3)
+    lens_note: "'Smart' is code-smell for hidden LLM call. Pin implementation strategy."
+  - severity: P2
+    finding: |
+      F8 Anxiety-Reducing Predictable UI — CSS + Vue only. Zero LLM cost.
+      Fastest possible ship.
+    evidence: axis3_accessibility_accommodations_findings.md (F8)
+    lens_note: No cost considerations.
+already_built:
+  - feature: "Arabic RTL i18n bundle"
+    evidence: src/student/full-version/src/plugins/i18n/locales/ar.json
+    note: F7 proposal extends existing bundle rather than greenfield.
+  - feature: "KaTeX LTR-in-RTL pattern (user memory feedback_math_always_ltr)"
+    evidence: "user memory: math always LTR via <bdi dir='ltr'>"
+    note: F7 should cite the existing pattern, not reinvent.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-010 (Arabic RTL renderer) = F7"
+  - "feature-discovery-2026-04-20.md: FD-025 (TTS highlighting) = F6 adjacent"
+extracted_tasks:
+  - title: "Pre-generate Hebrew/Arabic number-line audio as static CDN assets"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Convert runtime TTS cost to zero by pre-generating audio files for the
+      accessibility number-line trainer's fixed vocabulary (integers 1-100,
+      common fractions 1/2..9/10, standard operations).
+
+      ## Files
+      - scripts/accessibility/generate-number-audio.sh (new)
+      - src/student/full-version/public/audio/number-line/he/*.mp3 (generated)
+      - src/student/full-version/public/audio/number-line/ar/*.mp3 (generated)
+      - src/student/full-version/src/composables/useNumberLineAudio.ts (new)
+
+      ## Definition of Done
+      - Script generates all fixed audio files offline (one-time LLM/TTS cost)
+      - Files shipped via CDN with Cache-Control: public, max-age=31536000
+      - Composable returns audio URL; NO runtime API call
+      - License compliance (store which TTS service used, CC/commercial terms)
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L80-L150]
+  - title: "Build static MathML SpokenMath Hebrew/Arabic vocabulary map"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Author a static translation table from MathJax SRE SpokenMath English
+      output to Hebrew/Arabic math vocabulary (כלל השרשרת, מכפלה, מחלקה,
+      etc.) once, ship as JSON. Avoid runtime translation LLM calls.
+
+      ## Files
+      - src/student/full-version/src/assets/math-speech/he.json (new)
+      - src/student/full-version/src/assets/math-speech/ar.json (new)
+      - src/student/full-version/src/composables/useMathSpeech.ts (new)
+      - tests/unit/mathSpeech.spec.ts
+
+      ## Definition of Done
+      - 200+ math terms translated by qualified human reviewer (Prof. Amjad + Prof. Nadia)
+      - JSON schema documented; extension PRs require review
+      - Zero runtime LLM dependency
+      - Screen reader spot-test: derivative, integral, quadratic formula pronounce correctly in ar/he
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L250-L320]
+verdict: adopt
+verdict_reason: |
+  Economics are excellent across all 8 features. Only watch-out: ensure runtime
+  TTS and translation calls are replaced with one-time authoring + static
+  assets. No feature in this doc threatens the unit economics.
+cross_lens_handoff:
+  - to: persona-a11y
+    about: "Validate F6 SpokenMath vocabulary coverage against WCAG 2.2 AA and SRE library defaults."
+  - to: persona-educator
+    about: "F3 Digital Graph Paper — is 'smart alignment' load-bearing pedagogically, or can snap-to-grid suffice?"

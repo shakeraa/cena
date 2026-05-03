@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "runner": "cascade_prototype",
+  "source": "admin-upload://pdf_05_encrypted.pdf",
+  "hints": {
+    "subject": null,
+    "language": null,
+    "track": null,
+    "source_type": "admin_upload",
+    "taxonomy_node": null,
+    "expected_figures": null
+  },
+  "pdf_triage": "encrypted",
+  "text_blocks": [],
+  "math_blocks": [],
+  "figures": [],
+  "overall_confidence": 0.0,
+  "fallbacks_fired": [],
+  "cas_validated_math": 0,
+  "cas_failed_math": 0,
+  "human_review_required": true,
+  "reasons_for_review": [
+    "preprocess_failed_or_encrypted"
+  ],
+  "layer_timings_seconds": {
+    "layer_0_preprocess": 0.04,
+    "layer_1_layout": 0.0,
+    "layer_2a_text": 0.0,
+    "layer_2b_math": 0.0,
+    "layer_3_reassemble": 0.0,
+    "layer_4_gate": 0.0,
+    "layer_5_cas": 0.0
+  },
+  "total_latency_seconds": 0.04,
+  "captured_at": "2026-04-16T12:00:00Z",
+  "_dev_fixture": {
+    "scenario": "pdf_encrypted",
+    "source_kind": "synthesized",
+    "notes": "Early rejection. Surface A returns 422; Surface B flags to admin."
+  }
+}

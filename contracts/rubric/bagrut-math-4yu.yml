@@ -1,0 +1,95 @@
+# Ministry Bagrut Math 4 Units — Rubric DSL v1 (prr-033)
+# ADR-0052: per-track rubric with version pinning + sign-off metadata.
+
+exam_code: BAGRUT_MATH_4U
+rubric_version: "1.0.0"
+ministry_circular_ref: "2026-03-24-MOE-035-mathematics-assessment-framework"
+approved_by_user_id: "human-ministry-liaison"
+approved_at_utc: "2026-04-19T14:22:00Z"
+
+grade_bands:
+  - band: excellent
+    min_score: 90
+    max_score: 100
+    descriptor:
+      en: "Correct method, correct execution, clear justification, algebraic fluency visible."
+      he: "שיטה נכונה, ביצוע נכון, הנמקה ברורה, שליטה אלגברית."
+      ar: "طريقة صحيحة، تنفيذ صحيح، تبرير واضح، إتقان جبري ظاهر."
+  - band: proficient
+    min_score: 75
+    max_score: 89
+    descriptor:
+      en: "Correct method, minor execution errors, mostly clear justification."
+      he: "שיטה נכונה, טעויות ביצוע קטנות, הנמקה ברורה ברובה."
+      ar: "طريقة صحيحة، أخطاء تنفيذ طفيفة، تبرير واضح في معظمه."
+  - band: developing
+    min_score: 55
+    max_score: 74
+    descriptor:
+      en: "Appropriate method but material execution errors, or partial subproblem credit."
+      he: "שיטה מתאימה אך טעויות מהותיות, או ניקוד חלקי."
+      ar: "طريقة مناسبة لكن مع أخطاء جوهرية، أو نقاط جزئية."
+  - band: beginning
+    min_score: 0
+    max_score: 54
+    descriptor:
+      en: "Incorrect method or no meaningful progress toward a solution."
+      he: "שיטה שגויה או חוסר התקדמות משמעותית לפתרון."
+      ar: "طريقة خاطئة أو عدم تقدم ملموس نحو الحل."
+
+scoring_criteria:
+  - criterion_id: method_selection
+    weight: 0.25
+    display:
+      en: "Method selection"
+      he: "בחירת שיטה"
+      ar: "اختيار الطريقة"
+    checkpoints:
+      - id: identifies_problem_class
+        points: 5
+        description_en: "Identifies the problem class (calculus-light, trigonometry, geometry, probability)."
+      - id: selects_applicable_technique
+        points: 5
+        description_en: "Selects an applicable technique for that class."
+  - criterion_id: execution_accuracy
+    weight: 0.40
+    display:
+      en: "Execution accuracy"
+      he: "דיוק ביצוע"
+      ar: "دقة التنفيذ"
+    checkpoints:
+      - id: algebraic_manipulation_correct
+        points: 8
+        description_en: "Algebraic manipulations preserve equivalence."
+      - id: differentiation_or_integration_correct
+        points: 6
+        description_en: "Elementary differentiation / integration performed correctly."
+      - id: final_answer_form
+        points: 4
+        description_en: "Final answer expressed in the required form."
+  - criterion_id: justification_clarity
+    weight: 0.25
+    display:
+      en: "Justification clarity"
+      he: "בהירות ההנמקה"
+      ar: "وضوح التبرير"
+    checkpoints:
+      - id: reasoning_trail_visible
+        points: 6
+        description_en: "Each non-trivial step has a reason or reference."
+      - id: no_unexplained_leaps
+        points: 4
+        description_en: "No unexplained leaps between lines of working."
+  - criterion_id: presentation
+    weight: 0.10
+    display:
+      en: "Presentation"
+      he: "הצגה"
+      ar: "التقديم"
+    checkpoints:
+      - id: legible_notation
+        points: 2
+        description_en: "Standard mathematical notation, legible."
+      - id: answer_clearly_marked
+        points: 2
+        description_en: "Final answer clearly marked or boxed."

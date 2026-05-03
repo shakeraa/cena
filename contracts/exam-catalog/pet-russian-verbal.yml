@@ -1,0 +1,58 @@
+# PET (Psychometric Entrance Test) Verbal — Russian section.
+# ADR-0050 Q2 / PRR-240: at Launch. NITE regulator, not Ministry of Education.
+
+exam_code: PET_VERBAL_RUSSIAN
+family: STANDARDIZED
+track: null
+units: null
+region: International-PET
+regulator: nite
+ministry_subject_code: null
+ministry_question_paper_codes: []
+availability: roadmap
+available_from: "2026-Q3"
+item_bank_status: reference-only
+passback_eligible: false
+default_lead_days: 90
+sittings:
+  - code: PET_2026_SPRING
+    academic_year: "2026"
+    season: spring
+    moed: A
+    canonical_date: "2026-04-10"
+  - code: PET_2026_SUMMER
+    academic_year: "2026"
+    season: summer
+    moed: A
+    canonical_date: "2026-07-05"
+display:
+  en:
+    name: "PET Verbal (Russian)"
+    short_description: "Psychometric Entrance Test (NITE), verbal section — Russian."
+  he:
+    name: "פסיכומטרי — חלק מילולי (רוסית)"
+    short_description: "מבחן פסיכומטרי של המרכז הארצי לבחינות ולהערכה, חלק מילולי ברוסית."
+  ar:
+    name: "اختبار القبول النفسي — الشفوي (روسي)"
+    short_description: "اختبار القبول النفسي (نيتي)، القسم الشفوي - روسي."
+topics:
+  - topic_id: verbal.analogies
+    display:
+      en: "Analogies"
+      he: "אנלוגיות"
+      ar: "التشبيهات"
+  - topic_id: verbal.sentence_completion
+    display:
+      en: "Sentence completion"
+      he: "השלמת משפטים"
+      ar: "إكمال الجمل"
+  - topic_id: verbal.reading_comprehension
+    display:
+      en: "Reading comprehension"
+      he: "הבנת הנקרא"
+      ar: "فهم المقروء"
+  - topic_id: verbal.logic
+    display:
+      en: "Verbal logic"
+      he: "לוגיקה מילולית"
+      ar: "المنطق الشفوي"

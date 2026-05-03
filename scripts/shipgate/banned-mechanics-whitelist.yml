@@ -1,0 +1,184 @@
+# =============================================================================
+# Ship-gate whitelist: banned-mechanics rule pack
+# =============================================================================
+# Files that legitimately need to reference the banned mechanics (policy docs,
+# task bodies that ban the patterns, retirement logs, positive-test fixtures).
+# Everything else is scanned.
+# =============================================================================
+
+whitelist:
+  - path: "docs/engineering/shipgate.md"
+    reason: "Ship-gate policy doc: enumerates the banned mechanics"
+
+  - path: "docs/engineering/ci-prohibited-metrics-rules.md"
+    reason: "CI rules doc: catalogs prohibited metric patterns (policy, not implementation)"
+
+  - path: "docs/engineering/feature-success-metrics.md"
+    reason: "Metrics policy doc: cites banned copy to describe what's blocked"
+
+  - path: "docs/engineering/mastery-trajectory-honest-framing.md"
+    reason: "Honest-framing design doc: pairs banned copy with target copy (policy)"
+
+  - path: "docs/engineering/offline-sync-design.md"
+    reason: "Design doc: states UX explicitly avoids countdown (negation context)"
+
+  - path: "docs/design/SESSION-UX-002-progressive-disclosure.md"
+    reason: "Design doc: explicit ban statement"
+
+  - path: "docs/design/compression-diagnostic-design.md"
+    reason: "Design doc: anti-pattern description for review"
+
+  - path: "docs/design/daily-community-puzzle.md"
+    reason: "Design doc: explicit ban statement"
+
+  - path: "docs/design/microinteractions-emotional-design.md"
+    reason: "Design doc: describes banned timer countdown in rejection context"
+
+  # Test assertions that verify banned-copy does NOT render — legit references
+  - path: "src/actors/Cena.Actors.Tests/**"
+    reason: "Test assertions may reference banned copy in DoesNotContain checks"
+
+  - path: "src/api/**/*Tests*/**"
+    reason: "API test projects may assert banned copy is absent"
+
+  - path: "src/api/**/*.Tests/**"
+    reason: "API test projects (dotted variant) may assert banned copy is absent"
+
+  # Actor-code comments that EXPLAIN why a countdown is banned (policy context)
+  - path: "src/actors/Cena.Actors/ParentalControls/TimeBudget.cs"
+    reason: "Source comment explains the banned countdown pattern in rationale"
+
+  - path: "src/actors/Cena.Actors/Accommodations/AccommodationProfile.cs"
+    reason: "Source comment explains UI hides countdown (legit rationale)"
+
+  # Technical session-counter comments (NOT student-facing; decrementing-N-sessions, not a wall-clock deadline)
+  - path: "src/actors/Cena.Actors/Teacher/ScheduleOverride/TeacherOverrideState.cs"
+    reason: "Doc-comment on ActivePin record: 'countdown' describes a decrementing integer counter of pinned sessions (RemainingSessions), not a student-facing time-pressure mechanic. Not rendered to any surface."
+
+  - path: "src/actors/Cena.Actors/Teacher/ScheduleOverride/Events/PinTopicRequested_V1.cs"
+    reason: "Event-comment describes pin replacement semantics — 'countdown' is internal term-of-art for the session-counter (LATEST-ACTIVE-WINS). Not student-facing copy."
+
+  # SMS outbound shipgate is the ENFORCEMENT policy itself — regex list encodes banned patterns
+  - path: "src/actors/Cena.Actors/Notifications/OutboundSms/SmsShipgatePolicy.cs"
+    reason: "This file IS the SMS-side ban enforcement (mirrors banned-mechanics.yml for SMS copy); its regex list quotes every banned term by construction."
+
+  # Student-web UI files that include negation comments
+  - path: "src/student/full-version/src/components/session/QuestionCard.vue"
+    reason: "Component comment states the UI does NOT show a countdown (negation)"
+
+  - path: "src/student/full-version/src/components/InstallPrompt.vue"
+    reason: "Component comment documents absence of urgency/countdown"
+
+  - path: "docs/adr/**"
+    reason: "ADRs may describe banned mechanics in rationale / what-we-rejected sections"
+
+  - path: "docs/design/exam-prep-positive-framing.md"
+    reason: "Positive-framing reference: pairs anti-patterns with target copy"
+
+  - path: "docs/research/**"
+    reason: "Research notes analyse mechanics (pre-production)"
+
+  - path: "pre-release-review/reviews/retired.md"
+    reason: "Retirement log: documents the mechanics being banned"
+
+  - path: "pre-release-review/reviews/retired/**"
+    reason: "Retirement archives"
+
+  - path: "pre-release-review/reviews/banned-mechanics-historical-scan.md"
+    reason: "Retroactive scan report: catalogs historical hits"
+
+  - path: "pre-release-review/reviews/SYNTHESIS.md"
+    reason: "Synthesis: references mechanics by ID"
+
+  - path: "pre-release-review/reviews/conflicts.md"
+    reason: "Conflict log"
+
+  - path: "pre-release-review/reviews/persona-*/**"
+    reason: "Persona reviews quote mechanics in critique context"
+
+  - path: "pre-release-review/reviews/audit/**"
+    reason: "Audit logs may reference mechanics under review"
+
+  - path: "pre-release-review/reviews/tasks.jsonl"
+    reason: "Canonical task JSON"
+
+  - path: "pre-release-review/AXIS_*.md"
+    reason: "Axis research docs analyse mechanics in research context"
+
+  - path: "pre-release-review/axis*.md"
+    reason: "Axis research docs (lowercase)"
+
+  - path: "pre-release-review/cena_*.md"
+    reason: "Cena review docs quote mechanics in analysis context"
+
+  - path: "pre-release-review/finding_assessment_dr_rami.md"
+    reason: "Dr. Rami review"
+
+  - path: "pre-release-review/SUPERPROMPT.md"
+    reason: "Pre-release-review superprompt"
+
+  - path: "tasks/pre-release-review/TASK-PRR-006-*.md"
+    reason: "Task body: defines Crisis Mode / countdown rename"
+
+  - path: "tasks/pre-release-review/TASK-PRR-019-*.md"
+    reason: "Task body: defines predicted-Bagrut ban"
+
+  - path: "tasks/pre-release-review/TASK-PRR-040-*.md"
+    reason: "Task body: defines locale coverage"
+
+  - path: "tasks/pre-release-review/EPIC-PRR-D-*.md"
+    reason: "Epic body"
+
+  - path: "shipgate/fixtures/banned-mechanics-sample.md"
+    reason: "Positive-test fixture: deliberately contains every banned pattern"
+
+  - path: "shipgate/fixtures/ux-surfaces-sample.vue"
+    reason: "prr-211 UX-surface positive-test fixture: deliberately contains every banned pattern for ux-surface-scan.mjs"
+
+  - path: "scripts/shipgate/shipgate-ux-surfaces.yml"
+    reason: "prr-211 UX-surface rulepack itself (patterns quoted in rule definitions)"
+
+  - path: "scripts/shipgate/ux-surface-scan.mjs"
+    reason: "prr-211 UX-surface scanner source (patterns referenced in doc comments)"
+
+  - path: "tests/shipgate/ux-surfaces.spec.mjs"
+    reason: "prr-211 UX-surface test suite (patterns referenced in assertion messages)"
+
+  - path: "src/actors/Cena.Actors.Tests/Architecture/ShipgateScannerV2CoversNewSurfacesTest.cs"
+    reason: "prr-211 architecture ratchet (patterns referenced in assertion messages)"
+
+  - path: "scripts/shipgate/banned-mechanics.yml"
+    reason: "The rule pack itself (patterns quoted in comments)"
+
+  - path: "scripts/shipgate/banned-mechanics-whitelist.yml"
+    reason: "This whitelist (self)"
+
+  - path: "scripts/shipgate/scan.mjs"
+    reason: "Scanner source refers to banned patterns in comments / built-in rules"
+
+  - path: "scripts/shipgate/lexicon-lock-gate.mjs"
+    reason: "Companion lexicon scanner (unrelated rules, adjacent file)"
+
+  - path: "scripts/shipgate/README.md"
+    reason: "Future scanner README (if added) describes mechanics being banned"
+
+  - path: "tests/shipgate/**"
+    reason: "Test fixtures / spec files reference banned patterns"
+
+  - path: "CLAUDE.md"
+    reason: "Project rules: enumerate banned mechanics in non-negotiable #3"
+
+  - path: "AGENTS.md"
+    reason: "Cross-agent rules mirror CLAUDE.md ban list"
+
+  - path: ".agentdb/**"
+    reason: "Task queue protocol docs may reference ship-gate mechanics"
+
+  - path: "pre-release-review/feature-discovery-*.md"
+    reason: "Feature-discovery docs may reference banned mechanics in analysis"
+
+  - path: "pre-release-review/reviews/descoped-log.md"
+    reason: "Descoped-log"
+
+  - path: "docs/handoff/**"
+    reason: "Handoff notes may mention shipgate scanner expansions"

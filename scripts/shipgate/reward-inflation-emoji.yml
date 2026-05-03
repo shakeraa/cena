@@ -1,0 +1,72 @@
+# =============================================================================
+# Ship-gate rule pack: reward-inflation emoji (prr-153 / EPIC-PRR-D D2)
+# =============================================================================
+# Source:  tasks/pre-release-review/TASK-PRR-153 absorbed into EPIC-PRR-D
+# Policy:  Reward-inflation emoji (🔥, ⚡, 💯, 🏆, 🎉, 🌟, ⭐) are variable-
+#          ratio-reward signalling devices. They hit the same motivational
+#          circuits as slot-machine flashes and are the visual twin of the
+#          streak-counter ban in GD-004. Banned from learning UI surfaces.
+#
+#          Admin-facing celebrations (educator dashboards acknowledging a
+#          cohort milestone) are permitted — the student never sees them.
+#          Docs and test fixtures are whitelisted: policy documentation
+#          legitimately demonstrates what the scanner catches.
+#
+# Scope:
+#   - Student-web Vue templates   → scanned
+#   - Student-web locale JSON      → scanned
+#   - Admin-web Vue templates      → scanned (admin-visible, but the rule
+#                                    acknowledges admin-celebration allowed
+#                                    contexts live on a small whitelist)
+#   - Admin-web locale JSON        → scanned
+#   - C# backend hard-coded copy   → scanned
+#   - Feature specs / design docs  → scanned (copy that feeds production
+#                                    via prompt templates or locale-bundle
+#                                    authoring workflows)
+#   - tests/** and shipgate/fixtures/** → whitelisted (demonstrate the ban)
+#
+# Locale coverage: the rules are not language-specific (emoji are the same
+# glyph in every locale), but the whitelist enumerates the admin bundles
+# where educator-celebration copy may legitimately use 🎉 or 🏆.
+#
+# Rule shape: see banned-citations.yml header.
+# =============================================================================
+
+rules:
+  # --------------------------------------------------------------------------
+  # prr-153 — reward-inflation emoji (all locales — emoji are Unicode)
+  # --------------------------------------------------------------------------
+  - id: emoji-fire
+    reason: "Banned reward-inflation emoji 🔥 (prr-153 — variable-ratio reward signalling)"
+    pattern: "\\uD83D\\uDD25"
+    flags: u
+
+  - id: emoji-high-voltage
+    reason: "Banned reward-inflation emoji ⚡ (prr-153 — variable-ratio reward signalling)"
+    pattern: "\\u26A1"
+    flags: ""
+
+  - id: emoji-hundred
+    reason: "Banned reward-inflation emoji 💯 (prr-153 — variable-ratio reward signalling)"
+    pattern: "\\uD83D\\uDCAF"
+    flags: u
+
+  - id: emoji-trophy
+    reason: "Banned reward-inflation emoji 🏆 (prr-153 — variable-ratio reward signalling; admin-celebration exception on whitelist)"
+    pattern: "\\uD83C\\uDFC6"
+    flags: u
+
+  - id: emoji-party-popper
+    reason: "Banned reward-inflation emoji 🎉 (prr-153 — variable-ratio reward signalling; admin-celebration exception on whitelist)"
+    pattern: "\\uD83C\\uDF89"
+    flags: u
+
+  - id: emoji-glowing-star
+    reason: "Banned reward-inflation emoji 🌟 (prr-153 — variable-ratio reward signalling)"
+    pattern: "\\uD83C\\uDF1F"
+    flags: u
+
+  - id: emoji-star
+    reason: "Banned reward-inflation emoji ⭐ (prr-153 — variable-ratio reward signalling)"
+    pattern: "\\u2B50"
+    flags: ""

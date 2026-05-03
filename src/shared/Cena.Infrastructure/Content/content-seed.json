@@ -1,0 +1,216 @@
+{
+  "concepts": [
+    {
+      "conceptId": "math_algebra_linear_eq",
+      "name": "Linear Equations",
+      "subject": "Mathematics",
+      "description": "Solving equations of the form ax + b = c",
+      "parents": ["math_algebra_basics"],
+      "prerequisites": ["math_arithmetic_operations"],
+      "difficulty": 0.3,
+      "topics": ["algebra", "equations", "linear"],
+      "isInBagrut": true,
+      "bagrutFrequency": 85
+    },
+    {
+      "conceptId": "math_algebra_quadratic",
+      "name": "Quadratic Equations",
+      "subject": "Mathematics",
+      "description": "Solving ax² + bx + c = 0 using factoring, formula, completing the square",
+      "parents": ["math_algebra_linear_eq"],
+      "prerequisites": ["math_algebra_linear_eq", "math_exponents"],
+      "difficulty": 0.5,
+      "topics": ["algebra", "quadratic", "parabola"],
+      "isInBagrut": true,
+      "bagrutFrequency": 95
+    },
+    {
+      "conceptId": "math_calculus_derivatives",
+      "name": "Derivatives",
+      "subject": "Mathematics",
+      "description": "Finding the rate of change using differentiation",
+      "parents": ["math_functions"],
+      "prerequisites": ["math_limits", "math_functions"],
+      "difficulty": 0.7,
+      "topics": ["calculus", "derivatives", "differentiation"],
+      "isInBagrut": true,
+      "bagrutFrequency": 90
+    },
+    {
+      "conceptId": "math_calculus_integrals",
+      "name": "Integrals",
+      "subject": "Mathematics",
+      "description": "Finding areas under curves using integration",
+      "parents": ["math_calculus_derivatives"],
+      "prerequisites": ["math_calculus_derivatives"],
+      "difficulty": 0.75,
+      "topics": ["calculus", "integrals", "integration"],
+      "isInBagrut": true,
+      "bagrutFrequency": 85
+    },
+    {
+      "conceptId": "physics_mechanics_newton_laws",
+      "name": "Newton's Laws of Motion",
+      "subject": "Physics",
+      "description": "Understanding force, mass, and acceleration relationships",
+      "parents": ["physics_mechanics_basics"],
+      "prerequisites": ["physics_vectors", "math_algebra_linear_eq"],
+      "difficulty": 0.5,
+      "topics": ["mechanics", "newton", "forces"],
+      "isInBagrut": true,
+      "bagrutFrequency": 90
+    },
+    {
+      "conceptId": "physics_mechanics_energy",
+      "name": "Work and Energy",
+      "subject": "Physics",
+      "description": "Kinetic and potential energy, conservation of energy",
+      "parents": ["physics_mechanics_newton_laws"],
+      "prerequisites": ["physics_mechanics_newton_laws"],
+      "difficulty": 0.6,
+      "topics": ["mechanics", "energy", "work"],
+      "isInBagrut": true,
+      "bagrutFrequency": 80
+    },
+    {
+      "conceptId": "physics_electricity_circuits",
+      "name": "Electric Circuits",
+      "subject": "Physics",
+      "description": "Ohm's Law, series and parallel circuits, Kirchhoff's laws",
+      "parents": ["physics_electricity_basics"],
+      "prerequisites": ["physics_electricity_charge", "math_algebra_linear_eq"],
+      "difficulty": 0.55,
+      "topics": ["electricity", "circuits", "ohm"],
+      "isInBagrut": true,
+      "bagrutFrequency": 75
+    },
+    {
+      "conceptId": "chemistry_periodic_table",
+      "name": "Periodic Table and Trends",
+      "subject": "Chemistry",
+      "description": "Atomic structure, periodic trends, electron configuration",
+      "parents": ["chemistry_atomic_structure"],
+      "prerequisites": ["chemistry_atoms"],
+      "difficulty": 0.4,
+      "topics": ["periodic-table", "atomic-structure", "trends"],
+      "isInBagrut": true,
+      "bagrutFrequency": 70
+    },
+    {
+      "conceptId": "chemistry_chemical_bonds",
+      "name": "Chemical Bonds",
+      "subject": "Chemistry",
+      "description": "Ionic, covalent, and metallic bonding",
+      "parents": ["chemistry_periodic_table"],
+      "prerequisites": ["chemistry_periodic_table", "chemistry_electrons"],
+      "difficulty": 0.5,
+      "topics": ["bonding", "ionic", "covalent"],
+      "isInBagrut": true,
+      "bagrutFrequency": 80
+    },
+    {
+      "conceptId": "biology_cell_structure",
+      "name": "Cell Structure",
+      "subject": "Biology",
+      "description": "Prokaryotic and eukaryotic cell organelles and functions",
+      "parents": [],
+      "prerequisites": [],
+      "difficulty": 0.35,
+      "topics": ["cells", "organelles", "structure"],
+      "isInBagrut": true,
+      "bagrutFrequency": 75
+    },
+    {
+      "conceptId": "biology_cell_transport",
+      "name": "Cell Transport Mechanisms",
+      "subject": "Biology",
+      "description": "Diffusion, osmosis, active and passive transport",
+      "parents": ["biology_cell_structure"],
+      "prerequisites": ["biology_cell_structure"],
+      "difficulty": 0.45,
+      "topics": ["cells", "transport", "osmosis"],
+      "isInBagrut": true,
+      "bagrutFrequency": 70
+    },
+    {
+      "conceptId": "biology_genetics_dna",
+      "name": "DNA and Genetics",
+      "subject": "Biology",
+      "description": "DNA structure, replication, transcription, translation",
+      "parents": ["biology_cell_structure"],
+      "prerequisites": ["biology_cell_structure", "biology_biomolecules"],
+      "difficulty": 0.6,
+      "topics": ["genetics", "dna", "replication"],
+      "isInBagrut": true,
+      "bagrutFrequency": 85
+    }
+  ],
+  "learningPaths": [
+    {
+      "pathId": "math_algebra_foundation",
+      "name": "Algebra Foundations",
+      "description": "Master the basics of algebra from linear to quadratic equations",
+      "subject": "Mathematics",
+      "targetGrade": "9",
+      "conceptIds": [
+        "math_algebra_linear_eq",
+        "math_algebra_quadratic"
+      ],
+      "estimatedHours": 20,
+      "difficulty": "beginner"
+    },
+    {
+      "pathId": "math_calculus_intro",
+      "name": "Introduction to Calculus",
+      "description": "Learn derivatives and integrals for Bagrut 5-unit math",
+      "subject": "Mathematics",
+      "targetGrade": "11",
+      "conceptIds": [
+        "math_calculus_derivatives",
+        "math_calculus_integrals"
+      ],
+      "estimatedHours": 35,
+      "difficulty": "advanced"
+    },
+    {
+      "pathId": "physics_mechanics_core",
+      "name": "Mechanics Core Concepts",
+      "description": "Essential mechanics for Bagrut physics",
+      "subject": "Physics",
+      "targetGrade": "10",
+      "conceptIds": [
+        "physics_mechanics_newton_laws",
+        "physics_mechanics_energy"
+      ],
+      "estimatedHours": 25,
+      "difficulty": "intermediate"
+    },
+    {
+      "pathId": "chemistry_foundation",
+      "name": "Chemistry Foundation",
+      "description": "Build a strong base in chemical principles",
+      "subject": "Chemistry",
+      "targetGrade": "10",
+      "conceptIds": [
+        "chemistry_periodic_table",
+        "chemistry_chemical_bonds"
+      ],
+      "estimatedHours": 18,
+      "difficulty": "beginner"
+    },
+    {
+      "pathId": "biology_cell_basics",
+      "name": "Cell Biology Basics",
+      "description": "Understanding the fundamental unit of life",
+      "subject": "Biology",
+      "targetGrade": "9",
+      "conceptIds": [
+        "biology_cell_structure",
+        "biology_cell_transport",
+        "biology_genetics_dna"
+      ],
+      "estimatedHours": 30,
+      "difficulty": "intermediate"
+    }
+  ]
+}

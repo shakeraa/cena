@@ -1,0 +1,151 @@
+doc_path: pre-release-review/axis9_data_privacy_trust_mechanics.md
+reviewer: persona-cogsci
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight privacy/trust features: XAI recommendation rationale, student data
+  dashboard, data erasure, consent-revocation UX, age-appropriate privacy
+  communication, data provenance, differential-privacy cohort insights, and
+  transparency report. Almost entirely outside the cogsci lens — light review.
+system_purpose_fit: 3
+  rationale:
+    - F1 (explainable recommendations) has cogsci warrants (Conati XAI literature)
+      but the primary benefit is trust, not learning.
+    - F5 "age-appropriate privacy communication" is a cognitive-load / progressive-
+      disclosure application to legal copy — mild cogsci relevance.
+    - F6 "data provenance" trail is a metacognitive surface for students
+      (Open Learner Model literature, Bull & Kay).
+code_reality_check:
+  claims_verified_in_code:
+    - "ADR-0003 session-scope already matches F1 claim 'explanations must be generated from INTRA-session data only' (axis9:57)"
+    - "ExplanationCacheService already cache-keyed on (questionId, errorType, language) -> docs/adr/0003-misconception-session-scope.md:32-33 (substrate for F1)"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Mai et al. 2025 DOI 10.55220/2576-683x.v9.799 — verify citation exists."
+    - "Conati arXiv:2403.04035v2 — legitimate, commonly cited in XAI-for-education literature."
+  claims_unsupported_in_literature: []
+adr_alignment:
+  honored:
+    - ADR-0003 (F1 INTRA-session only framing)
+    - "Non-negotiable 2 (misconception session-scope) — F1 data provenance bounded to session"
+  violated: []
+  missing_adr_needed:
+    - "F6 data-provenance / inference trail — if the trail itself is persistent, it may constitute a behavioral profile of which inferences the system made about a student. Needs retention ADR."
+non_negotiable_violations: []
+persona_findings:
+  - severity: P2
+    finding: |
+      F1 (Explainable AI Recommendation Rationale) cites Conati's XAI personalization
+      work — the research shows personalizing explanations to individual cognitive
+      traits (Need for Cognition, Conscientiousness, Reading Proficiency) improves
+      trust and learning. Cena should not implement *personalized* explanations
+      on student cognitive traits — it would require building a cognitive-trait
+      profile that crosses ADR-0003 / ADR-0037 boundaries. Instead, Cena should
+      offer one solid explanation template, age-appropriately copy-edited per
+      onboarding-declared grade level. Doc is ambiguous on which flavor of XAI
+      is intended.
+    evidence: axis9_data_privacy_trust_mechanics.md:28-32, 38
+    lens_note: |
+      Important distinction: "XAI" in Conati sense requires cognitive profiling;
+      "XAI" in Cena sense is "show the rule that fired, translated to human
+      language". Only the second is allowed here.
+  - severity: P2
+    finding: |
+      F5 (Age-Appropriate Privacy Communication) applies progressive-disclosure
+      and plain-language principles to privacy copy. Cogsci-relevant because
+      extraneous cognitive load on a 12-year-old reading ADR-scale privacy
+      notices is a direct learning-session-blocker if it happens at onboarding.
+      Strong ship signal: keep the first-touch privacy surface under 40 words
+      with "More details" disclosure per cogsci progressive-disclosure guidance.
+    evidence: axis9_data_privacy_trust_mechanics.md:Feature 5 section
+    lens_note: |
+      Direct application of docs/cognitive-load-progressive-disclosure-research.md
+      principles to the legal-copy surface. Worth shipping.
+  - severity: P2
+    finding: |
+      F6 (Data Provenance Trail) exposes the inference chain that led to a
+      recommendation. Open Learner Model (Bull & Kay) warrant is sound, but
+      a student-facing trail of "what the system inferred about you" on its
+      own becomes a meta-inference surface. Must be audited: (a) no inference
+      shown that relies on retained misconception data, (b) the trail itself
+      is read-only, not a new derived profile.
+    evidence: axis9_data_privacy_trust_mechanics.md:Feature 6 section
+    lens_note: "Meta-level: showing the system's inferences is a cogsci win (metacognitive); but it must not create a persistent 'system beliefs about you' store."
+  - severity: P2
+    finding: |
+      F7 (Differential Privacy Cohort Insights) — same anxiety-interaction concern
+      as axis4 F4: DP-aggregated statistics still give students/parents information
+      that can be misread as a comparative benchmark. Content design must be
+      careful about framing. Not a cogsci ship-blocker; handoff to ethics/privacy.
+    evidence: axis9_data_privacy_trust_mechanics.md:Feature 7 section
+    lens_note: "Norm framing can backfire; see axis4 cross-lens handoff."
+already_built:
+  - feature: "Session-scoped explanation caching (substrate for F1)"
+    evidence: docs/adr/0003-misconception-session-scope.md:32-33
+    note: "F1 rule engine can sit on top of existing cache service."
+  - feature: "Core ADR-0003 data-boundary rules (F2 dashboard can surface these directly)"
+    evidence: docs/adr/0003-misconception-session-scope.md:49-52
+duplicates_of_other_docs:
+  - "AXIS_4_Parent_Engagement_Cena_Research.md: Feature 1 'Why This Topic' = F1 here"
+  - "AXIS_4_Parent_Engagement_Cena_Research.md: Feature 4 Privacy-Preserving Cohort Context = F7 here"
+  - "AXIS_10_Operational_Integration_Features.md: Feature 8 Student Data Portability Export = F2/F3 here"
+extracted_tasks:
+  - title: "F1 XAI: ship rule-based explanation templates, not personalized cogtrait XAI"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Implement rule-based explanation surface for each adaptive recommendation
+      (why this topic, why this item). Scope: session-local inputs only. No
+      cognitive-trait personalization. Template tone varies only by declared
+      grade level.
+
+      ## Files
+      - src/actors/Cena.Actors/Explainability/RecommendationExplainer.cs (new)
+      - src/student-web/src/components/WhyThisTopic.vue (new)
+
+      ## Definition of Done
+      - Rules come from the same source as the adaptive decision, not re-derived.
+      - No cognitive-trait profile ever consulted.
+      - Student can always dismiss.
+      - Copy review against ship-gate banned terms.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-xai-rule-based"
+    source_doc_lines: [L28-L62]
+  - title: "Ship F5 privacy copy at 12-year-old reading level with progressive disclosure"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Rewrite first-touch privacy notice + consent copy to ≤40 words primary
+      surface, with "More details" expander. Follow docs/cognitive-load-progressive-disclosure-research.md.
+
+      ## Files
+      - src/student-web/src/features/privacy/FirstTouchPrivacy.vue
+      - Localizations in he/ar/ru/am
+
+      ## Definition of Done
+      - Primary copy reading-age ≤ 12.
+      - All progressive-disclosure panels indexed by keyword for screen readers.
+      - Legal review signs off.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-privacy-copy-progressive"
+    source_doc_lines: [Feature 5 section]
+verdict: adopt
+verdict_reason: |
+  From the cogsci lens, F1 (rule-based not cogtrait XAI), F5 (progressive
+  disclosure for privacy copy), and F6 (audited provenance) are the only direct
+  contributions. The rest is privacy/compliance engineering handed off to the
+  privacy lens.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "All 8 features are primarily privacy-counsel lens. This cogsci review is secondary."
+  - to: persona-a11y
+    about: "F5 privacy copy must meet WCAG + plain-language + RTL requirements."
+  - to: persona-ethics
+    about: "F7 DP cohort insights framing risk (see axis4 F4 parallel)."
+  - to: persona-finops
+    about: "F8 transparency report publishing cadence + infra cost."

@@ -1,0 +1,210 @@
+doc_path: pre-release-review/cena_axis5_teacher_workflow_features.md
+reviewer: persona-ethics
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 teacher-workflow features (smart lesson planner, homework
+  auto-generator, in-class diagnostic sprint, exit ticket, Bagrut rubric
+  alignment, conference prep, class health pulse, Bagrut-readiness tracker).
+  All guardrail tables self-check against banned mechanics.
+system_purpose_fit: 3
+  rationale:
+    - Teacher-facing axis with low direct-to-student ethics surface area
+    - Three features (F4 Exit Ticket, F6 Conference Prep, F8 Bagrut-Readiness
+      Tracker) create indirect student-ethics risk: student data aggregated by
+      teachers and routed to parents without student agency
+    - F7 Class Health Pulse is well-designed and privacy-first
+    - F4 Exit Ticket shared-with-students framing (L131) edges toward
+      comparison/shame if not carefully implemented
+    - Overall axis is ethically sound with four revision points
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "STEP platform effect-size claims -> cogsci"
+    - "OpenEduCat 'under 2 minutes' timing -> out of lens"
+adr_alignment:
+  honored:
+    - "GD-004 shipgate (L326)"
+    - "ADR-0003 — 2-week recalc for homework profiles (L86)"
+  violated: []
+  missing_adr_needed:
+    - "ADR clarifying student agency in teacher-authored conference prep briefs,
+      parent-shared exit ticket results, and Bagrut readiness targeting"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F4 Exit Ticket Auto-Generator (L128-161) proposes (L131) teachers
+      can share results with students as "You mastered X / You might
+      want to review Y." Author notes "framed as encouragement, not
+      shame" but BORDERLINE flag (L158) admits comparison risk. Ethics
+      lens: if shared, must be strictly individual ("you, to your
+      yesterday") — absolutely no class-median reference, no color-
+      coded groups, no "where you rank." Shipgate should enforce this
+      at locale level.
+    evidence: cena_axis5_teacher_workflow_features.md:L131, L156-L160
+    lens_note: |
+      "You mastered X / you might want to review Y" is acceptable; a
+      teacher tempted to broaden to "most of your class got Y" crosses
+      the banned-comparative-percentile line. Without a copy lockdown
+      rule, the teacher UI will drift.
+  - severity: P1
+    finding: |
+      F6 Student Conference Prep (L199-230) auto-generates talking
+      points about each student for parent-teacher conferences. Author
+      flags (L227) that briefs are teacher-facing only. Ethics lens
+      requires stronger: the student must be offered an opt-in preview
+      of their own brief BEFORE the conference ("this is what will be
+      discussed — anything to add or correct?"). Otherwise the feature
+      enables teachers and parents to discuss the student's data
+      without the student's participation — a violation of autonomy for
+      14-18 year olds.
+    evidence: cena_axis5_teacher_workflow_features.md:L199-L230
+    lens_note: |
+      Self-Determination Theory + Israeli PPL (for minors approaching
+      adulthood) both support student access to data discussed about
+      them. Teacher-only briefs about minors who are 2-4 years from
+      legal adulthood erode autonomy by design.
+  - severity: P1
+    finding: |
+      F8 Bagrut-Readiness Tracker (L271-301) proposes a
+      students-by-units matrix with red/yellow/green cells. Author
+      flags BORDERLINE (L298). Ethics lens: the matrix itself is
+      teacher-facing, which is fine. But the "what-if scenario"
+      projection ("If I assign extra homework, which students would
+      move to on-track?") (L273) creates a gaming-the-student-toward-
+      a-target UX that treats the student as an optimization variable.
+      This is the kind of view that justifies teacher pressure calls
+      home. Recommend: what-if projections disabled by default, require
+      department-head activation + annual review.
+    evidence: cena_axis5_teacher_workflow_features.md:L273-L299
+    lens_note: |
+      Teacher dashboards that let a teacher simulate which homework
+      increase would move a student from yellow to green on Bagrut
+      readiness create incentive to increase homework load on already-
+      struggling students. Ethics lens flags this as an indirect
+      coercion amplifier.
+  - severity: P2
+    finding: |
+      F2 Homework Auto-Generator (L57-89) streams students into
+      Core/Progress/Stretch based on inferred level. Author flags
+      (L85-87) that profiles are recalc'd weekly. Ethics lens: the
+      student must see their assigned stream label is not visible to
+      them ("Core" vs "Stretch") — or if visible, must be neutralized
+      to avoid tracking/labeling effect (Rosenthal-Jacobson). Better:
+      no student-facing stream label, just problems.
+    evidence: cena_axis5_teacher_workflow_features.md:L57-L89
+    lens_note: |
+      Ability-group labels that reach the student (even subtly via
+      "Your set" naming) activate stereotype-threat research
+      well-documented since Rosenthal 1968.
+  - severity: P2
+    finding: |
+      F5 Bagrut Rubric Alignment (L164-196) is pedagogically sound.
+      One concern: author proposes "parent view showing readiness"
+      (L191 implicit in F8 but referenced here via Parent-readiness
+      note L290). Parent visibility of Bagrut readiness mapping
+      requires per-semester student opt-in, consistent with Axis 4
+      finding.
+    evidence: cena_axis5_teacher_workflow_features.md:L191, L290
+    lens_note: |
+      Same autonomy principle as Axis 4 F8 — parent visibility of
+      readiness is a significant disclosure, must be student-gated.
+already_built: []
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-022 through FD-027 covers all 8 features"
+extracted_tasks:
+  - title: "Exit Ticket student-share copy lockdown (no comparisons, no medians)"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F4 Exit Ticket results shared to students must pass shipgate
+      lint forbidding: "class average," "your rank," "others in your
+      class," "median," "percentile," "top X%," "bottom X%."
+      Student-shared view is strictly "you" statements.
+      ## Files
+      - scripts/shipgate/banned.json
+      - src/teacher-web/src/features/exit-ticket/StudentShareCopy.ts
+      ## Definition of Done
+      - Lint fails on any comparative phrase in exit-ticket-student-* namespace
+      - Existing templates pass
+      - Test fixture covers 10 violating and 10 valid strings
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L131, L156-L160]
+  - title: "Student-preview requirement for conference prep briefs"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F6 Conference Prep briefs: add mandatory student-preview step.
+      Before a teacher finalizes a brief, the student receives a
+      read-only preview with an "add your note" text box (optional).
+      The teacher sees the student's note appended (or blank) in the
+      final brief.
+      ## Files
+      - src/actors/ConferencePrep/*
+      - src/student-web/src/features/conference-preview/*
+      ## Definition of Done
+      - No brief can be marked "final" without student preview window
+      - Preview window has 72h response time before brief auto-finalizes
+        with a clearly-labeled "student did not review in time" notice
+      - Audit log records preview + response
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L199-L230]
+  - title: "Gate F8 'what-if' projections behind dept-head activation"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      F8 Bagrut-Readiness what-if projections disabled by default; each
+      school's department head must explicitly enable per-semester.
+      ADR-level policy: no individual teacher can enable what-if views
+      without dept-head sign-off.
+      ## Files
+      - docs/adr/00NN-bagrut-readiness-what-if-policy.md (new)
+      - src/teacher-web/src/features/readiness/WhatIf.vue (gated flag)
+      ## Definition of Done
+      - ADR accepted
+      - Feature flag controlled by department-head role only
+      - E2E test: individual teacher cannot self-enable
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L273-L299]
+  - title: "Remove student-facing stream labels (Core/Progress/Stretch)"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F2 Homework Auto-Generator: students receive problems without any
+      stream label ("Core," "Progress," "Stretch") visible in
+      student-facing UI or copy. Teacher UI may keep labels for
+      differentiation; student UI shows neutral "this week's practice."
+      ## Files
+      - src/student-web/src/features/homework/*
+      - src/student-web/src/locales/*.json
+      ## Definition of Done
+      - Grep finds no stream label in student-web strings
+      - Teacher dashboard preserves stream view
+      - Snapshot tests confirm student UI neutrality
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L57-L89]
+verdict: revise
+verdict_reason: |
+  Teacher-workflow features are mostly ethics-positive (time-savings,
+  privacy-first pulse). Revise F4 copy lockdown, F6 student preview, F8
+  what-if gating, F2 remove stream labels. F1, F3, F5, F7 ship.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "F6 teacher-brief data scope; F8 readiness projections retention"
+  - to: persona-educator
+    about: "Pedagogical validity of Core/Progress/Stretch auto-streaming"
+  - to: persona-enterprise
+    about: "F8 what-if scenarios computation — aggregation decomposition under ADR-0012"

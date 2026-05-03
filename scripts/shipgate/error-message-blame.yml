@@ -1,0 +1,132 @@
+# =============================================================================
+# Ship-gate rule pack: error message blame framing (prr-142 / EPIC-PRR-D D3)
+# =============================================================================
+# Source:  tasks/pre-release-review/TASK-PRR-142 absorbed into EPIC-PRR-D
+# Policy:  Student-facing error / wrong-answer / incorrect-step messages must
+#          use neutral, education-friendly framing — never blame, never
+#          shame, never punitive language.
+#
+#          BANNED: "wrong!", "incorrect!", "you failed", "you got it wrong",
+#          "mistake" in punitive positioning, "bad answer", "incorrect
+#          answer", "try harder", "you missed it again".
+#          REPLACEMENT PATTERN: "let's try again", "not quite yet",
+#          "close — check step N", "the next step is …".
+#
+# The curated replacement map lives at
+# contracts/copy/error-message-replacements.yml — it feeds future i18n bulk
+# rewrites and is referenced in the reason strings below so reviewers have
+# a ready-made alternative to suggest when they reject blame copy.
+#
+# Locale coverage: en / he / ar. Hebrew and Arabic patterns are best-effort
+# machine translations; review by native-speaker team before enforcement.
+#
+# Rule shape: see banned-citations.yml header.
+# =============================================================================
+
+rules:
+  # --------------------------------------------------------------------------
+  # prr-142 — blame-framed error copy (English)
+  # --------------------------------------------------------------------------
+  - id: blame-wrong-bang
+    reason: "Banned 'Wrong!' punitive framing (prr-142 — use 'let's try again'; see contracts/copy/error-message-replacements.yml)"
+    pattern: "(?:^|[\\s>\"'`])wrong\\s*[!?]"
+    flags: i
+
+  - id: blame-incorrect-bang
+    reason: "Banned 'Incorrect!' punitive framing (prr-142 — use 'not quite yet'; see contracts/copy/error-message-replacements.yml)"
+    pattern: "(?:^|[\\s>\"'`])incorrect\\s*[!?]"
+    flags: i
+
+  - id: blame-you-failed
+    reason: "Banned 'you failed' / 'you have failed' (prr-142 — use 'not quite yet'; see contracts/copy/error-message-replacements.yml)"
+    pattern: "you\\s+(have\\s+)?failed(?:\\s+(the|this|that|it|again))?"
+    flags: i
+
+  - id: blame-you-got-it-wrong
+    reason: "Banned 'you got it wrong' (prr-142 — use 'close — check step N'; see contracts/copy/error-message-replacements.yml)"
+    pattern: "you\\s+got\\s+(it|this|that|the\\s+\\w+)\\s+wrong"
+    flags: i
+
+  - id: blame-incorrect-answer
+    reason: "Banned 'incorrect answer' / 'wrong answer' punitive label (prr-142 — use 'not quite yet'; see contracts/copy/error-message-replacements.yml)"
+    pattern: "\\b(incorrect|wrong|bad)\\s+answer\\b"
+    flags: i
+
+  - id: blame-try-harder
+    reason: "Banned 'try harder' effort-shame framing (prr-142 — use 'let's break this into smaller steps'; see contracts/copy/error-message-replacements.yml)"
+    pattern: "\\btry\\s+harder\\b"
+    flags: i
+
+  - id: blame-missed-again
+    reason: "Banned 'you missed it/that/this again' repetition-shame (prr-142 — use 'let's try step N one more time'; see contracts/copy/error-message-replacements.yml)"
+    pattern: "you\\s+missed\\s+(it|that|this|again)\\s+again"
+    flags: i
+
+  - id: blame-you-made-a-mistake
+    reason: "Banned 'you made a mistake' blame framing (prr-142 — use 'let's revisit step N'; see contracts/copy/error-message-replacements.yml)"
+    pattern: "you\\s+made\\s+(a|another|the|yet\\s+another)\\s+mistake"
+    flags: i
+
+  - id: blame-bad-answer
+    reason: "Banned 'bad answer' / 'a bad attempt' punitive label (prr-142 — use 'not quite yet'; see contracts/copy/error-message-replacements.yml)"
+    pattern: "\\b(bad|terrible|awful|poor)\\s+(answer|attempt|response)\\b"
+    flags: i
+
+  - id: blame-not-good-enough
+    reason: "Banned 'not good enough' punitive framing (prr-142 — use 'close — check step N'; see contracts/copy/error-message-replacements.yml)"
+    pattern: "\\b(that'?s|this\\s+is|your\\s+(answer|attempt|response)\\s+is)\\s+not\\s+good\\s+enough\\b"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # Hebrew variants (best-effort; verify with native-speaker team)
+  # --------------------------------------------------------------------------
+  - id: he-blame-wrong-bang
+    reason: "Hebrew 'wrong!' (prr-142 — verify w/ native speaker)"
+    pattern: "(לא\\s+נכון|שגוי|טעות)\\s*!"
+    flags: u
+    locale: he
+
+  - id: he-blame-you-failed
+    reason: "Hebrew 'you failed' (prr-142 — verify w/ native speaker)"
+    pattern: "נכשלת"
+    flags: u
+    locale: he
+
+  - id: he-blame-incorrect-answer
+    reason: "Hebrew 'incorrect/wrong answer' (prr-142 — verify w/ native speaker)"
+    pattern: "תשובה\\s+(שגויה|לא\\s+נכונה|לא\\s+טובה)"
+    flags: u
+    locale: he
+
+  - id: he-blame-try-harder
+    reason: "Hebrew 'try harder' (prr-142 — verify w/ native speaker)"
+    pattern: "(תתאמץ|השתדל)\\s+(יותר|חזק\\s+יותר)"
+    flags: u
+    locale: he
+
+  # --------------------------------------------------------------------------
+  # Arabic variants (best-effort; verify with native-speaker team)
+  # --------------------------------------------------------------------------
+  - id: ar-blame-wrong-bang
+    reason: "Arabic 'wrong!' (prr-142 — verify w/ native speaker)"
+    pattern: "(خطأ|غير\\s+صحيح|غلط)\\s*!"
+    flags: u
+    locale: ar
+
+  - id: ar-blame-you-failed
+    reason: "Arabic 'you failed' (prr-142 — verify w/ native speaker)"
+    pattern: "(فشلت|رسبت)"
+    flags: u
+    locale: ar
+
+  - id: ar-blame-incorrect-answer
+    reason: "Arabic 'incorrect/wrong answer' (prr-142 — verify w/ native speaker)"
+    pattern: "(إجابة|جواب)\\s+(خاطئة|خاطئ|غير\\s+صحيحة|غير\\s+صحيح)"
+    flags: u
+    locale: ar
+
+  - id: ar-blame-try-harder
+    reason: "Arabic 'try harder' (prr-142 — verify w/ native speaker)"
+    pattern: "(اجتهد|حاول)\\s+(أكثر|بجد|بقوة)"
+    flags: u
+    locale: ar

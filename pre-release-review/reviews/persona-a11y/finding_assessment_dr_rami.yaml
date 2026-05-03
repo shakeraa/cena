@@ -1,0 +1,50 @@
+doc_path: pre-release-review/finding_assessment_dr_rami.md
+reviewer: persona-a11y
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr. Rami's honesty assessment of the 20 SHIP findings: 9 PASS, 8 WARNING,
+  3 REJECT (FD-003 fabricated evidence, FD-008 unverifiable + DPA §7 violation,
+  FD-011 cherry-picked ES). A11y-relevant finding: FD-010 Arabic RTL Math
+  Renderer is PASS on evidence grounds.
+system_purpose_fit: 2
+  rationale:
+    - Primarily an evidence/statistics review; a11y surface is minimal
+    - FD-010 Arabic RTL PASS confirms the feature is evidence-sound
+    - Out-of-lens for most claims
+code_reality_check:
+  claims_verified_in_code:
+    - "FD-010 Arabic RTL has Cena partial impl (tests/a11y/math-ltr-wrapper.spec.ts)"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Dr. Rami's statistical judgments — out of this lens"
+adr_alignment:
+  honored: []
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P2
+    finding: "FD-010 PASS on evidence. a11y/l10n lens agrees: this feature is non-negotiable and has existing partial code. Dr. Rami's clean bill of health removes one failure mode (cherry-picked sources) but doesn't change architectural ask."
+    evidence: "finding_assessment_dr_rami.md:FD-010 row"
+    lens_note: "Synthesizer: a feature passing both pedagogy (Nadia) and honesty (Rami) and a11y (me) should be top-10 SHIP priority."
+  - severity: P2
+    finding: "FD-013 mother-tongue hints WARNING (generalizability). a11y lens adds: even if evidence is thin, implementation should ship the lang-attribute contract upfront so pilots can be screen-reader-validated."
+    evidence: "finding_assessment_dr_rami.md:FD-013 row"
+    lens_note: "Technical a11y contracts are independent of effect-size evidence."
+already_built:
+  - feature: "Arabic RTL partial renderer (FD-010)"
+    evidence: "src/student/full-version/tests/a11y/math-ltr-wrapper.spec.ts"
+    note: "Evidence-clean + code-present = top priority"
+duplicates_of_other_docs:
+  - "cena_dr_nadia_pedagogical_review_20_findings.md (same 20 findings)"
+  - "feature-discovery-2026-04-20.md (source of all FD-xxx ids)"
+extracted_tasks: []
+verdict: adopt
+verdict_reason: "Honesty review confirms FD-010 (Arabic RTL) is sound; no a11y/l10n-specific tasks arise here since Dr. Rami's lens is statistics."
+cross_lens_handoff:
+  - to: persona-educator
+    about: "Full statistical assessment of all 20 findings"
+  - to: persona-cogsci
+    about: "FD-001 d=1.05 vs meta d=0.34 interleaving effect-size concern"
+  - to: persona-privacy
+    about: "FD-008 DPA §7 violation (AI partial-credit grading)"

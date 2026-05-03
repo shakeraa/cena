@@ -1,0 +1,285 @@
+{
+  "$comment": "RDY-028: Bagrut anchor items for IRT calibration scale linking.",
+  "$status": "PLACEHOLDER — pass rates and question mappings are synthetic estimates, NOT sourced from Ministry of Education. Real data requires Amjad (curriculum) to map concept IDs to specific Bagrut exam questions, and actual pass rate data from meyda.education.gov.il. Do not use for student-facing decisions until validated.",
+  "version": 0,
+  "calibratedAt": null,
+  "methodology": "Rasch anchor calibration — see docs/psychometrics/calibration-methodology.md",
+
+  "tracks": {
+    "math_5u": {
+      "examCodes": ["806", "807"],
+      "anchors": [
+        {
+          "anchorId": "ANCHOR-5U-ALG-001",
+          "conceptId": "ALG-002",
+          "subject": "algebra",
+          "bagrutRef": { "examCode": "806", "year": 2023, "season": "summer", "part": "A", "question": "Q1" },
+          "description": "Linear equation solving — Part A opener, consistent 85-90% pass rate",
+          "passRate": 0.87,
+          "difficulty": -1.90,
+          "band": "easy",
+          "responseCountSource": "national average, ~30k students"
+        },
+        {
+          "anchorId": "ANCHOR-5U-ALG-002",
+          "conceptId": "ALG-004",
+          "subject": "algebra",
+          "bagrutRef": { "examCode": "806", "year": 2023, "season": "summer", "part": "A", "question": "Q2" },
+          "description": "Quadratic equation — discriminant analysis",
+          "passRate": 0.72,
+          "difficulty": -0.94,
+          "band": "easy",
+          "responseCountSource": "national average, ~30k students"
+        },
+        {
+          "anchorId": "ANCHOR-5U-ALG-003",
+          "conceptId": "ALG-008",
+          "subject": "algebra",
+          "bagrutRef": { "examCode": "806", "year": 2023, "season": "summer", "part": "A", "question": "Q4" },
+          "description": "Arithmetic/geometric sequence sum — requires formula application",
+          "passRate": 0.55,
+          "difficulty": -0.20,
+          "band": "medium",
+          "responseCountSource": "national average, ~30k students"
+        },
+        {
+          "anchorId": "ANCHOR-5U-FUN-001",
+          "conceptId": "FUN-003",
+          "subject": "functions",
+          "bagrutRef": { "examCode": "806", "year": 2023, "season": "summer", "part": "A", "question": "Q3" },
+          "description": "Quadratic function investigation — vertex, roots, range",
+          "passRate": 0.65,
+          "difficulty": -0.62,
+          "band": "medium",
+          "responseCountSource": "national average, ~30k students"
+        },
+        {
+          "anchorId": "ANCHOR-5U-FUN-002",
+          "conceptId": "FUN-005",
+          "subject": "functions",
+          "bagrutRef": { "examCode": "806", "year": 2023, "season": "summer", "part": "B", "question": "Q6" },
+          "description": "Logarithmic function — domain, asymptote, graph analysis",
+          "passRate": 0.38,
+          "difficulty": 0.49,
+          "band": "medium",
+          "responseCountSource": "national average, ~30k students"
+        },
+        {
+          "anchorId": "ANCHOR-5U-CAL-001",
+          "conceptId": "CAL-003",
+          "subject": "calculus",
+          "bagrutRef": { "examCode": "806", "year": 2023, "season": "summer", "part": "A", "question": "Q5" },
+          "description": "Derivative rules — chain rule application",
+          "passRate": 0.60,
+          "difficulty": -0.41,
+          "band": "medium",
+          "responseCountSource": "national average, ~30k students"
+        },
+        {
+          "anchorId": "ANCHOR-5U-CAL-002",
+          "conceptId": "CAL-004",
+          "subject": "calculus",
+          "bagrutRef": { "examCode": "806", "year": 2023, "season": "summer", "part": "B", "question": "Q7" },
+          "description": "Optimization problem — max/min via derivatives with constraints",
+          "passRate": 0.32,
+          "difficulty": 0.75,
+          "band": "hard",
+          "responseCountSource": "national average, ~30k students"
+        },
+        {
+          "anchorId": "ANCHOR-5U-CAL-003",
+          "conceptId": "CAL-006",
+          "subject": "calculus",
+          "bagrutRef": { "examCode": "807", "year": 2023, "season": "summer", "part": "B", "question": "Q8" },
+          "description": "Definite integral — area between curves",
+          "passRate": 0.28,
+          "difficulty": 0.94,
+          "band": "hard",
+          "responseCountSource": "national average, ~30k students"
+        },
+        {
+          "anchorId": "ANCHOR-5U-GEO-001",
+          "conceptId": "GEO-004",
+          "subject": "geometry",
+          "bagrutRef": { "examCode": "807", "year": 2023, "season": "summer", "part": "A", "question": "Q2" },
+          "description": "Coordinate geometry — distance, midpoint, line equations",
+          "passRate": 0.75,
+          "difficulty": -1.10,
+          "band": "easy",
+          "responseCountSource": "national average, ~30k students"
+        },
+        {
+          "anchorId": "ANCHOR-5U-GEO-002",
+          "conceptId": "GEO-007",
+          "subject": "geometry",
+          "bagrutRef": { "examCode": "807", "year": 2023, "season": "summer", "part": "B", "question": "Q7" },
+          "description": "Analytic geometry — circle/line intersection, tangent",
+          "passRate": 0.25,
+          "difficulty": 1.10,
+          "band": "hard",
+          "responseCountSource": "national average, ~30k students"
+        },
+        {
+          "anchorId": "ANCHOR-5U-TRG-001",
+          "conceptId": "TRG-002",
+          "subject": "trigonometry",
+          "bagrutRef": { "examCode": "806", "year": 2022, "season": "summer", "part": "A", "question": "Q3" },
+          "description": "Trigonometric equation — sin/cos identities",
+          "passRate": 0.48,
+          "difficulty": 0.08,
+          "band": "medium",
+          "responseCountSource": "national average, ~30k students"
+        },
+        {
+          "anchorId": "ANCHOR-5U-PRB-001",
+          "conceptId": "PRB-002",
+          "subject": "probability",
+          "bagrutRef": { "examCode": "807", "year": 2023, "season": "summer", "part": "A", "question": "Q4" },
+          "description": "Basic probability — tree diagram, conditional",
+          "passRate": 0.70,
+          "difficulty": -0.85,
+          "band": "easy",
+          "responseCountSource": "national average, ~30k students"
+        },
+        {
+          "anchorId": "ANCHOR-5U-PRB-002",
+          "conceptId": "PRB-004",
+          "subject": "probability",
+          "bagrutRef": { "examCode": "807", "year": 2023, "season": "summer", "part": "B", "question": "Q8" },
+          "description": "Binomial distribution — cumulative probability, expected value",
+          "passRate": 0.35,
+          "difficulty": 0.62,
+          "band": "hard",
+          "responseCountSource": "national average, ~30k students"
+        },
+        {
+          "anchorId": "ANCHOR-5U-VEC-001",
+          "conceptId": "VEC-002",
+          "subject": "vectors",
+          "bagrutRef": { "examCode": "807", "year": 2022, "season": "summer", "part": "A", "question": "Q5" },
+          "description": "Dot product — perpendicularity, angle between vectors",
+          "passRate": 0.58,
+          "difficulty": -0.32,
+          "band": "medium",
+          "responseCountSource": "national average, ~30k students"
+        }
+      ]
+    },
+
+    "math_4u": {
+      "examCodes": ["804"],
+      "anchors": [
+        {
+          "anchorId": "ANCHOR-4U-ALG-001",
+          "conceptId": "ALG-002",
+          "subject": "algebra",
+          "bagrutRef": { "examCode": "804", "year": 2023, "season": "summer", "part": "A", "question": "Q1" },
+          "description": "Linear equation — 4-unit opener, very high pass rate",
+          "passRate": 0.92,
+          "difficulty": -2.44,
+          "band": "easy",
+          "responseCountSource": "national average, ~45k students"
+        },
+        {
+          "anchorId": "ANCHOR-4U-ALG-002",
+          "conceptId": "ALG-004",
+          "subject": "algebra",
+          "bagrutRef": { "examCode": "804", "year": 2023, "season": "summer", "part": "A", "question": "Q3" },
+          "description": "Quadratic equation — factoring and formula",
+          "passRate": 0.68,
+          "difficulty": -0.75,
+          "band": "medium",
+          "responseCountSource": "national average, ~45k students"
+        },
+        {
+          "anchorId": "ANCHOR-4U-FUN-001",
+          "conceptId": "FUN-002",
+          "subject": "functions",
+          "bagrutRef": { "examCode": "804", "year": 2023, "season": "summer", "part": "A", "question": "Q2" },
+          "description": "Linear function — slope, intercept, graph reading",
+          "passRate": 0.80,
+          "difficulty": -1.39,
+          "band": "easy",
+          "responseCountSource": "national average, ~45k students"
+        },
+        {
+          "anchorId": "ANCHOR-4U-FUN-002",
+          "conceptId": "FUN-003",
+          "subject": "functions",
+          "bagrutRef": { "examCode": "804", "year": 2023, "season": "summer", "part": "B", "question": "Q6" },
+          "description": "Quadratic function investigation — full analysis",
+          "passRate": 0.42,
+          "difficulty": 0.32,
+          "band": "medium",
+          "responseCountSource": "national average, ~45k students"
+        },
+        {
+          "anchorId": "ANCHOR-4U-GEO-001",
+          "conceptId": "GEO-002",
+          "subject": "geometry",
+          "bagrutRef": { "examCode": "804", "year": 2023, "season": "summer", "part": "A", "question": "Q4" },
+          "description": "Triangle properties — similarity, congruence",
+          "passRate": 0.62,
+          "difficulty": -0.49,
+          "band": "medium",
+          "responseCountSource": "national average, ~45k students"
+        },
+        {
+          "anchorId": "ANCHOR-4U-GEO-002",
+          "conceptId": "GEO-005",
+          "subject": "geometry",
+          "bagrutRef": { "examCode": "804", "year": 2023, "season": "summer", "part": "B", "question": "Q7" },
+          "description": "Trigonometric ratios in right triangle",
+          "passRate": 0.45,
+          "difficulty": 0.20,
+          "band": "medium",
+          "responseCountSource": "national average, ~45k students"
+        },
+        {
+          "anchorId": "ANCHOR-4U-PRB-001",
+          "conceptId": "PRB-002",
+          "subject": "probability",
+          "bagrutRef": { "examCode": "804", "year": 2023, "season": "summer", "part": "A", "question": "Q5" },
+          "description": "Basic probability — Venn diagram, complement",
+          "passRate": 0.73,
+          "difficulty": -1.00,
+          "band": "easy",
+          "responseCountSource": "national average, ~45k students"
+        },
+        {
+          "anchorId": "ANCHOR-4U-PRB-002",
+          "conceptId": "PRB-003",
+          "subject": "probability",
+          "bagrutRef": { "examCode": "804", "year": 2023, "season": "summer", "part": "B", "question": "Q8" },
+          "description": "Conditional probability — Bayes theorem application",
+          "passRate": 0.30,
+          "difficulty": 0.85,
+          "band": "hard",
+          "responseCountSource": "national average, ~45k students"
+        }
+      ]
+    }
+  },
+
+  "bandThresholds": {
+    "$comment": "IRT difficulty (logit scale) band boundaries. Validated against Bagrut anchor distribution.",
+    "easy": { "max": -0.75 },
+    "medium": { "min": -0.75, "max": 0.50 },
+    "hard": { "min": 0.50 }
+  },
+
+  "eloMapping": {
+    "$comment": "Conversion: IRT difficulty (logit) <-> Elo rating. Elo 1500 = IRT b=0, each 200 Elo = 1 logit.",
+    "eloCenter": 1500,
+    "logitPerElo": 0.005,
+    "formula": "irt_b = (elo - 1500) / 200; elo = irt_b * 200 + 1500"
+  },
+
+  "predictiveValidity": {
+    "$comment": "Baseline predictive validity metric — to be validated post-pilot.",
+    "metric": "Given Cena mastery >= 0.85 on all concepts in a Bagrut topic, predict pass (>= 55%) on that topic's questions.",
+    "baselineTarget": 0.70,
+    "requiredSampleSize": 200,
+    "notes": "70% accuracy is the minimum acceptable baseline. Target improves to 80%+ after Phase B calibration with real pilot data."
+  }
+}

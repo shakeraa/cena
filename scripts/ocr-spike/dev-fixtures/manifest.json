@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0",
+  "generator": "scripts/ocr-spike/build_dev_fixtures.py",
+  "generated_at": "2026-04-16T12:00:00Z",
+  "files": [
+    {
+      "path": "bagrut-analysis/analysis.json",
+      "bytes": 2787,
+      "sha256_prefix": "1c39af5599516dba"
+    },
+    {
+      "path": "cascade-results/bagrut-3u-text-shortcut.json",
+      "bytes": 197606,
+      "sha256_prefix": "57513ef0a109c5df"
+    },
+    {
+      "path": "cascade-results/bagrut-5u-full-cascade.json",
+      "bytes": 69156,
+      "sha256_prefix": "dc18290edd0b9a8b"
+    },
+    {
+      "path": "cascade-results/geva-hebrew-solutions.json",
+      "bytes": 54097,
+      "sha256_prefix": "b8daa11849d53833"
+    },
+    {
+      "path": "cascade-results/pdf-encrypted-422.json",
+      "bytes": 1049,
+      "sha256_prefix": "79bd3eb83b330d82"
+    },
+    {
+      "path": "cascade-results/pdf-scanned-bad-ocr.json",
+      "bytes": 3104,
+      "sha256_prefix": "29b68914819d275b"
+    },
+    {
+      "path": "cascade-results/psychometric-english-text.json",
+      "bytes": 41894,
+      "sha256_prefix": "dd3db913eb779c61"
+    },
+    {
+      "path": "cascade-results/psychometric-hebrew-mixed.json",
+      "bytes": 31793,
+      "sha256_prefix": "962b9693eae2c829"
+    },
+    {
+      "path": "cascade-results/sat-english-text.json",
+      "bytes": 19643,
+      "sha256_prefix": "5b062a7e1d7c8e1f"
+    },
+    {
+      "path": "cascade-results/student-photo-algebra-3u.json",
+      "bytes": 1512,
+      "sha256_prefix": "4cac13a9e32ca6ea"
+    },
+    {
+      "path": "cascade-results/student-photo-calculus-5u.json",
+      "bytes": 1787,
+      "sha256_prefix": "f9c5b3eb2c8b00da"
+    },
+    {
+      "path": "context-hints/examples.json",
+      "bytes": 2312,
+      "sha256_prefix": "317f2275b31586c4"
+    },
+    {
+      "path": "pipeline-states/pipeline-items.json",
+      "bytes": 5103,
+      "sha256_prefix": "05cec381ad59310e"
+    },
+    {
+      "path": "triage-verdicts/samples.json",
+      "bytes": 3762,
+      "sha256_prefix": "521083f55e116a63"
+    }
+  ],
+  "count": 14
+}

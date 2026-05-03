@@ -1,0 +1,56 @@
+# PET Quantitative (Psychometric Entrance Test — Math section).
+
+exam_code: PET_QUANTITATIVE
+family: STANDARDIZED
+track: null
+units: null
+region: International-PET
+regulator: nite
+ministry_subject_code: null
+ministry_question_paper_codes: []
+availability: launch
+item_bank_status: full
+passback_eligible: false
+default_lead_days: 90
+sittings:
+  - code: PET_2026_SPRING
+    academic_year: "2026"
+    season: spring
+    moed: A
+    canonical_date: "2026-04-10"
+  - code: PET_2026_SUMMER
+    academic_year: "2026"
+    season: summer
+    moed: A
+    canonical_date: "2026-07-05"
+display:
+  en:
+    name: "PET Quantitative"
+    short_description: "Psychometric Entrance Test (NITE), quantitative section."
+  he:
+    name: "פסיכומטרי — חלק כמותי"
+    short_description: "מבחן פסיכומטרי של המרכז הארצי לבחינות ולהערכה, חלק כמותי."
+  ar:
+    name: "اختبار القبول النفسي — الكمي"
+    short_description: "اختبار القبول النفسي (نيتي)، القسم الكمي."
+topics:
+  - topic_id: algebra.core
+    display:
+      en: "Algebra"
+      he: "אלגברה"
+      ar: "الجبر"
+  - topic_id: geometry.plane
+    display:
+      en: "Geometry"
+      he: "גיאומטריה"
+      ar: "الهندسة"
+  - topic_id: problem_solving
+    display:
+      en: "Word problems"
+      he: "בעיות מילוליות"
+      ar: "المسائل الكلامية"
+  - topic_id: statistics.basic
+    display:
+      en: "Statistics"
+      he: "סטטיסטיקה"
+      ar: "الإحصاء"

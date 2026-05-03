@@ -1,0 +1,164 @@
+doc_path: pre-release-review/cena_competitive_analysis.md
+reviewer: persona-ministry
+reviewed_at: 2026-04-20
+doc_summary: |
+  Surveys 30+ EdTech platforms (Israeli: GOOL, Kotar, Matam, 100ketav, Geva;
+  global adaptive, AI tutors, assessment, accessibility, parent engagement)
+  and extracts 10 adaptable features. Ministry-relevant picks: F8 "Bagrut-
+  Aligned Practice Engine", F4 "At-Risk Student Alert System", F6 "Auto-
+  Translation Parent Comms". Most other picks overlap other axes.
+system_purpose_fit: 3
+  rationale:
+    - Competitive landscape is useful framing; Ministry lens cares most
+      about (a) how Israeli competitors (GOOL, Geva) handle Bagrut
+      content legally and (b) whether the proposed Cena features match
+      what competitors already ship.
+    - F8 "Bagrut-Aligned Practice Engine" inspired by Up Learn (UK) +
+      Byju''s (India) + GOOL — must re-state "aligned" as "taxonomy-
+      referenced + AI-recreated items per ADR-0033", not "surfaces
+      actual Bagrut questions".
+    - Doc is mostly lens-neutral / descriptive.
+code_reality_check:
+  claims_verified_in_code:
+    - 'BagrutRecreation pipeline + canonical taxonomy exist (mapped in axis8 review)'
+    - 'Scripts/README-bagrut-reference.md declares "no question text ever reaches students"'
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - 'How Israeli competitors (GOOL) actually handle Ministry-content licensing — doc quotes their feature set but not their legal posture; not our concern except as a cautionary tale'
+adr_alignment:
+  honored:
+    - 'Non-negotiable #4 (F8 "Bagrut-Aligned" if read correctly means aligned to syllabus, not surfacing Ministry text)'
+  violated: []
+  missing_adr_needed:
+    - 'Competitor-diligence ADR — explicit statement that Cena does not copy competitor Ministry-content-handling practices without verifying their legality'
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 8 "Bagrut-Aligned Practice Engine" as framed could be
+      misread as "surface Bagrut questions like GOOL does". Israeli
+      competitor GOOL hosts real Bagrut past-paper questions (common
+      market practice). Cena''s legal posture (scripts/README-bagrut-
+      reference.md + memory:project_bagrut_reference_only) says we
+      do NOT. The competitive-analysis doc must explicitly distinguish:
+      we are taxonomy-aligned and AI-recreation-aligned, not
+      verbatim-paper-aligned.
+    evidence: 'cena_competitive_analysis.md:L588 (F8 row); scripts/README-bagrut-reference.md (legal posture); src/actors/Cena.Actors/Content/BagrutRecreation.cs (recreation is AI-authored)'
+    lens_note: |
+      Ministry lens: Cena''s differentiation and defensibility both
+      rest on "we recreate, never surface". If competitive framing
+      blurs this, we invite an IP / Ministry-content incident.
+  - severity: P2
+    finding: |
+      Feature 4 "At-Risk Student Alert System" (ALEKS Insights, iReady
+      inspiration) — must not be a Bagrut-outcome prediction system.
+      Same RDY-080 pattern as parent/teacher countdowns. Doc flags it
+      SHORTLIST; Ministry-lens supports SHORTLIST with reframing to
+      engagement-risk / dropout-risk, not "Bagrut-fail-risk".
+    evidence: 'cena_competitive_analysis.md:L584 (F4 row)'
+    lens_note: |
+      Ministry lens: "at-risk" is a defensible concept if it refers
+      to engagement (missed sessions, incomplete chapters), not an
+      exam-score prediction.
+  - severity: P2
+    finding: |
+      Feature 1 "Socratic AI Tutor (No-Answer Mode)" — for Bagrut
+      timeboxed cram-period students, pure Socratic is counter-
+      productive. Dr. Nadia flagged this (FD-009 WARNING). Ministry
+      lens: the tutor must still respect syllabus scope (not ask
+      Socratic leading questions about out-of-scope material).
+    evidence: 'cena_competitive_analysis.md:L581 (F1 row); pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md:L701 (FD-009 WARNING)'
+    lens_note: |
+      Ministry lens: agreement with Dr. Nadia; Socratic within
+      syllabus scope = good; Socratic taking a student off-syllabus
+      = bad.
+  - severity: P2
+    finding: |
+      Feature 10 "Context-Aware Math Keyboard" — good; no lens issue.
+      Worth flagging that the math keyboard must support both
+      Hebrew-math (LTR math inside RTL UI) and Arabic-math (RTL math,
+      Arabic-Indic numerals optional). Reuses AXIS 8 F4 / AXIS 3 F7.
+    evidence: 'cena_competitive_analysis.md:L590 (F10 row)'
+    lens_note: |
+      Ministry lens: keyboard parity across Hebrew + Arabic math is
+      accommodations-parity table-stakes.
+already_built:
+  - feature: Bagrut recreation pipeline
+    evidence: src/actors/Cena.Actors/Content/BagrutRecreation.cs + memory:project_bagrut_reference_only
+    note: |
+      F8 "Bagrut-Aligned Practice Engine" should be framed as reuse
+      of this, not new build.
+duplicates_of_other_docs:
+  - 'feature-discovery-2026-04-20.md: FD-009 (F1), FD-019 (F2 overlap), many others — index is canonical'
+  - 'AXIS_4_Parent_Engagement_Cena_Research.md: F6 auto-translation overlaps F6 here'
+  - 'axis3_accessibility_accommodations_findings.md: F9 TTS overlaps F9 here'
+extracted_tasks:
+  - title: Distinguish "Bagrut-Aligned" from "Bagrut-surfaced" in marketing/product copy
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Establish a standard definition of what "Bagrut-Aligned" means
+      on Cena (= taxonomy-aligned via scripts/bagrut-taxonomy.json +
+      AI-recreated items per ADR-0033) and enforce it in copy via the
+      shipgate scanner.
+
+      ## Files
+      - docs/engineering/shipgate.md (add banned patterns:
+        "real Bagrut questions", "past Bagrut papers", "exam archive",
+        "original Ministry questions")
+      - docs/content/bagrut-aligned-definition.md (new, canonical
+        definition)
+
+      ## Definition of Done
+      - Shipgate scanner flags the banned patterns on any doc/UI copy
+      - Canonical definition linked from CLAUDE.md non-negotiables
+        section
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L588]
+  - title: Reframe F4 "At-Risk Alert" scope (engagement-risk only, not exam-score risk)
+    priority: P2
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Ensure any "at-risk student" signal surfaced to teachers is
+      derived from engagement indicators (session frequency, chapter
+      pacing vs class median, incomplete assignments) and NOT from
+      projected Bagrut outcome.
+
+      ## Files
+      - pre-release-review/cena_competitive_analysis.md (revise F4
+        framing)
+      - When F4 is picked up: enforce with architecture test that
+        AtRiskSignalService has no dependency on any readiness/
+        theta/prediction service.
+
+      ## Definition of Done
+      - F4 section rewritten to specify engagement inputs
+      - Planned arch test noted in task for implementation phase
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L584]
+verdict: adopt
+verdict_reason: |
+  Doc is descriptive with two lens concerns — "Bagrut-Aligned" framing
+  and "at-risk" prediction risk — both cheap to pre-empt. Most features
+  duplicate other-axis entries; let the index be canonical.
+cross_lens_handoff:
+  - to: persona-finops
+    about: |
+      Per-feature cost implications of LLM-dependent features (F1
+      Socratic tutor, F3 "Stuck? Ask" button) — finops owns the 3-tier
+      routing decisions.
+  - to: persona-cogsci
+    about: |
+      Effect-size claims across competitive picks — cogsci owns
+      evidence audits.
+  - to: persona-enterprise
+    about: |
+      Competitive integrations (Mashov, Google Classroom) architecture.

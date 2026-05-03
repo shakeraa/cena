@@ -1,0 +1,110 @@
+doc_path: pre-release-review/axis3_accessibility_accommodations_findings.md
+reviewer: persona-enterprise
+reviewed_at: 2026-04-20
+doc_summary: |
+  Accessibility & accommodations features: TTS with highlighting, keyboard-only nav,
+  contrast/color-independence, RTL+LTR math, cognitive load accommodations, dyslexia fonts,
+  extended-time accommodations, and math-speech rendering.
+system_purpose_fit: 4
+  rationale:
+    - Most features are presentation-layer and touch the PWA/student web, not the actor/event graph. Low-risk for bounded contexts.
+    - Accommodation profile (e.g. 'extended time', 'TTS enabled', 'dyslexia font') is new persisted student state — must be enrollment- or profile-scoped with a clear aggregate owner.
+    - RTL+LTR math already has the bdi convention; doc aligns.
+code_reality_check:
+  claims_verified_in_code:
+    - "Accommodations bounded context exists -> src/actors/Cena.Actors/Accommodations/ (directory)"
+    - "Student has profile snapshot suitable for accommodation flags -> src/actors/Cena.Actors/Events/StudentProfileSnapshot.cs:11"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Whether current AccommodationsActor exposes a stable event schema; directory listing shows presence but content not audited in this pass"
+adr_alignment:
+  honored:
+    - "Non-negotiable 6 (math LTR inside RTL via <bdi>)"
+  violated: []
+  missing_adr_needed:
+    - "Accommodation profile ownership + retention (is it enrollment-scoped or a single global student setting?)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Extended-time accommodation affects session timing, which is tracked inside LearningSessionActor. If the
+      accommodation lives on StudentProfile and sessions live in their own context (ADR-0012), cross-context read
+      is required on session start. Doc does not specify read model / saga — defaults to hidden coupling.
+    evidence: "axis3_accessibility_accommodations_findings.md:L~300 (extended-time feature); docs/adr/0012-aggregate-decomposition.md:82-87"
+    lens_note: Enterprise — ADR-0012 explicitly lists Methodology as a cross-context query; accommodations need the same treatment.
+  - severity: P1
+    finding: |
+      Accommodations-per-enrollment vs accommodations-per-student is undecided. A student in two institutes (bagrut + SAT)
+      may have different accommodation policies (IEP may cover only school context). ADR-0001 says student M:N institutes;
+      implying accommodation policy can differ per enrollment.
+    evidence: "axis3_accessibility_accommodations_findings.md:L~250; docs/adr/0001-multi-institute-enrollment.md:29-33"
+    lens_note: Enterprise — multi-institute tenant isolation applies to accommodations too.
+  - severity: P2
+    finding: |
+      Doc proposes several "extended time" assessment hooks. Bagrut reference-only ADR mandates student-facing items are
+      AI-recreated + CAS-gated; extended-time on exam simulation must not allow stitching of actual Bagrut questions.
+    evidence: "axis3_accessibility_accommodations_findings.md:L~380; feedback memory project_bagrut_reference_only"
+    lens_note: Enterprise (with ministry overlap) — failure mode is leaking Bagrut text into exam simulation.
+  - severity: P2
+    finding: |
+      TTS with highlighting can emit a per-utterance pipeline that fires on every session render. If this wraps a new
+      TtsRequested event written to the stream, per-word events explode stream size. Needs a non-sourced transient channel.
+    evidence: axis3_accessibility_accommodations_findings.md:L~120 (TTS feature)
+    lens_note: Enterprise — not everything belongs on the event stream; TTS is a UI transient.
+already_built:
+  - feature: "Accommodations bounded context"
+    evidence: src/actors/Cena.Actors/Accommodations/
+    note: "Directory exists; audit whether doc's eight features already have partial implementation before authoring"
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-025 (TTS with highlighting)"
+extracted_tasks:
+  - title: "Audit Accommodations bounded context vs axis3 proposals"
+    priority: P1
+    estimate: S
+    suggested_assignee: claude-subagent-audit
+    queue_body: |
+      ## Goal
+      Inventory src/actors/Cena.Actors/Accommodations/ against axis3's eight proposed features. Produce a
+      matrix of {already-built, partial, missing} before any new feature is queued.
+
+      ## Files
+      - src/actors/Cena.Actors/Accommodations/ (read)
+      - pre-release-review/reviews/persona-enterprise/axis3_accessibility_accommodations_findings.yaml (append matrix)
+
+      ## Definition of Done
+      - 8-row matrix with code cites.
+      - Any feature marked "already-built" -> retire proposal.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-audit --result "<branch>"
+    source_doc_lines: [L1-L600]
+  - title: "ADR: Accommodation profile scope (student vs enrollment)"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Lock whether accommodation flags live on StudentProfile (global to a human) or Enrollment (per-institute
+      contract). Impacts IEP handling and multi-institute fairness.
+
+      ## Files
+      - docs/adr/ (new 0015-accommodations-scope.md)
+
+      ## Definition of Done
+      - ADR published; references ADR-0001 (M:N institutes).
+      - Data shape for Phase-1 accommodations feature locked to the chosen scope.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L200-L300]
+verdict: revise
+verdict_reason: |
+  Features are mostly safe, but accommodation scope + cross-context read from LearningSession need design lock before
+  any new events are authored.
+cross_lens_handoff:
+  - to: persona-a11y
+    about: WCAG 2.2 AA detail and RTL/bdi implementation correctness.
+  - to: persona-privacy
+    about: Medical/IEP accommodation data is sensitive PII — retention/consent rules required.
+  - to: persona-ministry
+    about: Extended-time on exam simulation must not leak Bagrut reference text.

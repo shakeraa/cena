@@ -1,0 +1,229 @@
+doc_path: pre-release-review/cena_cross_domain_feature_innovation.md
+reviewer: persona-educator
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 features adapted from non-EdTech domains: Obsidian-style math concept
+  map, Calm-style 60-second focus ritual, Fabulous-style learning journeys,
+  Tetris-flow adaptive difficulty, Woebot-style Cena Companion, Discord-
+  style study circles, Sanvello-style learning-energy tracker, Nike-training-
+  style session-type menu.
+
+system_purpose_fit: 3
+  rationale:
+    - Cross-domain inspiration is valuable for novel UX. Several features
+      (F1 concept map, F3 learning journeys, F4 flow sessions, F8 session
+      menu) genuinely differentiate.
+    - Pedagogue concern: some borrowings smuggle dark-pattern mechanics
+      under "innovation" language (habit-tracking apps typically rely on
+      streaks; fitness apps lean on comparative metrics).
+    - ADR-0003 respected throughout — doc explicitly says session-local,
+      no cross-session retention.
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Concept/topic graph exists" -> src/actors/Cena.Actors/Graph/, src/actors/Cena.Actors/Mastery/TopicPrerequisiteGraph.cs
+    - "Flow state + cognitive load + adaptive scheduler (F4 flow sessions)" -> src/actors/Cena.Actors/Services/FlowStateService.cs, CognitiveLoadService.cs, Mastery/AdaptiveScheduler.cs
+    - "Methodology / session-type backend (F8 session menu foundation)" -> src/actors/Cena.Actors/Methodology/MethodologyResolver.cs, MethodologyAssignment.cs, src/admin/full-version/src/views/apps/pedagogy/MethodologyHierarchyPanel.vue
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "F2 60-second breathing ritual, F3 Journeys visual path, F5 Companion
+      bot, F6 Study Circles, F7 energy tracker" — all appear new UX.
+
+adr_alignment:
+  honored:
+    - Ship-gate banned terms explicitly addressed in all 8 Guardrail Check
+      rows
+    - ADR-0003 explicit for F2 (mood session-local), F7 (consent gate)
+  violated: []
+  missing_adr_needed:
+    - "Companion bot" ADR — F5 Cena Companion needs explicit "not a
+      therapist" policy + crisis-escalation path (the Safeguarding
+      infrastructure already exists but must be wired).
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 5 (Cena Companion Supportive Check-in Bot) — the Woebot
+      parallel is dangerous. Woebot is a CBT tool; Cena is math prep. A
+      chat avatar that says "that was a tough session — want to try a
+      different approach next time?" *feels* supportive until a student
+      writes something concerning and the avatar either (a) responds
+      pedagogically (off-track) or (b) hands to safeguarding (good — but
+      needs verified pipeline). The existing SafeguardingClassifier +
+      SafeguardingEscalation (src/actors/Cena.Actors/Tutor/) MUST be
+      wired to every Companion interaction, not just the tutor. Add
+      explicit "I'm just a study buddy, here's where to find human help"
+      fallback copy.
+    evidence: cena_cross_domain_feature_innovation.md:L99-L117, src/actors/Cena.Actors/Tutor/SafeguardingClassifier.cs + SafeguardingEscalation.cs
+    lens_note: |
+      Teenagers disclose things to chatbots they don't say aloud. The
+      safeguarding pipeline is essential, not optional, and the doc only
+      glancingly addresses it.
+  - severity: P1
+    finding: |
+      Feature 3 (Learning Journeys Narrative Habit Paths) — "daily micro-
+      sessions (10-20 min)" is the Fabulous/Duolingo/habit-app pattern.
+      Without streak visualization, this can still create shame
+      when "the path" shows skipped days. Doc says "missing a day simply
+      means the next step waits; no visual penalty." Good. But require a
+      hard rule: no visual indicator of *days missed* anywhere in the UI.
+      Otherwise the design intent slides back into loss-aversion within
+      two design iterations.
+    evidence: cena_cross_domain_feature_innovation.md:L54-L73
+    lens_note: |
+      Design intent drifts. Lock the no-days-missed-indicator rule.
+  - severity: P2
+    finding: |
+      Feature 4 (Adaptive Flow Sessions) — the Tetris flow research is
+      charming but the flow channel for Bagrut math prep is not the same
+      as for Tetris. Students need *overlearning* on core procedures
+      (repetition below their edge) as well as flow-state stretch items.
+      A pure flow channel under-rotates overlearning. Wire the flow
+      session into the existing AdaptiveScheduler + FlowStateService
+      so it balances overlearning and stretch, not pure flow.
+    evidence: cena_cross_domain_feature_innovation.md:L76-L94, src/actors/Cena.Actors/Services/FlowStateService.cs
+    lens_note: |
+      Flow is good for engagement, not sufficient for mastery. The doc
+      skips over this trade-off.
+  - severity: P2
+    finding: |
+      Feature 2 (Pre-Session Focus Ritual) — the mood → difficulty
+      adjustment ("😰 → start with review problems, 🙂 → start with
+      challenge problems") inverts the Bagrut reality. A student showing
+      up anxious does not need *easier* problems on day 1; they need a
+      *warm-up* (familiar pattern) then graded stretch. Easier problems
+      reinforce "I'm bad" identity. Replace "easier" with "familiar
+      pattern / confidence-rebuild" framing.
+    evidence: cena_cross_domain_feature_innovation.md:L40-L50
+    lens_note: |
+      Adjusting difficulty by self-reported mood is fine; the adjustment
+      direction matters and "easier" is the wrong word to use.
+  - severity: P2
+    finding: |
+      Feature 1 (Math Concept Map) already has backend scaffolding
+      (Graph/, TopicPrerequisiteGraph). The doc scopes as L (6-8 weeks)
+      but the remaining work is primarily a frontend visualisation with
+      mastery overlay. Scope to M (3-4 weeks) after dependency on
+      existing backend is recognized.
+    evidence: cena_cross_domain_feature_innovation.md:L11-L29, src/actors/Cena.Actors/Mastery/TopicPrerequisiteGraph.cs
+    lens_note: |
+      Good feature, smaller-than-claimed effort if backend is reused.
+
+already_built:
+  - feature: "Concept / prerequisite graph (F1 foundation)"
+    evidence: src/actors/Cena.Actors/Mastery/TopicPrerequisiteGraph.cs, src/actors/Cena.Actors/Graph/
+    note: |
+      Graph backend exists. F1 is a UI/visualization task.
+  - feature: "Flow state + cognitive load services (F4 foundation)"
+    evidence: src/actors/Cena.Actors/Services/FlowStateService.cs + CognitiveLoadService.cs + Mastery/AdaptiveScheduler.cs
+    note: |
+      Flow state service exists; F4 wires the student-facing flow experience
+      on top.
+  - feature: "Methodology / session-type backend (F8 foundation)"
+    evidence: src/actors/Cena.Actors/Methodology/MethodologyResolver.cs + MethodologyAssignment.cs
+    note: |
+      Methodology switching is already a first-class concept. F8 session-
+      type menu is primarily a UI surface on existing backend.
+  - feature: "Safeguarding classifier + escalation (F5 prerequisite)"
+    evidence: src/actors/Cena.Actors/Tutor/SafeguardingClassifier.cs + SafeguardingEscalation.cs
+    note: |
+      Safeguarding pipeline exists for the tutor; F5 Companion must
+      reuse, not rebuild.
+
+duplicates_of_other_docs:
+  - axis1_pedagogy_mechanics_cena.md: F6 Desirable Difficulty (overlaps F4 flow sessions)
+  - axis2_motivation_self_regulation_findings.md: F4 Mastery Path (overlaps F1 concept map and F3 learning journey)
+  - AXIS_7_Collaboration_Social_Features_Cena.md: F4 async Q&A (overlaps F6 Study Circles)
+
+extracted_tasks:
+  - title: "Safeguarding pipeline wired into Cena Companion; 'not a therapist' copy"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      If F5 Cena Companion ships, every student message routes through
+      SafeguardingClassifier before template response is selected.
+      Flagged messages trigger SafeguardingEscalation (existing). Add
+      explicit "I'm a study buddy, not a counsellor — if you're feeling
+      [concerning], talk to [resource]" fallback copy in Hebrew/Arabic.
+      ## Files
+      - src/actors/Cena.Actors/Tutor/SafeguardingClassifier.cs (reuse)
+      - src/actors/Cena.Actors/ (new CompanionMessageService.cs)
+      - content/safeguarding-copy/ (he.json, ar.json)
+      ## Definition of Done
+      - 100% of Companion messages classified before response.
+      - Escalation hook triggered on safeguarding-flag.
+      - "Not a therapist" copy delivered for any affect-signal above
+        threshold.
+      - Tests: concerning test messages trigger escalation + copy.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: companion-safeguarding"
+    source_doc_lines: [L99-L117]
+  - title: "Learning-journeys design constraint: no days-missed indicator"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      ADR or design-brief that locks the F3 Learning Journeys design
+      constraint: *no UI indicator anywhere of days missed or streak-
+      broken*. Static path; student sees completed + current + upcoming
+      only. No time-based decoration.
+      ## Files
+      - docs/adr/ (new ADR: "learning-journeys-no-streak-indicators")
+      ## Definition of Done
+      - ADR includes explicit banned UI patterns (fire emoji decay,
+        days-since, broken-chain, countdown).
+      - Design brief includes positive allowed patterns (completed
+        badge, current-step emphasis).
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>: journeys-no-streak-ADR"
+    source_doc_lines: [L54-L73]
+  - title: "Focus-ritual mood-adjustment copy: 'familiar pattern' not 'easier'"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F2 mood-to-difficulty adjustment: rename "easier problems" to
+      "familiar-pattern warm-up" in student-facing copy and in the
+      backend session-config field name. Small language change, large
+      identity-protection effect.
+      ## Files
+      - src/actors/Cena.Actors/Sessions/ (session-config)
+      - src/student/student-web/ (focus-ritual UI)
+      ## Definition of Done
+      - No "easier problems" string in user-facing copy.
+      - Config-field renamed OR aliased for clarity.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: mood-adjust-copy"
+    source_doc_lines: [L40-L50]
+
+verdict: revise
+verdict_reason: |
+  Cross-domain inspiration is useful but each borrowing needs an IL-
+  Bagrut-context fit check. Most features have existing backend; scope
+  as UI surfaces. Companion bot and learning journeys need explicit
+  dark-pattern guardrails beyond what the doc specifies.
+
+cross_lens_handoff:
+  - to: persona-ethics
+    about: |
+      F3 Learning Journeys, F5 Companion bot, F6 Study Circles — ethics
+      owns the dark-pattern + digital-wellbeing scan.
+  - to: persona-privacy
+    about: |
+      F5 Companion — if any student disclosure logged, privacy must own
+      the retention + parent-notification policy.
+  - to: persona-a11y
+    about: |
+      F2 breathing animation — respect reduced-motion + colour-blind-
+      safe; F1 concept-map visualization — keyboard navigation + screen-
+      reader map exploration.
+  - to: persona-redteam
+    about: |
+      F5 Companion conversational prompt injection — redteam should
+      probe for prompt-injection that bypasses safeguarding.

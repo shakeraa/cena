@@ -1,0 +1,99 @@
+doc_path: pre-release-review/cena_axis5_teacher_workflow_features.md
+reviewer: persona-a11y
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 teacher-workflow features: smart lesson planner, homework auto-generator,
+  student conference prep, Bagrut-readiness tracking, class health pulse,
+  AI feedback drafting, grading turbo, auto-flag at-risk. Aimed at teacher
+  weekly-active rate. Teacher UI lives in admin/full-version.
+system_purpose_fit: 3
+  rationale:
+    - Teacher context often bilingual Hebrew/Arabic (Jewish and Arab schools)
+    - Admin dashboard already exists at src/admin/full-version/ with Vuexy Vue 3
+    - Doc silent on a11y/l10n for teacher surface
+    - Privacy guardrails explicitly honored (aggregation, consent)
+code_reality_check:
+  claims_verified_in_code:
+    - "Admin dashboard exists: src/admin/full-version/ (Vuexy Vue 3)"
+    - "Hebrew/Arabic/English locales for student-web (same stack can serve admin): src/student/full-version/src/plugins/i18n/locales/"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Teacher-side RTL/LTR mixed-content test coverage — admin dashboard a11y maturity unclear from doc"
+    - "Class Health Pulse visualizations — a11y of aggregation views not specified"
+adr_alignment:
+  honored:
+    - "Tenant scoping (ADR-0001) — features explicitly keep aggregations class-level"
+  violated: []
+  missing_adr_needed:
+    - "ADR for admin-dashboard a11y baseline (is it he/ar/en? WCAG 2.2 AA? matches student-web?)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: "Class Health Pulse (F5) and Bagrut-Readiness Tracking (F4) rely on charts/heatmaps. Heatmaps are especially hostile to CVD users; must use pattern/shape in addition to color."
+    evidence: "cena_axis5...md:F4-F5 sections"
+    lens_note: "Ties to AXIS 3 Feature 5 — chart-only palette task must land first or these views fail WCAG 1.4.1."
+  - severity: P1
+    finding: "Teacher UI must render math (student work previews, rubrics) with <bdi dir=\"ltr\"> in Hebrew/Arabic just like student-web. Doc doesn't specify whether admin/full-version has the same math-LTR scanner coverage as student-web."
+    evidence: "cena_axis5...md (no mention of bidi); tests/a11y/math-ltr-wrapper.spec.ts is student-web only"
+    lens_note: "Grep admin/full-version for katex — none yet. When teacher features ship with math previews, the scanner must extend to admin."
+  - severity: P1
+    finding: "F1 Smart Lesson Planner generates templates. Templates containing math must not embed equations as raster images — screen-reader teachers need MathML or LaTeX source."
+    evidence: "cena_axis5...md:F1 section"
+    lens_note: "Auto-generated content is the highest-risk a11y regression vector."
+  - severity: P2
+    finding: "F3 Student Conference Prep exports 'talking points'. If exported as PDF, must be tagged PDF/UA with language metadata matching teacher's locale."
+    evidence: "cena_axis5...md:F3 section"
+    lens_note: "Untagged PDFs are common and unusable for blind teachers."
+  - severity: P2
+    finding: "Teacher dashboard in Jewish/Arab co-sector schools may toggle locales rapidly. Ensure dir attribute is on the content container, not just the root, so a Hebrew teacher can view an Arabic student's work preview with correct RTL nesting."
+    evidence: "cena_axis5...md (all features)"
+    lens_note: "Memory feedback_math_always_ltr is student-focused; teacher preview surface needs the same rule."
+already_built:
+  - feature: "Admin/full-version dashboard infrastructure"
+    evidence: "src/admin/full-version/ (Vuexy Vue 3)"
+    note: "Don't greenfield a teacher portal — extend admin/full-version"
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: teacher-facing FD entries (if any)"
+  - "AXIS_10_Operational_Integration_Features.md: Feature 6 School IT Admin Dashboard (adjacent)"
+extracted_tasks:
+  - title: "Extend math-LTR + a11y scanners to admin/full-version"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Admin dashboard currently has no katex usage but teacher features will add math previews, rubric editors, and lesson planners. Before F1-F8 ship, extend the math-LTR wrapper scanner, color-contrast scanner, and aria-live scanner to admin/full-version so admin inherits the same a11y gates as student-web.
+      ## Files
+      - src/admin/full-version/tests/a11y/ (new directory mirroring student-web)
+      - copy from src/student/full-version/tests/a11y/*.spec.ts and re-root srcDir
+      ## Definition of Done
+      - Four scanners (math-ltr-wrapper, color-contrast, aria-live-on-dynamic, touch-target-size) green against admin/full-version
+      - CI pipeline includes admin a11y scanner runs
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F1-F8]
+  - title: "Teacher report export a11y: tagged PDF + MathML in HTML"
+    priority: P2
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F3 conference prep, F4 readiness tracking, F5 class health pulse all export documents. Ensure every exporter emits tagged PDF (PDF/UA) or HTML with MathML for equations. Don't ship raster screenshots of math.
+      ## Files
+      - src/admin/full-version/src/services/export/*.ts (when built)
+      - add a scanner or unit test: exported HTML contains MathML siblings for every KaTeX node
+      ## Definition of Done
+      - Exports include lang attribute, tagged structure, math as MathML not img
+      - Automated test downloads a sample export and asserts structure
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F3-F5 sections]
+verdict: adopt
+verdict_reason: "Teacher features are reasonable; a11y ask is to extend existing student-web a11y scanners to admin/full-version and require tagged exports."
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "F5 class health pulse aggregation threshold vs. re-identification (small classes)"
+  - to: persona-enterprise
+    about: "Teacher workflow tenant boundaries and cross-school data sharing"
+  - to: persona-sre
+    about: "Observability for teacher feature adoption"

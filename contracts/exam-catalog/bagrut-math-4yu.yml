@@ -1,0 +1,69 @@
+# Bagrut Math 4 Units (4 יחידות) — Hebrew mainstream.
+# Shared taxonomy with 5U + 3U; separate item pool.
+
+exam_code: BAGRUT_MATH_4U
+family: BAGRUT
+track: "4U"
+units: 4
+region: IL-Bagrut-Hebrew
+regulator: ministry_of_education
+ministry_subject_code: "035"
+ministry_question_paper_codes:
+  - "035471"
+  - "035472"
+availability: launch
+item_bank_status: full
+passback_eligible: true
+default_lead_days: 180
+sittings:
+  - code: TASHPA_SUMMER_A
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: A
+    canonical_date: "2026-06-15"
+  - code: TASHPA_SUMMER_B
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: B
+    canonical_date: "2026-07-20"
+  - code: TASHPA_WINTER_A
+    academic_year: "תשפ\"ו"
+    season: winter
+    moed: A
+    canonical_date: "2026-01-28"
+display:
+  en:
+    name: "Bagrut Math (4 units)"
+    short_description: "Israeli Bagrut mathematics, four-unit track."
+  he:
+    name: "בגרות במתמטיקה (4 יחידות)"
+    short_description: "בגרות מתמטיקה במסלול 4 יחידות."
+  ar:
+    name: "بجروت الرياضيات (4 وحدات)"
+    short_description: "بجروت الرياضيات، مسار 4 وحدات."
+topics:
+  - topic_id: algebra.quadratics
+    display:
+      en: "Quadratic equations"
+      he: "משוואות ריבועיות"
+      ar: "المعادلات التربيعية"
+  - topic_id: algebra.sequences
+    display:
+      en: "Sequences and series"
+      he: "סדרות וטורים"
+      ar: "المتتاليات والمتسلسلات"
+  - topic_id: geometry.analytic
+    display:
+      en: "Analytic geometry"
+      he: "גיאומטריה אנליטית"
+      ar: "الهندسة التحليلية"
+  - topic_id: calculus.derivatives
+    display:
+      en: "Differential calculus"
+      he: "חשבון דיפרנציאלי"
+      ar: "حساب التفاضل"
+  - topic_id: trigonometry
+    display:
+      en: "Trigonometry"
+      he: "טריגונומטריה"
+      ar: "علم المثلثات"

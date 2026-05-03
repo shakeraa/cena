@@ -1,0 +1,40 @@
+name: CAS Conformance (Nightly)
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+# CAS-CONFORMANCE-RUNNER (ADR-0032 §Enforcement):
+# Nightly gate for the router-mode conformance corpus. Strict 99% threshold
+# activates automatically when a SymPy sidecar is reachable (env
+# CENA_CAS_SIDECAR_URL); otherwise MathNet-only floor applies and the
+# artifact flags sympy_reachable=false for the runbook.
+jobs:
+  cas-conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CENA_CAS_GATE_MODE: Shadow
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - run: dotnet restore src/actors/Cena.Actors.sln
+      - run: dotnet build src/actors/Cena.Actors.sln --no-restore -c Release
+      - name: Run CAS conformance + baseline runner
+        run: |
+          dotnet test src/actors/Cena.Actors.Tests/Cena.Actors.Tests.csproj \
+            --no-build -c Release \
+            --filter "FullyQualifiedName~Cas.CasConformance" \
+            --logger "console;verbosity=normal" \
+            --logger "trx;LogFileName=cas-conformance.trx"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-conformance-report
+          path: |
+            ops/reports/cas-conformance-baseline.md
+            ops/reports/cas-conformance-last-run.json
+            **/TestResults/*.trx

@@ -1,0 +1,89 @@
+name: E2E Load (Nightly)
+
+# Phase 4.4 — exercises the end-to-end student journey + admin corpus ops
+# under realistic concurrent load. Complements cas-load-nightly.yml (which
+# targets the CAS authoring hot path).
+#
+# Scripts:
+#   tests/load/e2e-student-journey.js — 4 parallel scenarios hitting the
+#     session poll / answer / flow-state-assess / photo-upload endpoints
+#   tests/load/e2e-admin-corpus.js    — 2 parallel dry-run scenarios
+#     covering expand-corpus + recreate-from-reference
+#
+# SLOs are encoded inside the scripts (threshold blocks). A script-side
+# violation exits k6 non-zero and marks this workflow red.
+#
+# When staging URLs / tokens aren't provisioned (fork PR, etc.) the job
+# still runs `k6 archive` as a syntax-level safety net so regressions in
+# the scripts themselves get caught. No traffic fires.
+#
+# Security: all user inputs / secrets enter only via env: blocks, never
+# interpolated directly into run: bodies (GitHub Actions workflow-injection
+# guide). workflow_dispatch inputs are allow-listed URL overrides only.
+
+on:
+  schedule:
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+    inputs:
+      student_url:
+        description: 'Student API URL override (falls back to CENA_STUDENT_URL secret)'
+        required: false
+      admin_url:
+        description: 'Admin API URL override (falls back to CENA_ADMIN_URL secret)'
+        required: false
+
+jobs:
+  e2e-load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CENA_STUDENT_URL:   ${{ github.event.inputs.student_url || secrets.CENA_STUDENT_URL }}
+      CENA_STUDENT_TOKEN: ${{ secrets.CENA_STUDENT_TOKEN }}
+      CENA_SESSION_ID:    ${{ secrets.CENA_LOAD_SESSION_ID }}
+      CENA_ADMIN_URL:     ${{ github.event.inputs.admin_url || secrets.CENA_ADMIN_URL }}
+      CENA_ADMIN_TOKEN:   ${{ secrets.CENA_ADMIN_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
+            --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+            | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      # Syntax-check both scripts first — catches regressions even when
+      # no secrets are available (forked-PR runs land here).
+      - name: Validate student-journey script
+        run: k6 archive --out /tmp/student.tar tests/load/e2e-student-journey.js
+
+      - name: Validate admin-corpus script
+        run: k6 archive --out /tmp/admin.tar tests/load/e2e-admin-corpus.js
+
+      # Student journey — only runs when the staging target is configured.
+      - name: Run student-journey load test
+        if: env.CENA_STUDENT_URL != '' && env.CENA_STUDENT_TOKEN != ''
+        run: k6 run --summary-export=/tmp/student-summary.json tests/load/e2e-student-journey.js
+
+      - name: Upload student-journey summary
+        if: env.CENA_STUDENT_URL != '' && env.CENA_STUDENT_TOKEN != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-journey-summary
+          path: /tmp/student-summary.json
+
+      # Admin corpus — run only when staging admin is configured.
+      - name: Run admin-corpus load test
+        if: env.CENA_ADMIN_URL != '' && env.CENA_ADMIN_TOKEN != ''
+        run: k6 run --summary-export=/tmp/admin-summary.json tests/load/e2e-admin-corpus.js
+
+      - name: Upload admin-corpus summary
+        if: env.CENA_ADMIN_URL != '' && env.CENA_ADMIN_TOKEN != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-corpus-summary
+          path: /tmp/admin-summary.json

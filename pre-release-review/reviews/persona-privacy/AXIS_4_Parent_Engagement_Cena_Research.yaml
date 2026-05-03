@@ -1,0 +1,221 @@
+doc_path: pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md
+reviewer: persona-privacy
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 parent-engagement features: "Why this topic" explainability, bilingual
+  parent dashboard, parent-teacher bridge messages, privacy-preserving cohort context,
+  weekly chapter snapshot, growth-framed SMS nudges, culturally-localized views,
+  crisis-mode Bagrut countdown. Explicitly multi-language (Hebrew/Arabic/Russian/Amharic).
+
+system_purpose_fit: 3
+  rationale:
+    - Several features expose student data to parents without explicit student consent gate
+    - SMS nudges (Feature 6) = Twilio sub-processor, not disclosed
+    - Feature 4 (Privacy-Preserving Cohort Context) addresses k-anonymity but details thin
+    - Non-negotiable #3 honored (explicit "no comparative percentile shame" statements)
+    - Israeli PPL minor = under 18 — parental access rights broad, but student dignity/agency still applies (PPA Feb 2025 opinion)
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Parent digest aggregation exists -> src/actors/Cena.Actors/ParentDigest/ParentDigestPayload.cs + ParentDigestAggregator.cs"
+    - "Ship-gate test for parent digest exists -> src/actors/Cena.Actors.Tests/ParentDigest/ParentDigestShipgateTests.cs (blocks banned terms)"
+    - "Minor marketing consent denied by default -> src/shared/Cena.Infrastructure/Compliance/GdprConsentManager.cs:213-217"
+    - "Parent-visible audit surface exists -> src/admin/full-version/src/pages/apps/system/audit-log.vue"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Bilingual Russian/Amharic translation pipeline unverified (he/ar/en present in locales)"
+    - "Mashov sync, WhatsApp vendor — RDY-069 Twilio adapter in-flight but not fully wired"
+
+adr_alignment:
+  honored:
+    - Ship-gate banned terms (parent digest already has test coverage)
+    - ADR-0003 (Feature 4 cohort context notes k-anonymity / DP)
+  violated: []
+  missing_adr_needed:
+    - "ADR for parent-visible student data — student-consent vs parent-access-right boundary"
+    - "ADR for translation quality (educational terms) — mistranslated privacy notices in Arabic/Russian/Amharic = defective disclosure"
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P0
+    finding: |
+      Every parent-visible feature (1, 2, 5, 6, 7, 8) assumes unilateral parent-access
+      by virtue of parent account. For 16+ students, Israeli PPA draft opinion (Feb 2025)
+      + GDPR-K practice emphasize student dignity — parent-share must be student-opt-in
+      at 16+ (unless exceptional circumstances). Doc does not gate any feature on
+      student age-band.
+    evidence: "AXIS_4_Parent_Engagement_Cena_Research.md:19-22 (summary) + L103-119 (feature 3) + L307-310 (study plan)"
+    lens_note: |
+      Bagrut students span 12-18; a 17-year-old's math struggles being broadcast to
+      parent via SMS without the student's ongoing consent is a dignity/autonomy violation.
+      Under-13 defaults are fine (parent-gated); 13-15 should be parent-access-with-notice;
+      16+ should be student-grants.
+
+  - severity: P0
+    finding: |
+      Feature 6 (Encouragement SMS nudges) sends messages about a child's study behavior
+      to parent phone. Twilio sub-processor (RDY-069 in-flight). Message content like
+      "Yael hasn't studied for 3 days" is per-student behavioral data transmitted via
+      a third-party carrier. Needs: (a) Twilio DPA with ZDR / minimal retention;
+      (b) explicit separate consent purpose; (c) content scrubbing (no specific struggle);
+      (d) SMS regulator compliance (Israeli Communications Ministry).
+    evidence: "AXIS_4_Parent_Engagement_Cena_Research.md (Feature 6 summary L20) + src/actors/Cena.Actors/ParentDigest/ParentDigestShipgateTests.cs (banned terms)"
+    lens_note: |
+      "Growth-framed" wording does not neutralize the data-export-via-SMS surface.
+      Twilio message logs are a known PII surface.
+
+  - severity: P1
+    finding: |
+      Feature 4 (Privacy-Preserving Cohort Context) is the only feature explicitly addressing
+      k-anonymity for peer-comparison. Doc gives it SHORTLIST but all other features (1, 5, 7, 8)
+      implicitly expose cohort signals. Feature 4 should be a PRE-REQUISITE for 1/5/7/8, not a
+      peer feature.
+    evidence: "AXIS_4_Parent_Engagement_Cena_Research.md:17"
+    lens_note: |
+      You cannot ship cohort-comparison features without the DP/k-anonymity infrastructure.
+      Ordering dependency is reversed in the doc.
+
+  - severity: P1
+    finding: |
+      Feature 2 bilingual dashboard in Russian/Amharic requires professionally translated
+      privacy notices. Current src/ only shows he/ar/en locale files. Privacy notices in
+      Russian/Amharic MUST be validated translations — auto-translation = defective disclosure
+      under PPL §11.
+    evidence: "AXIS_4_Parent_Engagement_Cena_Research.md:68-70 + src/admin/full-version/src/plugins/i18n/locales/ (he/ar/en/fr only)"
+    lens_note: |
+      Adding a locale without validated privacy/consent copy creates a PPL §11 violation the
+      moment the language selector exposes it.
+
+  - severity: P2
+    finding: |
+      Feature 3 (Parent-Teacher Bridge Messages) sends child's analytics snippet to teacher.
+      Teacher is a third party. Even though teacher has legitimate interest, this routes
+      student performance data via parent through messaging layer — audit log needed.
+    evidence: "AXIS_4_Parent_Engagement_Cena_Research.md:107-111"
+    lens_note: |
+      StudentRecordAccessLog already tracks teacher reads; ensure parent-initiated sends
+      also log.
+
+  - severity: P2
+    finding: |
+      Feature 8 (Crisis Mode Bagrut Countdown) triggers alerts to parent near exam date.
+      Risk of amplifying exam anxiety on child; must be student-opt-in for 13+. Doc does
+      not gate on student age or mood.
+    evidence: "AXIS_4_Parent_Engagement_Cena_Research.md:21"
+    lens_note: |
+      Privacy + wellbeing overlap — parent alerts about crisis can harm rather than help.
+
+already_built:
+  - feature: ParentDigestAggregator + ship-gate test for banned terms
+    evidence: src/actors/Cena.Actors/ParentDigest/ParentDigestAggregator.cs + ParentDigestShipgateTests.cs
+    note: |
+      Features 5 (weekly snapshot) and 8 (crisis countdown) likely extend existing digest
+      rather than net-new infrastructure. ParentDigestPayload already exists.
+  - feature: Hebrew/Arabic/English locales for student + admin apps
+    evidence: src/*/full-version/src/plugins/i18n/locales/*.json
+    note: |
+      Feature 2 base bilingual infrastructure exists; Russian/Amharic additions are new work.
+
+duplicates_of_other_docs:
+  - "axis9_data_privacy_trust_mechanics.md: Feature 1 (explainable AI) overlaps Feature 1 here (parent variant)"
+  - "axis2_motivation_self_regulation_findings.md: Feature 8 (reflective study plan parent-share) overlaps Feature 5 here"
+  - "feature-discovery-2026-04-20.md: FD-034 auto-translation parent comms same as Feature 2"
+
+extracted_tasks:
+  - title: "Age-band-gated parent-visible data policy + student-opt-in at 16+"
+    priority: P0
+    estimate: M
+    suggested_assignee: claude-subagent-compliance
+    queue_body: |
+      ## Goal
+      Current parent surfaces assume unilateral access. Implement age-band gate:
+      - Under 13: parent VPC grants full access; student notified
+      - 13-15: parent access by default; student can set scope (which topics visible)
+      - 16-17: student-opt-in; parent sees only what student grants
+      - 18+: parent sees nothing without account holder consent (adult)
+
+      ## Files
+      - src/shared/Cena.Infrastructure/Compliance/ProcessingPurpose.cs (ParentSharing)
+      - src/actors/Cena.Actors/ParentDigest/ParentDigestAggregator.cs (age-band filter)
+      - New ADR: docs/adr/NNNN-parent-visible-student-data.md
+      - src/student/full-version/src/pages/settings/privacy.vue (student-grants UI for 16+)
+
+      ## Definition of Done
+      - ADR documents the 4 bands and rationale
+      - Aggregator honors band; 16+ emits empty payload without student-grant
+      - UI shows student "what your parent sees" view
+      - Test for each band
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-compliance --result "<branch>"
+    source_doc_lines: ["L17-22"]
+
+  - title: "Twilio sub-processor DPA + ZDR + consent purpose for SMS/WhatsApp nudges"
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Feature 6 parent SMS nudges rely on Twilio (already in-flight per RDY-069). Before
+      ship: (a) confirm Twilio DPA with zero/minimal retention, (b) add
+      ProcessingPurpose.ParentEngagementMessaging, (c) scrub specific struggle content
+      from message body, (d) rate-limit to prevent SMS storms, (e) Israeli SMS
+      regulatory review.
+
+      ## Files
+      - Legal: Twilio Israel DPA
+      - src/shared/Cena.Infrastructure/Compliance/ProcessingPurpose.cs
+      - RDY-069 (F5b WhatsApp phase 1B) — intersect with this task
+      - Privacy page: add Twilio to sub-processor list
+
+      ## Definition of Done
+      - DPA executed
+      - Purpose added, default-deny for minors
+      - Message template bank reviewed; no specific skill-failure text
+      - Rate limit per parent/day
+      - Privacy page lists Twilio
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: ["L20"]
+
+  - title: "Gate Feature 4 (privacy-preserving cohort) as pre-requisite for 1/5/7/8"
+    priority: P1
+    estimate: XS
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Feature 4's k-anonymity/DP infrastructure must exist before other parent features
+      expose cohort context. Re-sequence roadmap.
+
+      ## Definition of Done
+      - Roadmap updated
+      - ADR records pre-requisite relationship
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: ["L17"]
+
+verdict: revise
+verdict_reason: |
+  Good intent but parent features assume unilateral access inappropriate for 16+ students.
+  SMS nudges need sub-processor + consent work. Reorder so DP/k-anonymity ships first.
+  Once age-band gating + Twilio DPA land, features 1/3/5 are shippable.
+
+cross_lens_handoff:
+  - to: persona-ethics
+    about: |
+      Feature 6 SMS nudges sit on the parent-manipulation boundary. "Growth-framed" does
+      not preempt ethical-persuasion concerns about messaging parents about a minor's habits.
+  - to: persona-sre
+    about: |
+      SMS delivery SLO, retry semantics, silent-fail (minor not reached) behavior.
+  - to: persona-a11y
+    about: |
+      Russian/Amharic RTL (Amharic is LTR; Russian Cyrillic has no RTL issue but does need
+      Cyrillic font in KaTeX if math terms transliterated).
+  - to: persona-enterprise
+    about: |
+      Parent digest aggregation crosses StudentState + ParentState — aggregate boundary
+      implication for ADR-0012.

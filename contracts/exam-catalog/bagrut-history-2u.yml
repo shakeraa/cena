@@ -1,0 +1,68 @@
+# Bagrut History (היסטוריה) — 2 Units, Hebrew-stream mainstream.
+# PRR-241: humanities catalog extension, launch tier.
+# Topic taxonomy reflects the Ministry of Education general-history
+# syllabus at 2U (nationalism, totalitarianism, WWII, State of Israel
+# formation, modern Middle East). No raw Ministry item text — ADR-0043
+# reference-only rule applies to items, not topic taxonomy.
+
+exam_code: BAGRUT_HISTORY_2U
+family: BAGRUT
+track: "2U"
+units: 2
+region: IL-Bagrut-Hebrew
+regulator: ministry_of_education
+ministry_subject_code: "022"
+ministry_question_paper_codes:
+  - "022281"
+  - "022282"
+availability: launch
+item_bank_status: full
+passback_eligible: true
+default_lead_days: 180
+sittings:
+  - code: TASHPA_SUMMER_A
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: A
+    canonical_date: "2026-06-10"
+  - code: TASHPA_SUMMER_B
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: B
+    canonical_date: "2026-07-15"
+display:
+  en:
+    name: "Bagrut History (2 units)"
+    short_description: "Israeli Bagrut general history, two-unit track."
+  he:
+    name: "בגרות בהיסטוריה (2 יחידות)"
+    short_description: "בגרות בהיסטוריה במסלול 2 יחידות."
+  ar:
+    name: "بجروت التاريخ (وحدتان)"
+    short_description: "بجروت التاريخ العام، مسار وحدتين."
+topics:
+  - topic_id: history.nationalism
+    display:
+      en: "Nationalism in the 19th century"
+      he: "לאומיות במאה ה-19"
+      ar: "القومية في القرن التاسع عشر"
+  - topic_id: history.totalitarianism
+    display:
+      en: "Totalitarian regimes in the 20th century"
+      he: "משטרים טוטליטריים במאה ה-20"
+      ar: "الأنظمة الشمولية في القرن العشرين"
+  - topic_id: history.ww2_holocaust
+    display:
+      en: "World War II and the Holocaust"
+      he: "מלחמת העולם השנייה והשואה"
+      ar: "الحرب العالمية الثانية والهولوكوست"
+  - topic_id: history.zionism_state
+    display:
+      en: "Zionism and the founding of the State of Israel"
+      he: "הציונות וקום המדינה"
+      ar: "الصهيونية وتأسيس دولة إسرائيل"
+  - topic_id: history.modern_middle_east
+    display:
+      en: "The modern Middle East"
+      he: "המזרח התיכון המודרני"
+      ar: "الشرق الأوسط الحديث"

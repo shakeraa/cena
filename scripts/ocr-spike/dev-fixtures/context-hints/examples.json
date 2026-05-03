@@ -1,0 +1,80 @@
+{
+  "schema_version": "1.0",
+  "examples": [
+    {
+      "id": "student_photo_math_he_unknown_track",
+      "description": "Student uploads a homework photo — infers language + track",
+      "hints": {
+        "subject": "math",
+        "language": "he",
+        "track": null,
+        "source_type": "student_photo",
+        "taxonomy_node": null,
+        "expected_figures": null
+      }
+    },
+    {
+      "id": "student_pdf_math_he_4u",
+      "description": "Student uploads a PDF worksheet — 4u track known from tutor context",
+      "hints": {
+        "subject": "math",
+        "language": "he",
+        "track": "4u",
+        "source_type": "student_pdf",
+        "taxonomy_node": null,
+        "expected_figures": null
+      }
+    },
+    {
+      "id": "bagrut_batch_5u",
+      "description": "Batch scrape of Ministry 5u exams — track + source known",
+      "hints": {
+        "subject": "math",
+        "language": "he",
+        "track": "5u",
+        "source_type": "bagrut_reference",
+        "taxonomy_node": null,
+        "expected_figures": true
+      }
+    },
+    {
+      "id": "admin_upload_curator_tagged",
+      "description": "Curator uploaded file with full metadata from RDY-019e review",
+      "hints": {
+        "subject": "math",
+        "language": "he",
+        "track": "5u",
+        "source_type": "admin_upload",
+        "taxonomy_node": "algebra.quadratics.discriminant",
+        "expected_figures": false
+      }
+    },
+    {
+      "id": "cloud_dir_unknown",
+      "description": "Cloud-directory drop-zone — metadata will be back-filled by RDY-019e handshake",
+      "hints": {
+        "subject": null,
+        "language": null,
+        "track": null,
+        "source_type": "cloud_dir",
+        "taxonomy_node": null,
+        "expected_figures": null
+      }
+    },
+    {
+      "id": "english_proof_problem",
+      "description": "English-language proof problem (e.g. olympiad-style)",
+      "hints": {
+        "subject": "math",
+        "language": "en",
+        "track": "5u",
+        "source_type": "student_photo",
+        "taxonomy_node": "geometry.proof",
+        "expected_figures": true
+      }
+    }
+  ],
+  "_dev_fixture": {
+    "notes": "Use examples[].hints as the payload to IOcrCascadeService.RecognizeAsync. Mirrors the dataclass in runners/base.py."
+  }
+}

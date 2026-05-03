@@ -1,0 +1,106 @@
+doc_path: pre-release-review/cena_axis5_teacher_workflow_features.md
+reviewer: persona-sre
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight teacher-facing features (smart lesson planner, homework auto-generator, class health pulse, conference prep,
+  in-class diagnostic sprint, differentiated assignment, Bagrut readiness tracker, teacher chat w/ AI). Heavy on aggregation
+  queries + real-time pushes (diagnostic sprint) + bulk generation (homework auto-gen).
+system_purpose_fit: 4
+  rationale:
+    - Aligns with RDY-080 (no Bagrut-score prediction) per doc's own guardrail column.
+    - SRE gaps in: real-time push scale, bulk-generation rate limits, small-class-size privacy suppression.
+code_reality_check:
+  claims_verified_in_code:
+    - "Admin Api exists and has question/generation surface -> src/api/Cena.Admin.Api/Questions/GenerateSimilarHandlerTests.cs"
+    - "Class mastery heatmap projection -> src/actors/Cena.Actors.Tests/Projections/ClassMasteryHeatmapProjectionTests.cs"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "In-class diagnostic sprint real-time histogram — SignalR hub scale not sized"
+    - "5-minute sprint targeting 30+ students x 100+ classes simultaneously — no load test"
+adr_alignment:
+  honored: [ADR-0001 (tenancy), RDY-080 (no Bagrut prediction)]
+  violated: []
+  missing_adr_needed:
+    - "Small-class-size anonymity threshold + suppression policy"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      In-Class Diagnostic Sprint (Feature 5) pushes live aggregate to the teacher's screen while 30+ students answer. During
+      a Bagrut-week pep-class these are highly concurrent. Load test required against SignalR actor hub with N=50 classes x 30
+      students; backpressure plan for slow students.
+    evidence: cena_axis5_teacher_workflow_features.md Feature 5; feature-discovery-2026-04-20.md:L698-L722
+    lens_note: Real-time aggregation is the classic "works in demo, melts in production".
+  - severity: P1
+    finding: |
+      Homework Auto-Generator (Feature 2) triples content generation load (3 streams per class). Without a rate-limiter on the
+      CAS-gated ingestion pipeline, a Monday 08:00 burst across 100 teachers can saturate the sidecar.
+    evidence: cena_axis5_teacher_workflow_features.md Feature 2
+    lens_note: Bulk-gen must be queued + back-pressured, never fire-and-forget.
+  - severity: P1
+    finding: |
+      Smart Lesson Planner (Feature 1) notes small-class anonymity risk but leaves it a "mitigation" bullet. SRE needs a codified
+      minimum-N threshold (e.g. 15 students) that suppresses or warns — implemented once, reused across all teacher features.
+    evidence: cena_axis5_teacher_workflow_features.md Feature 1 guardrail
+    lens_note: Anonymity threshold is a platform property, not per-feature.
+  - severity: P2
+    finding: |
+      Bagrut Readiness Tracker (Feature 7) has "what-if" scenario simulator. Naive implementation re-runs the whole projection
+      on each slider movement. Needs explicit debounce + batched-eval to avoid DB query storms.
+    evidence: cena_axis5_teacher_workflow_features.md Feature 7; feature-discovery-2026-04-20.md:L755-L779
+    lens_note: Interactive sliders are a common hot-path for query-storm incidents.
+already_built:
+  - feature: Class mastery heatmap projection
+    evidence: src/actors/Cena.Actors.Tests/Projections/ClassMasteryHeatmapProjectionTests.cs
+    note: Feature 3 (class health pulse) probably already has the data source.
+  - feature: Admin question generation handler
+    evidence: src/api/Cena.Admin.Api.Tests/Questions/GenerateSimilarHandlerTests.cs
+    note: Feature 2 bulk homework gen should sit behind this.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md FD-022..FD-028."
+  - "AXIS_6_Assessment_Feedback_Research.md (sprint / crisis mode overlap)."
+extracted_tasks:
+  - title: Codify minimum-N anonymity threshold as platform primitive
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Add a single `AggregateGuard` service: any teacher-facing aggregate with N<15 returns "too-few-students" + audit log.
+      All teacher features (Feature 1, 3, 5, 7) consume it.
+      ## Files
+      src/api/Cena.Admin.Api/ (new AggregateGuard)
+      src/api/Cena.Admin.Api.Tests/ (unit tests)
+      docs/engineering/ (new: small-class-anonymity.md)
+      ## Definition of Done
+      - All teacher-facing aggregate endpoints route through guard
+      - CI test proves suppression at N<15
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/aggregate-guard"
+    source_doc_lines: []
+  - title: Load-test in-class diagnostic sprint hub at 50 classes x 30 students
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Prove SignalR hub + projection keep p95 aggregation latency <= 1s under synthetic sprint load.
+      ## Files
+      .github/workflows/e2e-load-nightly.yml
+      src/student/full-version/tests/e2e/ (new: sprint-load.spec.ts)
+      deploy/helm/cena/templates/actors-hpa.yaml (if needed)
+      docs/ops/runbooks/ (new: diagnostic-sprint.md)
+      ## Definition of Done
+      - 1500 concurrent answers in <5 min -> SLO met
+      - Runbook ladder covers hub-restart case
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch:sre/sprint-load"
+    source_doc_lines: []
+verdict: revise
+verdict_reason: |
+  Teacher-value items are strong but need platform-level anonymity primitive + explicit load tests before SHIP.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: Small-class suppression policy as a PPL compliance control.
+  - to: persona-finops
+    about: Bulk generation cost per class per week (ADR-026 tier routing).

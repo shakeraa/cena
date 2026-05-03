@@ -1,0 +1,2498 @@
+{
+  "$schema": "./glossary-schema.json",
+  "version": "1.0.0",
+  "lastUpdated": "2026-04-14",
+  "description": "Canonical Hebrew ↔ Arabic ↔ English math/physics glossary for Cena platform. Validated against Israeli Bagrut exam terminology (2019-2024). Source of truth for all question authoring, translation, and quality gates.",
+  "notes": {
+    "genderConvention": "Arabic gender field: m = masculine, f = feminine. Adjectives modifying these terms must agree in gender.",
+    "hebrewSource": "MoE Bagrut exams 806/807/804 (2019-2024), Yoel Geva textbooks",
+    "arabicSource": "Israeli Arab school math/physics textbooks, Palestinian curriculum alignment (MSA)",
+    "physicsNotation": "SI units throughout. Hebrew physics uses Latin variable letters. Arabic physics maps Arabic letters per ArabicMathNormalizer."
+  },
+  "terms": [
+    {
+      "id": "alg_equation",
+      "english": "Equation",
+      "hebrew": "משוואה",
+      "arabic": "معادلة",
+      "domain": "algebra",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_inequality",
+      "english": "Inequality",
+      "hebrew": "אי-שוויון",
+      "arabic": "متباينة",
+      "domain": "algebra",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_variable",
+      "english": "Variable",
+      "hebrew": "משתנה",
+      "arabic": "متغير",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_coefficient",
+      "english": "Coefficient",
+      "hebrew": "מקדם",
+      "arabic": "معامل",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_constant",
+      "english": "Constant",
+      "hebrew": "קבוע",
+      "arabic": "ثابت",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_expression",
+      "english": "Expression",
+      "hebrew": "ביטוי",
+      "arabic": "تعبير جبري",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_term",
+      "english": "Term",
+      "hebrew": "איבר",
+      "arabic": "حد",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_polynomial",
+      "english": "Polynomial",
+      "hebrew": "פולינום",
+      "arabic": "كثير حدود",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_monomial",
+      "english": "Monomial",
+      "hebrew": "חד-איבר",
+      "arabic": "أحادي حد",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_binomial",
+      "english": "Binomial",
+      "hebrew": "דו-איבר",
+      "arabic": "ثنائي حد",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_quadratic",
+      "english": "Quadratic equation",
+      "hebrew": "משוואה ריבועית",
+      "arabic": "معادلة تربيعية",
+      "domain": "algebra",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_linear",
+      "english": "Linear equation",
+      "hebrew": "משוואה לינארית",
+      "arabic": "معادلة خطية",
+      "domain": "algebra",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_factoring",
+      "english": "Factoring",
+      "hebrew": "פירוק לגורמים",
+      "arabic": "تحليل إلى عوامل",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_discriminant",
+      "english": "Discriminant",
+      "hebrew": "דיסקרימיננטה",
+      "arabic": "المميز",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_root",
+      "english": "Root (of equation)",
+      "hebrew": "שורש (של משוואה)",
+      "arabic": "جذر (المعادلة)",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_solution",
+      "english": "Solution",
+      "hebrew": "פתרון",
+      "arabic": "حل",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_solution_set",
+      "english": "Solution set",
+      "hebrew": "קבוצת פתרונות",
+      "arabic": "مجموعة الحلول",
+      "domain": "algebra",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_absolute_value",
+      "english": "Absolute value",
+      "hebrew": "ערך מוחלט",
+      "arabic": "القيمة المطلقة",
+      "domain": "algebra",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_exponent",
+      "english": "Exponent / Power",
+      "hebrew": "חזקה",
+      "arabic": "أس",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_logarithm",
+      "english": "Logarithm",
+      "hebrew": "לוגריתם",
+      "arabic": "لوغاريتم",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_natural_log",
+      "english": "Natural logarithm",
+      "hebrew": "לוגריתם טבעי",
+      "arabic": "لوغاريتم طبيعي",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_square_root",
+      "english": "Square root",
+      "hebrew": "שורש ריבועי",
+      "arabic": "جذر تربيعي",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_cube_root",
+      "english": "Cube root",
+      "hebrew": "שורש שלישי",
+      "arabic": "جذر تكعيبي",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_ratio",
+      "english": "Ratio",
+      "hebrew": "יחס",
+      "arabic": "نسبة",
+      "domain": "algebra",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_proportion",
+      "english": "Proportion",
+      "hebrew": "פרופורציה",
+      "arabic": "تناسب",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_system_of_equations",
+      "english": "System of equations",
+      "hebrew": "מערכת משוואות",
+      "arabic": "جملة معادلات",
+      "domain": "algebra",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_substitution",
+      "english": "Substitution",
+      "hebrew": "הצבה",
+      "arabic": "تعويض",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_elimination",
+      "english": "Elimination",
+      "hebrew": "חיסור/חיבור משוואות",
+      "arabic": "حذف",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_completing_square",
+      "english": "Completing the square",
+      "hebrew": "השלמה לריבוע",
+      "arabic": "إكمال المربع",
+      "domain": "algebra",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "alg_quadratic_formula",
+      "english": "Quadratic formula",
+      "hebrew": "נוסחת השורשים",
+      "arabic": "صيغة الحل العامة",
+      "domain": "algebra",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_function",
+      "english": "Function",
+      "hebrew": "פונקציה",
+      "arabic": "دالة",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_domain",
+      "english": "Domain",
+      "hebrew": "תחום",
+      "arabic": "مجال",
+      "domain": "functions",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_range",
+      "english": "Range",
+      "hebrew": "טווח",
+      "arabic": "مدى",
+      "domain": "functions",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_slope",
+      "english": "Slope",
+      "hebrew": "שיפוע",
+      "arabic": "ميل",
+      "domain": "functions",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_intercept",
+      "english": "Intercept",
+      "hebrew": "נקודת חיתוך",
+      "arabic": "نقطة تقاطع",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_y_intercept",
+      "english": "Y-intercept",
+      "hebrew": "נקודת חיתוך עם ציר y",
+      "arabic": "نقطة تقاطع مع محور y",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_x_intercept",
+      "english": "X-intercept",
+      "hebrew": "נקודת חיתוך עם ציר x",
+      "arabic": "نقطة تقاطع مع محور x",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_graph",
+      "english": "Graph",
+      "hebrew": "גרף",
+      "arabic": "رسم بياني",
+      "domain": "functions",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_increasing",
+      "english": "Increasing",
+      "hebrew": "עולה",
+      "arabic": "تصاعدي",
+      "domain": "functions",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_decreasing",
+      "english": "Decreasing",
+      "hebrew": "יורד",
+      "arabic": "تنازلي",
+      "domain": "functions",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_maximum",
+      "english": "Maximum",
+      "hebrew": "מקסימום",
+      "arabic": "قيمة عظمى",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_minimum",
+      "english": "Minimum",
+      "hebrew": "מינימום",
+      "arabic": "قيمة صغرى",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_vertex",
+      "english": "Vertex",
+      "hebrew": "קודקוד",
+      "arabic": "رأس",
+      "domain": "functions",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_parabola",
+      "english": "Parabola",
+      "hebrew": "פרבולה",
+      "arabic": "قطع مكافئ",
+      "domain": "functions",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_asymptote",
+      "english": "Asymptote",
+      "hebrew": "אסימפטוטה",
+      "arabic": "خط تقارب",
+      "domain": "functions",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_inverse",
+      "english": "Inverse function",
+      "hebrew": "פונקציה הפוכה",
+      "arabic": "دالة عكسية",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_composite",
+      "english": "Composite function",
+      "hebrew": "פונקציה מורכבת",
+      "arabic": "دالة مركبة",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_even",
+      "english": "Even function",
+      "hebrew": "פונקציה זוגית",
+      "arabic": "دالة زوجية",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_odd",
+      "english": "Odd function",
+      "hebrew": "פונקציה אי-זוגית",
+      "arabic": "دالة فردية",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_periodic",
+      "english": "Periodic function",
+      "hebrew": "פונקציה מחזורית",
+      "arabic": "دالة دورية",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_exponential",
+      "english": "Exponential function",
+      "hebrew": "פונקציה מעריכית",
+      "arabic": "دالة أسية",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_logarithmic",
+      "english": "Logarithmic function",
+      "hebrew": "פונקציה לוגריתמית",
+      "arabic": "دالة لوغاريتمية",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_rational",
+      "english": "Rational function",
+      "hebrew": "פונקציה רציונלית",
+      "arabic": "دالة كسرية",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_polynomial_func",
+      "english": "Polynomial function",
+      "hebrew": "פונקציה פולינומית",
+      "arabic": "دالة كثيرة حدود",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_continuous",
+      "english": "Continuous",
+      "hebrew": "רציפה",
+      "arabic": "متصلة",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "func_discontinuity",
+      "english": "Discontinuity",
+      "hebrew": "נקודת אי-רציפות",
+      "arabic": "نقطة انقطاع",
+      "domain": "functions",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_limit",
+      "english": "Limit",
+      "hebrew": "גבול",
+      "arabic": "نهاية",
+      "domain": "calculus",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_derivative",
+      "english": "Derivative",
+      "hebrew": "נגזרת",
+      "arabic": "مشتقة",
+      "domain": "calculus",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_integral",
+      "english": "Integral",
+      "hebrew": "אינטגרל",
+      "arabic": "تكامل",
+      "domain": "calculus",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_definite_integral",
+      "english": "Definite integral",
+      "hebrew": "אינטגרל מסוים",
+      "arabic": "تكامل محدد",
+      "domain": "calculus",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_indefinite_integral",
+      "english": "Indefinite integral",
+      "hebrew": "אינטגרל לא-מסוים",
+      "arabic": "تكامل غير محدد",
+      "domain": "calculus",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_chain_rule",
+      "english": "Chain rule",
+      "hebrew": "כלל השרשרת",
+      "arabic": "قاعدة السلسلة",
+      "domain": "calculus",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_product_rule",
+      "english": "Product rule",
+      "hebrew": "כלל המכפלה",
+      "arabic": "قاعدة الجداء",
+      "domain": "calculus",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_quotient_rule",
+      "english": "Quotient rule",
+      "hebrew": "כלל המנה",
+      "arabic": "قاعدة القسمة",
+      "domain": "calculus",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_integration_by_parts",
+      "english": "Integration by parts",
+      "hebrew": "אינטגרציה בחלקים",
+      "arabic": "تكامل بالتجزئة",
+      "domain": "calculus",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_rate_of_change",
+      "english": "Rate of change",
+      "hebrew": "קצב שינוי",
+      "arabic": "معدل التغير",
+      "domain": "calculus",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_tangent_line",
+      "english": "Tangent line",
+      "hebrew": "משיק",
+      "arabic": "خط مماس",
+      "domain": "calculus",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_inflection_point",
+      "english": "Inflection point",
+      "hebrew": "נקודת פיתול",
+      "arabic": "نقطة انعطاف",
+      "domain": "calculus",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_critical_point",
+      "english": "Critical point",
+      "hebrew": "נקודה קריטית",
+      "arabic": "نقطة حرجة",
+      "domain": "calculus",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_extremum",
+      "english": "Extremum",
+      "hebrew": "נקודת קיצון",
+      "arabic": "نقطة قصوى",
+      "domain": "calculus",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_concave_up",
+      "english": "Concave up",
+      "hebrew": "קעורה כלפי מעלה",
+      "arabic": "مقعرة للأعلى",
+      "domain": "calculus",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_concave_down",
+      "english": "Concave down",
+      "hebrew": "קעורה כלפי מטה",
+      "arabic": "مقعرة للأسفل",
+      "domain": "calculus",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_area_under_curve",
+      "english": "Area under curve",
+      "hebrew": "שטח מתחת לעקומה",
+      "arabic": "المساحة تحت المنحنى",
+      "domain": "calculus",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "calc_antiderivative",
+      "english": "Antiderivative",
+      "hebrew": "פונקציה קדומה",
+      "arabic": "الدالة الأصلية",
+      "domain": "calculus",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "geom_angle",
+      "english": "Angle",
+      "hebrew": "זווית",
+      "arabic": "زاوية",
+      "domain": "geometry",
+      "arabicGender": "f",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_triangle",
+      "english": "Triangle",
+      "hebrew": "משולש",
+      "arabic": "مثلث",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_circle",
+      "english": "Circle",
+      "hebrew": "מעגל",
+      "arabic": "دائرة",
+      "domain": "geometry",
+      "arabicGender": "f",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_radius",
+      "english": "Radius",
+      "hebrew": "רדיוס",
+      "arabic": "نصف قطر",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_diameter",
+      "english": "Diameter",
+      "hebrew": "קוטר",
+      "arabic": "قطر",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_perpendicular",
+      "english": "Perpendicular",
+      "hebrew": "ניצב",
+      "arabic": "عمودي",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_parallel",
+      "english": "Parallel",
+      "hebrew": "מקביל",
+      "arabic": "متوازي",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_area",
+      "english": "Area",
+      "hebrew": "שטח",
+      "arabic": "مساحة",
+      "domain": "geometry",
+      "arabicGender": "f",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_perimeter",
+      "english": "Perimeter",
+      "hebrew": "היקף",
+      "arabic": "محيط",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_volume",
+      "english": "Volume",
+      "hebrew": "נפח",
+      "arabic": "حجم",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_coordinate",
+      "english": "Coordinate",
+      "hebrew": "קואורדינטה",
+      "arabic": "إحداثي",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_point",
+      "english": "Point",
+      "hebrew": "נקודה",
+      "arabic": "نقطة",
+      "domain": "geometry",
+      "arabicGender": "f",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_line",
+      "english": "Line",
+      "hebrew": "ישר",
+      "arabic": "مستقيم",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_line_segment",
+      "english": "Line segment",
+      "hebrew": "קטע",
+      "arabic": "قطعة مستقيمة",
+      "domain": "geometry",
+      "arabicGender": "f",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_ray",
+      "english": "Ray",
+      "hebrew": "קרן",
+      "arabic": "شعاع",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_midpoint",
+      "english": "Midpoint",
+      "hebrew": "אמצע",
+      "arabic": "نقطة المنتصف",
+      "domain": "geometry",
+      "arabicGender": "f",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_distance",
+      "english": "Distance",
+      "hebrew": "מרחק",
+      "arabic": "مسافة",
+      "domain": "geometry",
+      "arabicGender": "f",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_congruent",
+      "english": "Congruent",
+      "hebrew": "חופף",
+      "arabic": "متطابق",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_similar",
+      "english": "Similar",
+      "hebrew": "דומה",
+      "arabic": "متشابه",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_isosceles",
+      "english": "Isosceles triangle",
+      "hebrew": "משולש שווה-שוקיים",
+      "arabic": "مثلث متساوي الساقين",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_equilateral",
+      "english": "Equilateral triangle",
+      "hebrew": "משולש שווה-צלעות",
+      "arabic": "مثلث متساوي الأضلاع",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_right_triangle",
+      "english": "Right triangle",
+      "hebrew": "משולש ישר-זווית",
+      "arabic": "مثلث قائم الزاوية",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_hypotenuse",
+      "english": "Hypotenuse",
+      "hebrew": "יתר",
+      "arabic": "وتر",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_rectangle",
+      "english": "Rectangle",
+      "hebrew": "מלבן",
+      "arabic": "مستطيل",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_square",
+      "english": "Square",
+      "hebrew": "ריבוע",
+      "arabic": "مربع",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_parallelogram",
+      "english": "Parallelogram",
+      "hebrew": "מקבילית",
+      "arabic": "متوازي أضلاع",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_trapezoid",
+      "english": "Trapezoid",
+      "hebrew": "טרפז",
+      "arabic": "شبه منحرف",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_rhombus",
+      "english": "Rhombus",
+      "hebrew": "מעוין",
+      "arabic": "معين",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_polygon",
+      "english": "Polygon",
+      "hebrew": "מצולע",
+      "arabic": "مضلع",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_diagonal",
+      "english": "Diagonal",
+      "hebrew": "אלכסון",
+      "arabic": "قطر",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "notes": "Arabic قطر also means diameter; context-dependent",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_tangent_geom",
+      "english": "Tangent (geometry)",
+      "hebrew": "משיק",
+      "arabic": "مماس",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_chord",
+      "english": "Chord",
+      "hebrew": "מיתר",
+      "arabic": "وتر",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "notes": "Arabic وتر also means hypotenuse; context-dependent",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_arc",
+      "english": "Arc",
+      "hebrew": "קשת",
+      "arabic": "قوس",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "geom_sector",
+      "english": "Sector",
+      "hebrew": "גזרה",
+      "arabic": "قطاع",
+      "domain": "geometry",
+      "arabicGender": "m",
+      "source": "Bagrut 804"
+    },
+    {
+      "id": "trig_sine",
+      "english": "Sine",
+      "hebrew": "סינוס",
+      "arabic": "جيب",
+      "domain": "trigonometry",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "trig_cosine",
+      "english": "Cosine",
+      "hebrew": "קוסינוס",
+      "arabic": "جيب تمام",
+      "domain": "trigonometry",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "trig_tangent",
+      "english": "Tangent (trig)",
+      "hebrew": "טנגנס",
+      "arabic": "ظل",
+      "domain": "trigonometry",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "trig_cotangent",
+      "english": "Cotangent",
+      "hebrew": "קוטנגנס",
+      "arabic": "ظل تمام",
+      "domain": "trigonometry",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "trig_radian",
+      "english": "Radian",
+      "hebrew": "רדיאן",
+      "arabic": "راديان",
+      "domain": "trigonometry",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "trig_degree",
+      "english": "Degree (angle)",
+      "hebrew": "מעלה",
+      "arabic": "درجة",
+      "domain": "trigonometry",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "trig_pythagorean",
+      "english": "Pythagorean theorem",
+      "hebrew": "משפט פיתגורס",
+      "arabic": "نظرية فيثاغورس",
+      "domain": "trigonometry",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "trig_sine_rule",
+      "english": "Sine rule",
+      "hebrew": "משפט הסינוסים",
+      "arabic": "قانون الجيب",
+      "domain": "trigonometry",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "trig_cosine_rule",
+      "english": "Cosine rule",
+      "hebrew": "משפט הקוסינוסים",
+      "arabic": "قانون جيب التمام",
+      "domain": "trigonometry",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "trig_unit_circle",
+      "english": "Unit circle",
+      "hebrew": "מעגל היחידה",
+      "arabic": "دائرة الوحدة",
+      "domain": "trigonometry",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "trig_identity",
+      "english": "Trigonometric identity",
+      "hebrew": "זהות טריגונומטרית",
+      "arabic": "متطابقة مثلثية",
+      "domain": "trigonometry",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "trig_inverse_trig",
+      "english": "Inverse trigonometric",
+      "hebrew": "פונקציה טריגונומטרית הפוכה",
+      "arabic": "دالة مثلثية عكسية",
+      "domain": "trigonometry",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "trig_amplitude",
+      "english": "Amplitude",
+      "hebrew": "אמפליטודה",
+      "arabic": "سعة",
+      "domain": "trigonometry",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "trig_period",
+      "english": "Period",
+      "hebrew": "מחזור",
+      "arabic": "دورة",
+      "domain": "trigonometry",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "prob_probability",
+      "english": "Probability",
+      "hebrew": "הסתברות",
+      "arabic": "احتمال",
+      "domain": "probability",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "prob_permutation",
+      "english": "Permutation",
+      "hebrew": "תמורה",
+      "arabic": "تبديل",
+      "domain": "probability",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "prob_combination",
+      "english": "Combination",
+      "hebrew": "צירוף",
+      "arabic": "توافيق",
+      "domain": "probability",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "prob_sample_space",
+      "english": "Sample space",
+      "hebrew": "מרחב המדגם",
+      "arabic": "فضاء العينة",
+      "domain": "probability",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "prob_event",
+      "english": "Event",
+      "hebrew": "מאורע",
+      "arabic": "حدث",
+      "domain": "probability",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "prob_independent",
+      "english": "Independent events",
+      "hebrew": "מאורעות בלתי-תלויים",
+      "arabic": "أحداث مستقلة",
+      "domain": "probability",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "prob_conditional",
+      "english": "Conditional probability",
+      "hebrew": "הסתברות מותנית",
+      "arabic": "احتمال شرطي",
+      "domain": "probability",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "prob_binomial_dist",
+      "english": "Binomial distribution",
+      "hebrew": "התפלגות בינומית",
+      "arabic": "توزيع ذو حدين",
+      "domain": "probability",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "prob_normal_dist",
+      "english": "Normal distribution",
+      "hebrew": "התפלגות נורמלית",
+      "arabic": "توزيع طبيعي",
+      "domain": "probability",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "stat_mean",
+      "english": "Mean / Average",
+      "hebrew": "ממוצע",
+      "arabic": "متوسط",
+      "domain": "statistics",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "stat_median",
+      "english": "Median",
+      "hebrew": "חציון",
+      "arabic": "وسيط",
+      "domain": "statistics",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "stat_mode",
+      "english": "Mode",
+      "hebrew": "שכיח",
+      "arabic": "منوال",
+      "domain": "statistics",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "stat_standard_deviation",
+      "english": "Standard deviation",
+      "hebrew": "סטיית תקן",
+      "arabic": "انحراف معياري",
+      "domain": "statistics",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "stat_variance",
+      "english": "Variance",
+      "hebrew": "שונות",
+      "arabic": "تباين",
+      "domain": "statistics",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "stat_frequency",
+      "english": "Frequency",
+      "hebrew": "שכיחות",
+      "arabic": "تكرار",
+      "domain": "statistics",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "stat_histogram",
+      "english": "Histogram",
+      "hebrew": "היסטוגרמה",
+      "arabic": "مدرج تكراري",
+      "domain": "statistics",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "seq_arithmetic_seq",
+      "english": "Arithmetic sequence",
+      "hebrew": "סדרה חשבונית",
+      "arabic": "متتالية حسابية",
+      "domain": "sequences",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "seq_geometric_seq",
+      "english": "Geometric sequence",
+      "hebrew": "סדרה הנדסית",
+      "arabic": "متتالية هندسية",
+      "domain": "sequences",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "seq_common_difference",
+      "english": "Common difference",
+      "hebrew": "הפרש",
+      "arabic": "أساس المتتالية الحسابية",
+      "domain": "sequences",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "seq_common_ratio",
+      "english": "Common ratio",
+      "hebrew": "מנה",
+      "arabic": "أساس المتتالية الهندسية",
+      "domain": "sequences",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "seq_sum_of_series",
+      "english": "Sum of series",
+      "hebrew": "סכום טור",
+      "arabic": "مجموع متسلسلة",
+      "domain": "sequences",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "seq_convergence",
+      "english": "Convergence",
+      "hebrew": "התכנסות",
+      "arabic": "تقارب",
+      "domain": "sequences",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "seq_divergence",
+      "english": "Divergence",
+      "hebrew": "התבדרות",
+      "arabic": "تباعد",
+      "domain": "sequences",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "vec_vector",
+      "english": "Vector",
+      "hebrew": "וקטור",
+      "arabic": "متجه",
+      "domain": "vectors",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "vec_scalar",
+      "english": "Scalar",
+      "hebrew": "סקלר",
+      "arabic": "كمية قياسية",
+      "domain": "vectors",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "vec_dot_product",
+      "english": "Dot product",
+      "hebrew": "מכפלה סקלרית",
+      "arabic": "جداء نقطي",
+      "domain": "vectors",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "vec_cross_product",
+      "english": "Cross product",
+      "hebrew": "מכפלה וקטורית",
+      "arabic": "جداء اتجاهي",
+      "domain": "vectors",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "vec_magnitude",
+      "english": "Magnitude",
+      "hebrew": "גודל",
+      "arabic": "مقدار",
+      "domain": "vectors",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_proof",
+      "english": "Proof",
+      "hebrew": "הוכחה",
+      "arabic": "إثبات",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_theorem",
+      "english": "Theorem",
+      "hebrew": "משפט",
+      "arabic": "نظرية",
+      "domain": "general",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_axiom",
+      "english": "Axiom",
+      "hebrew": "אקסיומה",
+      "arabic": "بديهية",
+      "domain": "general",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_conjecture",
+      "english": "Conjecture",
+      "hebrew": "השערה",
+      "arabic": "حدسية",
+      "domain": "general",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_contradiction",
+      "english": "Proof by contradiction",
+      "hebrew": "הוכחה בדרך השלילה",
+      "arabic": "إثبات بالتناقض",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_matrix",
+      "english": "Matrix",
+      "hebrew": "מטריצה",
+      "arabic": "مصفوفة",
+      "domain": "general",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_determinant",
+      "english": "Determinant",
+      "hebrew": "דטרמיננטה",
+      "arabic": "محدد",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_set",
+      "english": "Set",
+      "hebrew": "קבוצה",
+      "arabic": "مجموعة",
+      "domain": "general",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_subset",
+      "english": "Subset",
+      "hebrew": "תת-קבוצה",
+      "arabic": "مجموعة جزئية",
+      "domain": "general",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_union",
+      "english": "Union",
+      "hebrew": "איחוד",
+      "arabic": "اتحاد",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_intersection",
+      "english": "Intersection",
+      "hebrew": "חיתוך",
+      "arabic": "تقاطع",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_empty_set",
+      "english": "Empty set",
+      "hebrew": "קבוצה ריקה",
+      "arabic": "مجموعة خالية",
+      "domain": "general",
+      "arabicGender": "f",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_natural_numbers",
+      "english": "Natural numbers",
+      "hebrew": "מספרים טבעיים",
+      "arabic": "أعداد طبيعية",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_integer",
+      "english": "Integer",
+      "hebrew": "מספר שלם",
+      "arabic": "عدد صحيح",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_rational",
+      "english": "Rational number",
+      "hebrew": "מספר רציונלי",
+      "arabic": "عدد نسبي",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_irrational",
+      "english": "Irrational number",
+      "hebrew": "מספר אי-רציונלי",
+      "arabic": "عدد غير نسبي",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_real_numbers",
+      "english": "Real numbers",
+      "hebrew": "מספרים ממשיים",
+      "arabic": "أعداد حقيقية",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_complex_number",
+      "english": "Complex number",
+      "hebrew": "מספר מרוכב",
+      "arabic": "عدد مركب",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_fraction",
+      "english": "Fraction",
+      "hebrew": "שבר",
+      "arabic": "كسر",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_numerator",
+      "english": "Numerator",
+      "hebrew": "מונה",
+      "arabic": "بسط",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_denominator",
+      "english": "Denominator",
+      "hebrew": "מכנה",
+      "arabic": "مقام",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_pi",
+      "english": "Pi",
+      "hebrew": "פאי",
+      "arabic": "باي",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_infinity",
+      "english": "Infinity",
+      "hebrew": "אינסוף",
+      "arabic": "ما لا نهاية",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_factorial",
+      "english": "Factorial",
+      "hebrew": "עצרת",
+      "arabic": "مضروب",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_sigma_notation",
+      "english": "Sigma notation (summation)",
+      "hebrew": "סימן סכום",
+      "arabic": "رمز المجموع",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "gen_inequality_sign",
+      "english": "Greater than / Less than",
+      "hebrew": "גדול מ / קטן מ",
+      "arabic": "أكبر من / أصغر من",
+      "domain": "general",
+      "arabicGender": "m",
+      "source": "Bagrut 806"
+    },
+    {
+      "id": "phys_force",
+      "english": "Force",
+      "hebrew": "כוח",
+      "arabic": "قوة",
+      "domain": "physics_mechanics",
+      "arabicGender": "f",
+      "notes": "Arabic var: ق→F",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_mass",
+      "english": "Mass",
+      "hebrew": "מסה",
+      "arabic": "كتلة",
+      "domain": "physics_mechanics",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_weight",
+      "english": "Weight",
+      "hebrew": "משקל",
+      "arabic": "وزن",
+      "domain": "physics_mechanics",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_acceleration",
+      "english": "Acceleration",
+      "hebrew": "תאוצה",
+      "arabic": "تسارع",
+      "domain": "physics_mechanics",
+      "arabicGender": "m",
+      "notes": "Arabic var: ت→a",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_velocity",
+      "english": "Velocity",
+      "hebrew": "מהירות",
+      "arabic": "سرعة",
+      "domain": "physics_mechanics",
+      "arabicGender": "f",
+      "notes": "Arabic var: ح→v (from حركة motion)",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_speed",
+      "english": "Speed",
+      "hebrew": "מהירות (סקלרית)",
+      "arabic": "سرعة (قياسية)",
+      "domain": "physics_mechanics",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_displacement",
+      "english": "Displacement",
+      "hebrew": "העתק",
+      "arabic": "إزاحة",
+      "domain": "physics_mechanics",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_distance_phys",
+      "english": "Distance (physics)",
+      "hebrew": "מרחק",
+      "arabic": "مسافة",
+      "domain": "physics_mechanics",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_time",
+      "english": "Time",
+      "hebrew": "זמן",
+      "arabic": "زمن",
+      "domain": "physics_mechanics",
+      "arabicGender": "m",
+      "notes": "Arabic var: ز→T (period)",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_momentum",
+      "english": "Momentum",
+      "hebrew": "תנע",
+      "arabic": "كمية الحركة",
+      "domain": "physics_mechanics",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_impulse",
+      "english": "Impulse",
+      "hebrew": "דחף",
+      "arabic": "دفع",
+      "domain": "physics_mechanics",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_friction",
+      "english": "Friction",
+      "hebrew": "חיכוך",
+      "arabic": "احتكاك",
+      "domain": "physics_mechanics",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_normal_force",
+      "english": "Normal force",
+      "hebrew": "כוח נורמלי",
+      "arabic": "قوة عمودية",
+      "domain": "physics_mechanics",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_gravity",
+      "english": "Gravity / Gravitational force",
+      "hebrew": "כוח כבידה",
+      "arabic": "قوة الجاذبية",
+      "domain": "physics_mechanics",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_free_fall",
+      "english": "Free fall",
+      "hebrew": "נפילה חופשית",
+      "arabic": "سقوط حر",
+      "domain": "physics_mechanics",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_projectile",
+      "english": "Projectile motion",
+      "hebrew": "תנועה בליסטית",
+      "arabic": "حركة قذيفة",
+      "domain": "physics_mechanics",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_circular_motion",
+      "english": "Circular motion",
+      "hebrew": "תנועה מעגלית",
+      "arabic": "حركة دائرية",
+      "domain": "physics_mechanics",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_centripetal",
+      "english": "Centripetal force",
+      "hebrew": "כוח צנטריפטלי",
+      "arabic": "قوة جاذبة مركزية",
+      "domain": "physics_mechanics",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_torque",
+      "english": "Torque",
+      "hebrew": "מומנט",
+      "arabic": "عزم دوران",
+      "domain": "physics_mechanics",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_equilibrium",
+      "english": "Equilibrium",
+      "hebrew": "שיווי משקל",
+      "arabic": "اتزان",
+      "domain": "physics_mechanics",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_newtons_law_1",
+      "english": "Newton's first law",
+      "hebrew": "חוק ניוטון הראשון",
+      "arabic": "قانون نيوتن الأول",
+      "domain": "physics_mechanics",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_newtons_law_2",
+      "english": "Newton's second law",
+      "hebrew": "חוק ניוטון השני",
+      "arabic": "قانون نيوتن الثاني",
+      "domain": "physics_mechanics",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_newtons_law_3",
+      "english": "Newton's third law",
+      "hebrew": "חוק ניוטון השלישי",
+      "arabic": "قانون نيوتن الثالث",
+      "domain": "physics_mechanics",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_energy",
+      "english": "Energy",
+      "hebrew": "אנרגיה",
+      "arabic": "طاقة",
+      "domain": "physics_energy",
+      "arabicGender": "f",
+      "notes": "Arabic var: ط→E",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_kinetic_energy",
+      "english": "Kinetic energy",
+      "hebrew": "אנרגיה קינטית",
+      "arabic": "طاقة حركية",
+      "domain": "physics_energy",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_potential_energy",
+      "english": "Potential energy",
+      "hebrew": "אנרגיה פוטנציאלית",
+      "arabic": "طاقة وضع",
+      "domain": "physics_energy",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_work",
+      "english": "Work",
+      "hebrew": "עבודה",
+      "arabic": "شغل",
+      "domain": "physics_energy",
+      "arabicGender": "m",
+      "notes": "Arabic var: ش→W",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_power",
+      "english": "Power",
+      "hebrew": "הספק",
+      "arabic": "قدرة",
+      "domain": "physics_energy",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_conservation_energy",
+      "english": "Conservation of energy",
+      "hebrew": "חוק שימור האנרגיה",
+      "arabic": "قانون حفظ الطاقة",
+      "domain": "physics_energy",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_conservation_momentum",
+      "english": "Conservation of momentum",
+      "hebrew": "חוק שימור התנע",
+      "arabic": "قانون حفظ كمية الحركة",
+      "domain": "physics_energy",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_elastic_collision",
+      "english": "Elastic collision",
+      "hebrew": "התנגשות אלסטית",
+      "arabic": "تصادم مرن",
+      "domain": "physics_energy",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_inelastic_collision",
+      "english": "Inelastic collision",
+      "hebrew": "התנגשות לא-אלסטית",
+      "arabic": "تصادم غير مرن",
+      "domain": "physics_energy",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_voltage",
+      "english": "Voltage",
+      "hebrew": "מתח",
+      "arabic": "جهد كهربائي",
+      "domain": "physics_electricity",
+      "arabicGender": "m",
+      "notes": "Symbol: V. Arabic var: ج→V",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_current",
+      "english": "Electric current",
+      "hebrew": "זרם",
+      "arabic": "تيار كهربائي",
+      "domain": "physics_electricity",
+      "arabicGender": "m",
+      "notes": "Symbol: I",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_resistance",
+      "english": "Resistance",
+      "hebrew": "התנגדות",
+      "arabic": "مقاومة",
+      "domain": "physics_electricity",
+      "arabicGender": "f",
+      "notes": "Symbol: R. Unit: Ω (ohm)",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_ohms_law",
+      "english": "Ohm's law",
+      "hebrew": "חוק אום",
+      "arabic": "قانون أوم",
+      "domain": "physics_electricity",
+      "arabicGender": "m",
+      "notes": "V = IR",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_circuit",
+      "english": "Circuit",
+      "hebrew": "מעגל חשמלי",
+      "arabic": "دائرة كهربائية",
+      "domain": "physics_electricity",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_series_circuit",
+      "english": "Series circuit",
+      "hebrew": "חיבור טורי",
+      "arabic": "دائرة توالي",
+      "domain": "physics_electricity",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_parallel_circuit",
+      "english": "Parallel circuit",
+      "hebrew": "חיבור מקבילי",
+      "arabic": "دائرة توازي",
+      "domain": "physics_electricity",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_capacitor",
+      "english": "Capacitor",
+      "hebrew": "קבל",
+      "arabic": "مكثف",
+      "domain": "physics_electricity",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_capacitance",
+      "english": "Capacitance",
+      "hebrew": "קיבול",
+      "arabic": "سعة كهربائية",
+      "domain": "physics_electricity",
+      "arabicGender": "f",
+      "notes": "Unit: F (farad)",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_charge",
+      "english": "Electric charge",
+      "hebrew": "מטען חשמלי",
+      "arabic": "شحنة كهربائية",
+      "domain": "physics_electricity",
+      "arabicGender": "f",
+      "notes": "Unit: C (coulomb)",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_electric_field",
+      "english": "Electric field",
+      "hebrew": "שדה חשמלי",
+      "arabic": "مجال كهربائي",
+      "domain": "physics_electricity",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_magnetic_field",
+      "english": "Magnetic field",
+      "hebrew": "שדה מגנטי",
+      "arabic": "مجال مغناطيسي",
+      "domain": "physics_electricity",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_emf",
+      "english": "Electromotive force (EMF)",
+      "hebrew": "כא\"מ (כוח אלקטרומוטורי)",
+      "arabic": "قوة دافعة كهربائية",
+      "domain": "physics_electricity",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_wave",
+      "english": "Wave",
+      "hebrew": "גל",
+      "arabic": "موجة",
+      "domain": "physics_waves",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_wavelength",
+      "english": "Wavelength",
+      "hebrew": "אורך גל",
+      "arabic": "طول الموجة",
+      "domain": "physics_waves",
+      "arabicGender": "m",
+      "notes": "Symbol: λ (lambda)",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_frequency",
+      "english": "Frequency",
+      "hebrew": "תדירות",
+      "arabic": "تردد",
+      "domain": "physics_waves",
+      "arabicGender": "m",
+      "notes": "Unit: Hz",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_amplitude_phys",
+      "english": "Amplitude (physics)",
+      "hebrew": "אמפליטודה",
+      "arabic": "سعة",
+      "domain": "physics_waves",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_period_phys",
+      "english": "Period (physics)",
+      "hebrew": "מחזור",
+      "arabic": "دورة",
+      "domain": "physics_waves",
+      "arabicGender": "f",
+      "notes": "Symbol: T",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_reflection",
+      "english": "Reflection",
+      "hebrew": "החזרה",
+      "arabic": "انعكاس",
+      "domain": "physics_waves",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_refraction",
+      "english": "Refraction",
+      "hebrew": "שבירה",
+      "arabic": "انكسار",
+      "domain": "physics_waves",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_diffraction",
+      "english": "Diffraction",
+      "hebrew": "עקיפה",
+      "arabic": "حيود",
+      "domain": "physics_waves",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_interference",
+      "english": "Interference",
+      "hebrew": "התאבכות",
+      "arabic": "تداخل",
+      "domain": "physics_waves",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_snells_law",
+      "english": "Snell's law",
+      "hebrew": "חוק סנל",
+      "arabic": "قانون سنل",
+      "domain": "physics_waves",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_speed_of_light",
+      "english": "Speed of light",
+      "hebrew": "מהירות האור",
+      "arabic": "سرعة الضوء",
+      "domain": "physics_waves",
+      "arabicGender": "f",
+      "notes": "c = 3×10⁸ m/s",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_photon",
+      "english": "Photon",
+      "hebrew": "פוטון",
+      "arabic": "فوتون",
+      "domain": "physics_modern",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_electron",
+      "english": "Electron",
+      "hebrew": "אלקטרון",
+      "arabic": "إلكترون",
+      "domain": "physics_modern",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_proton",
+      "english": "Proton",
+      "hebrew": "פרוטון",
+      "arabic": "بروتون",
+      "domain": "physics_modern",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_neutron",
+      "english": "Neutron",
+      "hebrew": "נויטרון",
+      "arabic": "نيوترون",
+      "domain": "physics_modern",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_atom",
+      "english": "Atom",
+      "hebrew": "אטום",
+      "arabic": "ذرة",
+      "domain": "physics_modern",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_nucleus",
+      "english": "Nucleus",
+      "hebrew": "גרעין",
+      "arabic": "نواة",
+      "domain": "physics_modern",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_radioactivity",
+      "english": "Radioactivity",
+      "hebrew": "רדיואקטיביות",
+      "arabic": "نشاط إشعاعي",
+      "domain": "physics_modern",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_half_life",
+      "english": "Half-life",
+      "hebrew": "זמן מחצית חיים",
+      "arabic": "عمر النصف",
+      "domain": "physics_modern",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_photoelectric",
+      "english": "Photoelectric effect",
+      "hebrew": "אפקט פוטואלקטרי",
+      "arabic": "التأثير الكهروضوئي",
+      "domain": "physics_modern",
+      "arabicGender": "m",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_temperature",
+      "english": "Temperature",
+      "hebrew": "טמפרטורה",
+      "arabic": "درجة الحرارة",
+      "domain": "physics_thermo",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_heat",
+      "english": "Heat",
+      "hebrew": "חום",
+      "arabic": "حرارة",
+      "domain": "physics_thermo",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_specific_heat",
+      "english": "Specific heat capacity",
+      "hebrew": "חום סגולי",
+      "arabic": "السعة الحرارية النوعية",
+      "domain": "physics_thermo",
+      "arabicGender": "f",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_pressure",
+      "english": "Pressure",
+      "hebrew": "לחץ",
+      "arabic": "ضغط",
+      "domain": "physics_thermo",
+      "arabicGender": "m",
+      "notes": "Unit: Pa (pascal)",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "phys_density",
+      "english": "Density",
+      "hebrew": "צפיפות",
+      "arabic": "كثافة",
+      "domain": "physics_thermo",
+      "arabicGender": "f",
+      "notes": "Symbol: ρ (rho)",
+      "source": "Bagrut Physics"
+    },
+    {
+      "id": "unit_newton",
+      "english": "Newton",
+      "hebrew": "ניוטון",
+      "arabic": "نيوتن",
+      "domain": "units",
+      "arabicGender": "m",
+      "notes": "N — force",
+      "source": "SI"
+    },
+    {
+      "id": "unit_joule",
+      "english": "Joule",
+      "hebrew": "ג'אול",
+      "arabic": "جول",
+      "domain": "units",
+      "arabicGender": "m",
+      "notes": "J — energy",
+      "source": "SI"
+    },
+    {
+      "id": "unit_watt",
+      "english": "Watt",
+      "hebrew": "ואט",
+      "arabic": "واط",
+      "domain": "units",
+      "arabicGender": "m",
+      "notes": "W — power",
+      "source": "SI"
+    },
+    {
+      "id": "unit_ampere",
+      "english": "Ampere",
+      "hebrew": "אמפר",
+      "arabic": "أمبير",
+      "domain": "units",
+      "arabicGender": "m",
+      "notes": "A — current",
+      "source": "SI"
+    },
+    {
+      "id": "unit_volt",
+      "english": "Volt",
+      "hebrew": "וולט",
+      "arabic": "فولت",
+      "domain": "units",
+      "arabicGender": "m",
+      "notes": "V — voltage",
+      "source": "SI"
+    },
+    {
+      "id": "unit_ohm",
+      "english": "Ohm",
+      "hebrew": "אום",
+      "arabic": "أوم",
+      "domain": "units",
+      "arabicGender": "m",
+      "notes": "Ω — resistance",
+      "source": "SI"
+    },
+    {
+      "id": "unit_hertz",
+      "english": "Hertz",
+      "hebrew": "הרץ",
+      "arabic": "هرتز",
+      "domain": "units",
+      "arabicGender": "m",
+      "notes": "Hz — frequency",
+      "source": "SI"
+    },
+    {
+      "id": "unit_pascal",
+      "english": "Pascal",
+      "hebrew": "פסקל",
+      "arabic": "باسكال",
+      "domain": "units",
+      "arabicGender": "m",
+      "notes": "Pa — pressure",
+      "source": "SI"
+    },
+    {
+      "id": "unit_meter",
+      "english": "Meter",
+      "hebrew": "מטר",
+      "arabic": "متر",
+      "domain": "units",
+      "arabicGender": "m",
+      "notes": "m — length",
+      "source": "SI"
+    },
+    {
+      "id": "unit_kilogram",
+      "english": "Kilogram",
+      "hebrew": "קילוגרם",
+      "arabic": "كيلوغرام",
+      "domain": "units",
+      "arabicGender": "m",
+      "notes": "kg — mass",
+      "source": "SI"
+    },
+    {
+      "id": "unit_second",
+      "english": "Second",
+      "hebrew": "שנייה",
+      "arabic": "ثانية",
+      "domain": "units",
+      "arabicGender": "f",
+      "notes": "s — time",
+      "source": "SI"
+    },
+    {
+      "id": "unit_coulomb",
+      "english": "Coulomb",
+      "hebrew": "קולון",
+      "arabic": "كولوم",
+      "domain": "units",
+      "arabicGender": "m",
+      "notes": "C — charge",
+      "source": "SI"
+    },
+    {
+      "id": "unit_farad",
+      "english": "Farad",
+      "hebrew": "פרד",
+      "arabic": "فاراد",
+      "domain": "units",
+      "arabicGender": "m",
+      "notes": "F — capacitance",
+      "source": "SI"
+    },
+    {
+      "id": "notation_alpha",
+      "english": "Alpha",
+      "hebrew": "אלפא",
+      "arabic": "ألفا",
+      "domain": "notation",
+      "arabicGender": "m",
+      "notes": "α — angular acceleration, thermal expansion coefficient",
+      "source": "SI"
+    },
+    {
+      "id": "notation_beta",
+      "english": "Beta",
+      "hebrew": "בטא",
+      "arabic": "بيتا",
+      "domain": "notation",
+      "arabicGender": "m",
+      "notes": "β — angle designation in physics",
+      "source": "SI"
+    },
+    {
+      "id": "notation_gamma",
+      "english": "Gamma",
+      "hebrew": "גמא",
+      "arabic": "جاما",
+      "domain": "notation",
+      "arabicGender": "m",
+      "notes": "γ — Lorentz factor, photon symbol",
+      "source": "SI"
+    },
+    {
+      "id": "notation_delta",
+      "english": "Delta",
+      "hebrew": "דלתא",
+      "arabic": "دلتا",
+      "domain": "notation",
+      "arabicGender": "m",
+      "notes": "Δ — change in quantity. Hebrew/Arabic both use Δ in formulae directly.",
+      "source": "SI"
+    },
+    {
+      "id": "notation_theta",
+      "english": "Theta",
+      "hebrew": "תטא",
+      "arabic": "ثيتا",
+      "domain": "notation",
+      "arabicGender": "m",
+      "notes": "θ — angle. Arabic var: ث→θ",
+      "source": "SI"
+    },
+    {
+      "id": "notation_lambda",
+      "english": "Lambda",
+      "hebrew": "למבדה",
+      "arabic": "لاندا",
+      "domain": "notation",
+      "arabicGender": "m",
+      "notes": "λ — wavelength",
+      "source": "SI"
+    },
+    {
+      "id": "notation_mu",
+      "english": "Mu",
+      "hebrew": "מיו",
+      "arabic": "ميو",
+      "domain": "notation",
+      "arabicGender": "m",
+      "notes": "μ — friction coefficient, micro prefix",
+      "source": "SI"
+    },
+    {
+      "id": "notation_omega",
+      "english": "Omega",
+      "hebrew": "אומגה",
+      "arabic": "أوميغا",
+      "domain": "notation",
+      "arabicGender": "m",
+      "notes": "ω — angular velocity. Ω — ohm (resistance unit)",
+      "source": "SI"
+    },
+    {
+      "id": "notation_pi_phys",
+      "english": "Pi (physics/math constant)",
+      "hebrew": "פאי",
+      "arabic": "باي",
+      "domain": "notation",
+      "arabicGender": "m",
+      "notes": "π ≈ 3.14159. Symbol used directly in all three languages",
+      "source": "SI"
+    },
+    {
+      "id": "notation_sigma",
+      "english": "Sigma",
+      "hebrew": "סיגמא",
+      "arabic": "سيجما",
+      "domain": "notation",
+      "arabicGender": "m",
+      "notes": "σ — stress, standard deviation. Σ — summation",
+      "source": "SI"
+    },
+    {
+      "id": "notation_rho",
+      "english": "Rho",
+      "hebrew": "רו",
+      "arabic": "رو",
+      "domain": "notation",
+      "arabicGender": "m",
+      "notes": "ρ — density",
+      "source": "SI"
+    },
+    {
+      "id": "notation_tau",
+      "english": "Tau",
+      "hebrew": "טאו",
+      "arabic": "تاو",
+      "domain": "notation",
+      "arabicGender": "m",
+      "notes": "τ — torque, time constant",
+      "source": "SI"
+    }
+  ]
+}

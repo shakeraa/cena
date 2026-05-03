@@ -1,0 +1,177 @@
+<mxfile host="app.diagrams.net" agent="cena/adr-0062" version="1.0">
+  <diagram name="Student → Concept Mastery (ADR-0062 + ADR-0039 + ADR-0050)" id="student-mastery-flow">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="2100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Student lane -->
+        <mxCell id="lane-student" value="Student" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="320" height="2000" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s0" value="Student opens Cena (SPA / future PWA)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="80" y="100" width="240" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s1" value="Student answers question" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="80" y="780" width="240" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s2" value="Sees feedback + distractor rationale" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="80" y="1180" width="240" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s3" value="Next question" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="80" y="1880" width="240" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Session start lane -->
+        <mxCell id="lane-start" value="Session start" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="380" y="40" width="320" height="320" as="geometry" />
+        </mxCell>
+
+        <mxCell id="startEp" value="POST /api/me/sessions/start&#10;(SessionEndpoints)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="100" width="240" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="examTarget" value="Active ExamTarget&#10;ADR-0050: (student, examTarget, skill)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="420" y="180" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="plan" value="StudentPlan reader&#10;QuestionPaperCodes filter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="270" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Question delivery lane -->
+        <mxCell id="lane-deliver" value="Question delivery (Student API host)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="380" y="380" width="700" height="380" as="geometry" />
+        </mxCell>
+
+        <mxCell id="adaptive" value="AdaptiveQuestionPool" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="440" width="240" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="pool" value="MartenQuestionPool&#10;policy: AllowReferenceItems=false&#10;+ QuestionPaperCodes intersect" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="500" width="240" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="readModel" value="QuestionReadModel&#10;Concepts: List[SkillCode]&#10;(populated by Phase 1 projection)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d1ecf1;strokeColor=#0c5460;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="700" y="500" width="280" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="selector" value="Selector picks question&#10;by Bloom + Elo difficulty (target ~0.85 success)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="610" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="deliver" value="Question delivered:&#10;stem, options, figures, scaffolding rung" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="690" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Answer handling lane -->
+        <mxCell id="lane-answer" value="Answer handling" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="380" y="780" width="320" height="380" as="geometry" />
+        </mxCell>
+
+        <mxCell id="answerEp" value="POST /sessions/{id}/answer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="840" width="240" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="verify" value="CAS-verified answer match&#10;(SymPy oracle, ADR-0002)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8d7da;strokeColor=#721c24" vertex="1" parent="1">
+          <mxGeometry x="420" y="900" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="feedback" value="Feedback engine&#10;L1 explanation + per-distractor rationale" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="980" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="misc" value="Misconception detector&#10;session-scoped (ADR-0003, 30-day TTL)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="1060" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Mastery update lane -->
+        <mxCell id="lane-mastery" value="Mastery update — BKT keys on PRIMARY only (ADR-0039)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="720" y="780" width="380" height="380" as="geometry" />
+        </mxCell>
+
+        <mxCell id="attempted" value="ConceptAttempted_V3&#10;conceptId = PrimaryConceptId" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#fff3cd;strokeColor=#856404;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="760" y="840" width="300" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="bkt" value="BktService.UpdateMastery&#10;Koedinger defaults:&#10;P(L0)=0.3 P(T)=0.1 P(G)=0.2 P(S)=0.1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d4edda;strokeColor=#155724;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="760" y="930" width="300" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="masteryDoc" value="StudentMasteryDocument&#10;keyed (student, examTarget, skill)&#10;per ADR-0050" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d1ecf1;strokeColor=#0c5460" vertex="1" parent="1">
+          <mxGeometry x="760" y="1040" width="300" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Phase 2 lane (gated) -->
+        <mxCell id="lane-phase2" value="Supporting concepts (Phase 2 — GATED OFF until N≥10)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1;dashed=1" vertex="1" parent="1">
+          <mxGeometry x="380" y="1180" width="700" height="320" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stabilityGate" value="IConceptItemPublicationCounter&#10;≥10 published items per supporting leaf?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f8d7da;strokeColor=#721c24" vertex="1" parent="1">
+          <mxGeometry x="430" y="1260" width="280" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="nudge" value="MasterySignalEmitted_V1&#10;positive-only, ½ post-reflection delta,&#10;never decrements" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e2e3e5;strokeColor=#6c757d;dashed=1" vertex="1" parent="1">
+          <mxGeometry x="760" y="1240" width="300" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="skipNudge" value="Skip — leaf below floor;&#10;posteriors too noisy&#10;(van de Sande 2013)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e2e3e5;strokeColor=#6c757d;dashed=1" vertex="1" parent="1">
+          <mxGeometry x="760" y="1380" width="300" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Scheduling loop lane -->
+        <mxCell id="lane-schedule" value="Adaptive scheduling loop" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="380" y="1520" width="700" height="380" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stagnation" value="StagnationDetector&#10;3+ wrong on _sessionPrimaryConceptId&#10;→ scaffolding bump" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="1580" width="280" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="nextPick" value="AdaptiveQuestionPool.GetNext&#10;BKT mastery + PSI prerequisite check&#10;+ ExamTarget filter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="760" y="1580" width="300" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Edges -->
+        <mxCell id="se1" style="endArrow=classic;html=1;" edge="1" parent="1" source="s0" target="startEp"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se2" style="endArrow=classic;html=1;" edge="1" parent="1" source="startEp" target="examTarget"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se3" style="endArrow=classic;html=1;" edge="1" parent="1" source="startEp" target="plan"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se4" value="paperCodes" style="endArrow=classic;html=1;dashed=1;" edge="1" parent="1" source="plan" target="pool"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="se5" style="endArrow=classic;html=1;" edge="1" parent="1" source="startEp" target="adaptive"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se6" style="endArrow=classic;html=1;" edge="1" parent="1" source="adaptive" target="pool"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se7" style="endArrow=classic;html=1;" edge="1" parent="1" source="pool" target="readModel"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se8" style="endArrow=classic;html=1;" edge="1" parent="1" source="pool" target="selector"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se9" style="endArrow=classic;html=1;" edge="1" parent="1" source="selector" target="deliver"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se10" style="endArrow=classic;html=1;" edge="1" parent="1" source="deliver" target="s1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="se11" style="endArrow=classic;html=1;" edge="1" parent="1" source="s1" target="answerEp"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se12" style="endArrow=classic;html=1;" edge="1" parent="1" source="answerEp" target="verify"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se13" style="endArrow=classic;html=1;" edge="1" parent="1" source="verify" target="feedback"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se14" style="endArrow=classic;html=1;" edge="1" parent="1" source="verify" target="misc"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se15" style="endArrow=classic;html=1;" edge="1" parent="1" source="feedback" target="s2"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="se16" style="endArrow=classic;html=1;" edge="1" parent="1" source="answerEp" target="attempted"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se17" style="endArrow=classic;html=1;" edge="1" parent="1" source="attempted" target="bkt"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se18" style="endArrow=classic;html=1;" edge="1" parent="1" source="bkt" target="masteryDoc"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="se19" value="phase 2: per supporting" style="endArrow=classic;html=1;dashed=1;" edge="1" parent="1" source="answerEp" target="stabilityGate"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se20" value="yes" style="endArrow=classic;html=1;dashed=1;" edge="1" parent="1" source="stabilityGate" target="nudge"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se21" value="no" style="endArrow=classic;html=1;dashed=1;" edge="1" parent="1" source="stabilityGate" target="skipNudge"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se22" style="endArrow=classic;html=1;dashed=1;" edge="1" parent="1" source="nudge" target="masteryDoc"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="se23" style="endArrow=classic;html=1;dashed=1;" edge="1" parent="1" source="masteryDoc" target="nextPick"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se24" style="endArrow=classic;html=1;" edge="1" parent="1" source="answerEp" target="stagnation"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se25" style="endArrow=classic;html=1;" edge="1" parent="1" source="stagnation" target="nextPick"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se26" style="endArrow=classic;html=1;" edge="1" parent="1" source="nextPick" target="adaptive" exitX="0" exitY="0.5" entryX="1" entryY="0.5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se27" style="endArrow=classic;html=1;" edge="1" parent="1" source="s2" target="s3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se28" style="endArrow=classic;html=1;" edge="1" parent="1" source="s3" target="nextPick" exitX="1" exitY="0.5" entryX="0" entryY="0.5"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

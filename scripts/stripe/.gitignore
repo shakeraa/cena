@@ -1,0 +1,4 @@
+# Never commit generated Stripe env files (they contain price IDs that are
+# per-sandbox and secrets that MUST NOT land in git).
+.env.stripe.local
+.env.stripe.*

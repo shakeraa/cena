@@ -1,0 +1,116 @@
+doc_path: pre-release-review/AXIS_6_Assessment_Feedback_Research.md
+reviewer: persona-sre
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight assessment + feedback features (formative/summative split dashboard, 2PL-CAT placement, AI partial-credit,
+  free-response CAS-validated AI grading, per-session error analysis, real-time misconception tagging, crisis mode,
+  confidence calibration). Heavy on CAS + LLM co-dependence; RDY-080 sensitivity on "readiness" scores.
+system_purpose_fit: 4
+  rationale:
+    - Respects ADR-0003 session-scope on misconception tagging + per-session error analysis.
+    - RDY-080 awareness is explicit in doc headers.
+    - SRE gap: no failure mode analysis if CAS or LLM sidecar degrades mid-session.
+code_reality_check:
+  claims_verified_in_code:
+    - "CAS nightly + chaos + load harness -> .github/workflows/cas-nightly.yml, cas-chaos-nightly.yml"
+    - "LLM judge sidecar HTTP adapter exists -> commit d6ecfac"
+    - "Session answer endpoint CAS-gated -> src/api/Cena.Student.Api.Host/Endpoints/ + Layer5CasValidationTests"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Human-in-the-loop validation queue for AI partial-credit grading — no moderation queue schema cited"
+    - "Per-session error analysis auto-deletion architecture — TTL implementation path not stated"
+adr_alignment:
+  honored: [ADR-0002, ADR-0003, RDY-080]
+  violated: []
+  missing_adr_needed:
+    - "AI grading human-review SLA + error budget"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      AI Partial-Credit Grading (Feature 3) and Free-Response CAS-Validated AI Grading (Feature 4) must never ship with LLM
+      as the last word. Need a hard contract: CAS symbolic equivalence is authoritative; LLM rubric score can only adjust
+      within CAS-approved bounds. Plus a human-in-the-loop queue before first-N scores are persisted.
+    evidence: AXIS_6_Assessment_Feedback_Research.md Features 3, 4
+    lens_note: A mis-graded Bagrut practice item is a community-trust incident; SRE needs a rollback path for stale grades.
+  - severity: P0
+    finding: |
+      Dr Rami flagged Feature 3 citation as REJECT (Yu et al. 2026 does not exist). Do not start ops work until the feature's
+      claim basis is replaced; otherwise we risk building a runbook for a feature that gets killed by legal/research review.
+    evidence: finding_assessment_dr_rami.md:L13-L15 (FD-008 REJECT); AXIS_6_Assessment_Feedback_Research.md Feature 3
+    lens_note: Don't invest runbook effort on features whose claims will be retracted.
+  - severity: P1
+    finding: |
+      Real-Time Misconception Tagging (Feature 6) repeats ADR-0003 risk. SRE ask is identical to FD-003: Redis-only + TLS +
+      per-tenant keyspace + eviction-rate alarm + 30-day probe.
+    evidence: AXIS_6_Assessment_Feedback_Research.md Feature 6
+    lens_note: Single primitive should serve all misconception-tagging features.
+  - severity: P1
+    finding: |
+      Crisis Mode (Feature 7) materially changes the session schedule in the last weeks pre-Bagrut — a period where any
+      incident is national news. Need an explicit "freeze window" policy: no new deploys touching session logic during the
+      two weeks before the Bagrut exam date.
+    evidence: AXIS_6_Assessment_Feedback_Research.md Feature 7
+    lens_note: Change-freeze windows are standard fintech practice; apply to the exam calendar.
+  - severity: P1
+    finding: |
+      IRT-Driven 2PL-CAT (Feature 2) stopping rule is SE < 0.3. That is a computational budget claim that needs a latency SLO
+      (e.g. "placement test completion <= 10 min, no individual item >3s").
+    evidence: AXIS_6_Assessment_Feedback_Research.md Feature 2
+    lens_note: Psychometric budgets must be expressed as ops SLOs.
+already_built:
+  - feature: CAS nightly + chaos CI
+    evidence: .github/workflows/cas-nightly.yml, cas-chaos-nightly.yml
+    note: Use as gate for any grading feature; do not bypass.
+  - feature: LLM judge sidecar
+    evidence: commit d6ecfac
+    note: Features 3 + 4 must share this sidecar + its observability.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md FD-003..FD-008 (IRT, AI grading, misconception, crisis, calibration)."
+  - "cena_dr_nadia_pedagogical_review_20_findings.md + finding_assessment_dr_rami.md (review of same items)."
+extracted_tasks:
+  - title: Enforce Bagrut exam-week change-freeze in CD
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Block production deploys that touch session/assessment code during configured freeze windows (exam dates).
+      ## Files
+      .github/workflows/cd-deploy.yml
+      docs/engineering/shipgate.md
+      ops/reports/ (new: freeze-windows.json)
+      ## Definition of Done
+      - Attempted deploy inside window fails with clear message
+      - Override requires human-architect signed approval
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/exam-freeze"
+    source_doc_lines: []
+  - title: Human-review queue + rollback path for AI partial-credit scores
+    priority: P0
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      AI-graded scores land in a pending state, sampled for human review, and can be bulk-corrected (event-sourced reversal)
+      when a scoring bug is found post-deploy.
+      ## Files
+      src/actors/Cena.Actors/ (new GradingReviewQueue)
+      src/api/Cena.Admin.Api/ (moderation endpoints)
+      docs/ops/runbooks/ (new: grading-rollback.md)
+      ## Definition of Done
+      - Sampling rate configurable per flag
+      - Integration test: insert bad score -> reversal event fixes student-facing view
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/grading-review"
+    source_doc_lines: []
+verdict: revise
+verdict_reason: |
+  Assessment stack needs explicit change-freeze + graded-score rollback + CAS-is-final contract before SHIP.
+cross_lens_handoff:
+  - to: persona-ministry
+    about: AI-graded feedback passing Bagrut reference-only non-negotiable.
+  - to: persona-privacy
+    about: Misconception-tag store (shared primitive with FD-003).
+  - to: persona-finops
+    about: LLM grading + IRT sampler cost per student.

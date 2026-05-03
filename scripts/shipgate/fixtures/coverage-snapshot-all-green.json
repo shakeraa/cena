@@ -1,0 +1,118 @@
+{
+  "schemaVersion": "1.0",
+  "runAt": "2026-04-20T00:00:00Z",
+  "source": "prr-210-fixture:all-green",
+  "_comment": "Every active cell meets or exceeds required N. Draft cells may still be under (advisory).",
+  "cells": [
+    {
+      "topic": "algebra.linear_equations",
+      "difficulty": "Easy",
+      "methodology": "Halabi",
+      "track": "FourUnit",
+      "questionType": "multiple-choice",
+      "language": "en",
+      "variantCount": 12,
+      "belowSlo": false,
+      "curatorTaskId": null
+    },
+    {
+      "topic": "algebra.linear_equations",
+      "difficulty": "Medium",
+      "methodology": "Halabi",
+      "track": "FourUnit",
+      "questionType": "multiple-choice",
+      "language": "en",
+      "variantCount": 14,
+      "belowSlo": false,
+      "curatorTaskId": null
+    },
+    {
+      "topic": "algebra.linear_equations",
+      "difficulty": "Hard",
+      "methodology": "Halabi",
+      "track": "FourUnit",
+      "questionType": "multiple-choice",
+      "language": "en",
+      "variantCount": 15,
+      "belowSlo": false,
+      "curatorTaskId": null
+    },
+    {
+      "topic": "algebra.linear_equations",
+      "difficulty": "Easy",
+      "methodology": "Rabinovitch",
+      "track": "FourUnit",
+      "questionType": "multiple-choice",
+      "language": "en",
+      "variantCount": 11,
+      "belowSlo": false,
+      "curatorTaskId": null
+    },
+    {
+      "topic": "algebra.linear_equations",
+      "difficulty": "Medium",
+      "methodology": "Rabinovitch",
+      "track": "FourUnit",
+      "questionType": "multiple-choice",
+      "language": "en",
+      "variantCount": 10,
+      "belowSlo": false,
+      "curatorTaskId": null
+    },
+    {
+      "topic": "algebra.quadratic_equations",
+      "difficulty": "Medium",
+      "methodology": "Halabi",
+      "track": "FiveUnit",
+      "questionType": "multiple-choice",
+      "language": "en",
+      "variantCount": 10,
+      "belowSlo": false,
+      "curatorTaskId": null
+    },
+    {
+      "topic": "algebra.quadratic_equations",
+      "difficulty": "Hard",
+      "methodology": "Halabi",
+      "track": "FiveUnit",
+      "questionType": "step-solver",
+      "language": "en",
+      "variantCount": 5,
+      "belowSlo": false,
+      "curatorTaskId": null
+    },
+    {
+      "topic": "calculus.differentiation",
+      "difficulty": "Medium",
+      "methodology": "Halabi",
+      "track": "FiveUnit",
+      "questionType": "step-solver",
+      "language": "en",
+      "variantCount": 6,
+      "belowSlo": false,
+      "curatorTaskId": null
+    },
+    {
+      "topic": "calculus.differentiation",
+      "difficulty": "Hard",
+      "methodology": "Halabi",
+      "track": "FiveUnit",
+      "questionType": "step-solver",
+      "language": "en",
+      "variantCount": 7,
+      "belowSlo": false,
+      "curatorTaskId": null
+    },
+    {
+      "topic": "physics.free_body_diagrams",
+      "difficulty": "Medium",
+      "methodology": "Halabi",
+      "track": "FiveUnit",
+      "questionType": "fbd-construct",
+      "language": "en",
+      "variantCount": 3,
+      "belowSlo": false,
+      "curatorTaskId": null
+    }
+  ]
+}

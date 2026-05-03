@@ -1,0 +1,790 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Cena Adaptive Learning Platform — GraphQL Schema (Read Side)
+#
+# Served by the Analytics Context. Backed by Marten CQRS read model projections.
+# Used by: student knowledge graph visualization, teacher dashboards, parent views.
+#
+# Conventions:
+#   - Cursor-based pagination (Relay-style) for all list queries
+#   - All timestamps are ISO 8601 UTC
+#   - All IDs are UUIDv7 (time-sortable)
+#   - Field deprecation follows 90-day sunset policy (see docs/api-contracts.md)
+#   - Authorization enforced at resolver layer via JWT claims (role + scope)
+#
+# @see docs/api-contracts.md Section 3 — GraphQL Schema — Read Side
+# @see docs/architecture-design.md Section 3.2 — Bounded Context Definitions
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Scalars ──────────────────────────────────────────────────────────────────
+
+"""ISO 8601 UTC datetime string."""
+scalar DateTime
+
+"""UUIDv7 (time-sortable unique identifier)."""
+scalar UUID
+
+"""JSON scalar for opaque metadata payloads."""
+scalar JSON
+
+# ── Enums ────────────────────────────────────────────────────────────────────
+
+"""Mastery status for a concept in the student's knowledge graph overlay."""
+enum MasteryStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  MASTERED
+  DECAYING
+}
+
+"""Learning session lifecycle status."""
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+  TIMED_OUT
+}
+
+"""Leaderboard scope — class, school, or global."""
+enum LeaderboardScope {
+  CLASS
+  SCHOOL
+  GLOBAL
+}
+
+"""Teaching methodology types supported by the Pedagogy Context."""
+enum MethodologyType {
+  SOCRATIC
+  SPACED_REPETITION
+  PROJECT_BASED
+  BLOOMS_PROGRESSION
+  FEYNMAN
+  WORKED_EXAMPLE
+  ANALOGY
+  RETRIEVAL_PRACTICE
+}
+
+"""Session progress event types for real-time subscriptions."""
+enum SessionEventType {
+  SESSION_STARTED
+  QUESTION_ANSWERED
+  CONCEPT_MASTERED
+  METHODOLOGY_SWITCHED
+  STAGNATION_DETECTED
+  SESSION_ENDED
+}
+
+"""Risk alert severity for parent notifications."""
+enum RiskSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+"""Sort direction."""
+enum SortDirection {
+  ASC
+  DESC
+}
+
+"""Error type classification (aligned with Kimi error classification output)."""
+enum ErrorType {
+  """Rule-based or procedural errors — student knows the concept but misapplies steps."""
+  PROCEDURAL
+  """Conceptual misunderstanding — student has a fundamental misconception."""
+  CONCEPTUAL
+  """Motivational stagnation — student is disengaged, not confused."""
+  MOTIVATIONAL
+  """No error detected (correct answer)."""
+  NONE
+}
+
+"""Sortable fields for session history."""
+enum SessionSortField {
+  STARTED_AT
+  DURATION
+  XP_EARNED
+  ACCURACY
+}
+
+"""Sortable fields for student lists."""
+enum StudentSortField {
+  DISPLAY_NAME
+  MASTERY
+  XP
+  STREAK
+  LAST_ACTIVE
+}
+
+# ── Pagination (Relay-style cursor-based) ────────────────────────────────────
+
+"""Pagination metadata following the Relay cursor connection specification."""
+type PageInfo {
+  """Whether more items exist after the last edge in this page."""
+  hasNextPage: Boolean!
+  """Whether more items exist before the first edge in this page."""
+  hasPreviousPage: Boolean!
+  """Cursor of the first edge in the page."""
+  startCursor: String
+  """Cursor of the last edge in the page."""
+  endCursor: String
+}
+
+# ── Core Types ───────────────────────────────────────────────────────────────
+
+"""Student profile with engagement and progress data."""
+type Student {
+  id: UUID!
+  displayName: String!
+  gradeLevel: Int!
+  schoolId: UUID
+  """Subjects the student is enrolled in."""
+  subjects: [Subject!]!
+  """Current consecutive day streak."""
+  currentStreak: Int!
+  """All-time longest streak."""
+  longestStreak: Int!
+  """Total XP accumulated."""
+  totalXP: Int!
+  """Current level (derived from XP)."""
+  level: Int!
+  """Progress within current level (0.0 - 1.0)."""
+  levelProgress: Float!
+  """Aggregate engagement statistics."""
+  engagementStats: EngagementStats!
+  """A/B test experiment cohort (null if not enrolled)."""
+  experimentCohort: String
+  createdAt: DateTime!
+  lastActiveAt: DateTime!
+}
+
+"""Academic subject (e.g., Mathematics, Physics)."""
+type Subject {
+  id: UUID!
+  """Internal name (e.g., "math", "physics")."""
+  name: String!
+  """Localized display name (e.g., Hebrew)."""
+  displayName: String!
+  """Total concepts in this subject's knowledge graph."""
+  conceptCount: Int!
+  """Concepts the queried student has mastered."""
+  masteredConceptCount: Int!
+  """Aggregate mastery across all concepts (0.0 - 1.0)."""
+  overallMastery: Float!
+}
+
+"""
+A concept (knowledge node) in the curriculum knowledge graph.
+Represents a single teachable unit (e.g., "Chain Rule", "Newton's Second Law").
+"""
+type Concept {
+  id: UUID!
+  """Internal canonical name."""
+  name: String!
+  """Localized display name."""
+  displayName: String!
+  """Parent subject."""
+  subject: Subject!
+  """Topic within the subject (e.g., "calculus", "mechanics")."""
+  topic: String!
+  """Difficulty rating (1-10, Bloom's-mapped)."""
+  difficulty: Int!
+  """Concepts that must be mastered before this one."""
+  prerequisites: [Concept!]!
+  """Concepts that depend on this one."""
+  dependents: [Concept!]!
+}
+
+"""
+Student-specific mastery overlay on a concept node.
+Combines the curriculum concept with the student's learning state.
+"""
+type MasteryEdge {
+  """The underlying curriculum concept."""
+  concept: Concept!
+  """Current mastery level (0.0 - 1.0, BKT P(known))."""
+  masteryLevel: Float!
+  """Predicted recall from Half-Life Regression (0.0 - 1.0)."""
+  predictedRecall: Float!
+  """Current mastery status."""
+  status: MasteryStatus!
+  """Total attempts on this concept across all sessions."""
+  attemptsCount: Int!
+  """Timestamp of the most recent attempt."""
+  lastAttemptAt: DateTime
+  """Timestamp when mastery threshold was last crossed."""
+  lastMasteredAt: DateTime
+  """Currently active methodology for this concept."""
+  activeMethodology: MethodologyType
+  """Half-life in hours for spaced repetition scheduling."""
+  halfLifeHours: Float
+  """Next scheduled review time (null if not yet mastered)."""
+  nextReviewDue: DateTime
+}
+
+"""Directed edge in the knowledge graph (prerequisite relationship)."""
+type GraphEdge {
+  fromConceptId: UUID!
+  toConceptId: UUID!
+  """Whether the student has met the prerequisite (from mastered)."""
+  unlocked: Boolean!
+}
+
+"""
+A student's full knowledge graph for a subject.
+Contains concept nodes with mastery overlays and prerequisite edges.
+"""
+type KnowledgeGraph {
+  studentId: UUID!
+  subject: Subject!
+  """All concept nodes with student-specific mastery data."""
+  nodes: [MasteryEdge!]!
+  """Prerequisite edges between concepts."""
+  edges: [GraphEdge!]!
+  """Aggregate mastery across the subject (0.0 - 1.0)."""
+  overallMastery: Float!
+  """Concepts the student is ready to learn (prerequisites met, not yet mastered)."""
+  readyToLearn: [Concept!]!
+  """Concepts due for spaced repetition review."""
+  reviewDue: [MasteryEdge!]!
+  """Knowledge graph version for offline sync compatibility."""
+  graphVersion: String!
+}
+
+"""A learning session record."""
+type LearningSession {
+  id: UUID!
+  studentId: UUID!
+  subject: Subject!
+  startedAt: DateTime!
+  endedAt: DateTime
+  """Duration in seconds (null if still active)."""
+  durationSeconds: Int
+  questionsAttempted: Int!
+  correctAnswers: Int!
+  """Accuracy ratio (0.0 - 1.0)."""
+  accuracy: Float!
+  xpEarned: Int!
+  """Per-concept breakdown of mastery changes."""
+  conceptsTouched: [SessionConceptSummary!]!
+  endReason: String
+  status: SessionStatus!
+  """Whether this session was started offline."""
+  wasOffline: Boolean!
+  """Methodologies used during this session."""
+  methodologiesUsed: [MethodologyType!]!
+}
+
+"""Per-concept summary within a learning session."""
+type SessionConceptSummary {
+  concept: Concept!
+  masteryBefore: Float!
+  masteryAfter: Float!
+  questionsAttempted: Int!
+  correctAnswers: Int!
+  """Methodology active for this concept during the session."""
+  methodology: MethodologyType
+}
+
+"""Aggregate engagement statistics for a student."""
+type EngagementStats {
+  totalSessions: Int!
+  totalTimeMinutes: Int!
+  averageSessionMinutes: Float!
+  totalQuestionsAttempted: Int!
+  overallAccuracy: Float!
+  conceptsMastered: Int!
+  currentStreak: Int!
+  longestStreak: Int!
+  lastSevenDays: PeriodStats!
+  lastThirtyDays: PeriodStats!
+}
+
+"""Engagement statistics over a time period."""
+type PeriodStats {
+  sessionsCount: Int!
+  timeMinutes: Int!
+  questionsAttempted: Int!
+  accuracy: Float!
+  xpEarned: Int!
+  conceptsMastered: Int!
+}
+
+# ── Teacher Types ────────────────────────────────────────────────────────────
+
+"""Classroom overview for teacher dashboards."""
+type ClassRoom {
+  id: UUID!
+  name: String!
+  schoolId: UUID!
+  teacherId: UUID!
+  subject: Subject!
+  """Students in this classroom (paginated)."""
+  students(
+    first: Int = 20
+    after: String
+    sortBy: StudentSortField = LAST_ACTIVE
+    sortDirection: SortDirection = DESC
+  ): StudentConnection!
+  studentCount: Int!
+  """Class-wide average mastery (0.0 - 1.0)."""
+  averageMastery: Float!
+  """Class-wide average streak in days."""
+  averageStreak: Float!
+  """Top concepts where students are struggling."""
+  topKnowledgeGaps(limit: Int = 10): [ConceptGap!]!
+  """Students who haven't been active recently."""
+  inactiveStudents(daysThreshold: Int = 7): [Student!]!
+}
+
+"""Concept-level gap analysis across a classroom."""
+type ConceptGap {
+  concept: Concept!
+  """Percentage of students below mastery threshold (0.0 - 1.0)."""
+  studentsBelowThreshold: Float!
+  """Average mastery across all students in the class."""
+  averageMastery: Float!
+  """Number of students who attempted this concept."""
+  studentsAttempted: Int!
+  """Most common error type for this concept in the class."""
+  dominantErrorType: ErrorType
+}
+
+"""Assignment completion tracking for a teacher."""
+type AssignmentCompletion {
+  conceptId: UUID!
+  conceptName: String!
+  """Total students assigned."""
+  totalStudents: Int!
+  """Students who have reached mastery."""
+  masteredCount: Int!
+  """Students in progress (attempted but not mastered)."""
+  inProgressCount: Int!
+  """Students who haven't started."""
+  notStartedCount: Int!
+  """Average mastery across all students."""
+  averageMastery: Float!
+  """Estimated time for the remaining students to reach mastery."""
+  estimatedRemainingMinutes: Float
+}
+
+"""Leaderboard entry for gamification."""
+type LeaderboardEntry {
+  rank: Int!
+  student: Student!
+  xp: Int!
+  streak: Int!
+  conceptsMastered: Int!
+}
+
+# ── Parent Types ─────────────────────────────────────────────────────────────
+
+"""Weekly progress report for a parent."""
+type WeeklyReport {
+  studentId: UUID!
+  studentName: String!
+  """Report period start (Monday)."""
+  weekStart: DateTime!
+  """Report period end (Sunday)."""
+  weekEnd: DateTime!
+  """Total time spent learning in minutes."""
+  totalTimeMinutes: Int!
+  """Number of sessions."""
+  sessionsCount: Int!
+  """New concepts mastered this week."""
+  conceptsMastered: Int!
+  """XP earned this week."""
+  xpEarned: Int!
+  """Streak status at end of week."""
+  streakDays: Int!
+  """Accuracy trend compared to previous week (-1.0 to 1.0)."""
+  accuracyTrend: Float!
+  """Per-subject breakdown."""
+  subjectBreakdown: [SubjectWeeklySummary!]!
+  """Encouraging message generated by the system."""
+  encouragementMessage: String!
+}
+
+"""Per-subject weekly summary within a WeeklyReport."""
+type SubjectWeeklySummary {
+  subject: Subject!
+  timeMinutes: Int!
+  conceptsMastered: Int!
+  accuracy: Float!
+  masteryProgress: Float!
+}
+
+"""Risk alert for a parent — flags that need attention."""
+type RiskAlert {
+  id: UUID!
+  studentId: UUID!
+  """When the risk was detected."""
+  detectedAt: DateTime!
+  severity: RiskSeverity!
+  """Type of risk detected."""
+  riskType: String!
+  """Human-readable description. Localized."""
+  message: String!
+  """Whether the alert has been acknowledged by the parent."""
+  acknowledged: Boolean!
+  """Suggested action for the parent."""
+  suggestedAction: String
+}
+
+"""Child progress view for a parent."""
+type ChildProgress {
+  student: Student!
+  """Knowledge graph summary (top-level mastery per subject)."""
+  subjectMastery: [SubjectMasterySummary!]!
+  """Recent sessions (last 7 days)."""
+  recentSessions: [LearningSession!]!
+  """Active risk alerts."""
+  activeAlerts: [RiskAlert!]!
+  """Weekly report if available."""
+  latestWeeklyReport: WeeklyReport
+}
+
+"""Subject-level mastery summary for parent views."""
+type SubjectMasterySummary {
+  subject: Subject!
+  overallMastery: Float!
+  conceptsMastered: Int!
+  totalConcepts: Int!
+  """Trend direction over last 30 days."""
+  trend: Float!
+}
+
+# ── Streak Types ─────────────────────────────────────────────────────────────
+
+"""Full streak status with history."""
+type StreakStatus {
+  currentStreak: Int!
+  longestStreak: Int!
+  freezesRemaining: Int!
+  """ISO 8601 UTC — deadline to maintain the streak."""
+  expiresAt: DateTime!
+  """Recent streak history (last 30 days)."""
+  streakHistory: [StreakDay!]!
+}
+
+"""Single day in streak history."""
+type StreakDay {
+  date: DateTime!
+  """Whether the student was active on this day."""
+  active: Boolean!
+  """Whether a streak freeze was used on this day."""
+  freezeUsed: Boolean!
+}
+
+# ── Pagination Connections ───────────────────────────────────────────────────
+
+type StudentConnection {
+  edges: [StudentEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type StudentEdge {
+  node: Student!
+  cursor: String!
+}
+
+type SessionConnection {
+  edges: [SessionEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type SessionEdge {
+  node: LearningSession!
+  cursor: String!
+}
+
+type RiskAlertConnection {
+  edges: [RiskAlertEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type RiskAlertEdge {
+  node: RiskAlert!
+  cursor: String!
+}
+
+# ── Input Types ──────────────────────────────────────────────────────────────
+
+"""Filter input for session history queries."""
+input SessionFilter {
+  """Filter by subject."""
+  subjectId: UUID
+  """Filter by session status."""
+  status: SessionStatus
+  """Sessions after this timestamp."""
+  startedAfter: DateTime
+  """Sessions before this timestamp."""
+  startedBefore: DateTime
+  """Minimum accuracy (0.0 - 1.0)."""
+  minAccuracy: Float
+  """Filter offline-only sessions."""
+  offlineOnly: Boolean
+}
+
+"""Filter for knowledge gap analysis."""
+input KnowledgeGapFilter {
+  """Only concepts below this mastery threshold."""
+  masteryThreshold: Float = 0.85
+  """Only concepts with at least this many student attempts."""
+  minAttempts: Int = 3
+  """Filter by topic within the subject."""
+  topic: String
+}
+
+"""Date range input for reports."""
+input DateRange {
+  start: DateTime!
+  end: DateTime!
+}
+
+# ── Queries ──────────────────────────────────────────────────────────────────
+
+type Query {
+  # ── Student Queries ──────────────────────────────────────────────────────
+
+  """
+  Get the authenticated student's own profile.
+  Requires role: STUDENT.
+  """
+  myProfile: Student!
+
+  """
+  Get a student's knowledge graph overlay for a given subject.
+  Students see their own; teachers see their students'; parents see their children's.
+  """
+  myKnowledgeGraph(subjectId: UUID!): KnowledgeGraph
+
+  """
+  Get the authenticated student's mastery map across all subjects.
+  Returns a flat list of MasteryEdge nodes for rendering a cross-subject overview.
+  """
+  myMasteryMap: [MasteryEdge!]!
+
+  """
+  Get the authenticated student's session history with filtering and pagination.
+  """
+  mySessionHistory(
+    first: Int = 20
+    after: String
+    filter: SessionFilter
+    sortBy: SessionSortField = STARTED_AT
+    sortDirection: SortDirection = DESC
+  ): SessionConnection!
+
+  """
+  Get the authenticated student's streak status.
+  """
+  myStreak: StreakStatus!
+
+  """
+  Get a student profile by ID.
+  Teachers can query their students; parents can query their children.
+  """
+  studentProfile(studentId: UUID!): Student
+
+  """
+  Get the knowledge graph for a specific student and subject.
+  Requires authorization (own, teacher, or parent relationship).
+  """
+  knowledgeGraph(studentId: UUID!, subjectId: UUID!): KnowledgeGraph
+
+  """
+  Get recent sessions for a specific student.
+  Requires authorization (own, teacher, or parent relationship).
+  """
+  recentSessions(
+    studentId: UUID!
+    first: Int = 10
+    after: String
+    filter: SessionFilter
+  ): SessionConnection!
+
+  """
+  Get streak status for a specific student.
+  Requires authorization (own, teacher, or parent relationship).
+  """
+  streakStatus(studentId: UUID!): StreakStatus
+
+  """
+  Get a leaderboard (class, school, or global).
+  """
+  leaderboard(
+    scope: LeaderboardScope!
+    classRoomId: UUID
+    subjectId: UUID
+    limit: Int = 20
+  ): [LeaderboardEntry!]!
+
+  """
+  Get a student's subject-level progress.
+  """
+  subjectProgress(studentId: UUID!, subjectId: UUID!): Subject
+
+  # ── Teacher Queries ────────────────────────────────────────────────────
+
+  """
+  Get class-level overview for a teacher's classroom.
+  Requires role: TEACHER with access to the specified classroom.
+  """
+  classOverview(classRoomId: UUID!): ClassRoom
+
+  """
+  Get detailed view of a specific student within a teacher's classroom.
+  Includes knowledge graph, recent sessions, and risk indicators.
+  """
+  studentDetail(classRoomId: UUID!, studentId: UUID!): Student
+
+  """
+  Analyze knowledge gaps across a classroom.
+  Returns concepts where a significant portion of students are struggling.
+  """
+  knowledgeGapAnalysis(
+    classRoomId: UUID!
+    filter: KnowledgeGapFilter
+  ): [ConceptGap!]!
+
+  """
+  Get assignment completion status for concepts in a classroom.
+  Useful for tracking which students have mastered assigned material.
+  """
+  assignmentCompletion(
+    classRoomId: UUID!
+    conceptIds: [UUID!]!
+  ): [AssignmentCompletion!]!
+
+  """
+  Get all classrooms for the authenticated teacher.
+  """
+  myClassrooms: [ClassRoom!]!
+
+  # ── Parent Queries ─────────────────────────────────────────────────────
+
+  """
+  Get progress overview for a linked child.
+  Requires role: PARENT with verified parent-child link.
+  """
+  childProgress(childId: UUID!): ChildProgress
+
+  """
+  Get weekly report for a linked child.
+  If no dateRange is specified, returns the most recent completed week.
+  """
+  weeklyReport(childId: UUID!, dateRange: DateRange): WeeklyReport
+
+  """
+  Get active risk alerts for a linked child.
+  Paginated, sorted by severity (critical first) then by detection time.
+  """
+  riskAlerts(
+    childId: UUID!
+    first: Int = 20
+    after: String
+    includeAcknowledged: Boolean = false
+  ): RiskAlertConnection!
+
+  """
+  Get all linked children for the authenticated parent.
+  """
+  myChildren: [Student!]!
+}
+
+# ── Mutations (minimal — most writes go through SignalR commands) ────────────
+
+type Mutation {
+  """
+  Acknowledge a risk alert (parent action).
+  Returns the updated alert.
+  """
+  acknowledgeRiskAlert(alertId: UUID!): RiskAlert!
+
+  """
+  Update display name or preferences (student action).
+  """
+  updateProfile(
+    displayName: String
+    locale: String
+    notificationPreferences: JSON
+  ): Student!
+
+  """
+  Link a parent to a child via invite code.
+  Returns the child's profile on success.
+  """
+  linkChild(inviteCode: String!): Student!
+}
+
+# ── Subscriptions (real-time via GraphQL over WebSocket) ─────────────────────
+
+type Subscription {
+  """
+  Subscribe to knowledge graph updates for a student in a subject.
+  Fires when mastery levels change during an active session.
+  Used by the knowledge graph visualization component.
+  """
+  onKnowledgeGraphUpdate(studentId: UUID!, subjectId: UUID!): KnowledgeGraphUpdate!
+
+  """
+  Subscribe to session progress events for a student.
+  Used by parent/teacher views to watch a session in real-time.
+  """
+  onSessionProgress(studentId: UUID!): SessionProgressEvent!
+
+  """
+  Subscribe to class-wide mastery updates.
+  Used by teacher dashboards for live class progress tracking.
+  Fires when any student in the class has a mastery change.
+  """
+  onClassMasteryUpdate(classRoomId: UUID!): ClassMasteryUpdate!
+
+  """
+  Subscribe to new risk alerts for a child.
+  Used by the parent mobile app for push notification triggers.
+  """
+  onRiskAlert(childId: UUID!): RiskAlert!
+}
+
+"""Payload for knowledge graph update subscriptions."""
+type KnowledgeGraphUpdate {
+  studentId: UUID!
+  subjectId: UUID!
+  updatedNodes: [MasteryEdge!]!
+  updatedEdges: [GraphEdge!]!
+  timestamp: DateTime!
+}
+
+"""Payload for session progress subscriptions."""
+type SessionProgressEvent {
+  sessionId: UUID!
+  studentId: UUID!
+  eventType: SessionEventType!
+  conceptId: UUID
+  conceptName: String
+  questionIndex: Int
+  correct: Boolean
+  masteryDelta: Float
+  xpEarned: Int
+  timestamp: DateTime!
+}
+
+"""Payload for class-wide mastery update subscriptions."""
+type ClassMasteryUpdate {
+  classRoomId: UUID!
+  studentId: UUID!
+  studentName: String!
+  conceptId: UUID!
+  conceptName: String!
+  """Previous mastery level."""
+  previousMastery: Float!
+  """New mastery level."""
+  newMastery: Float!
+  """Whether the student just mastered this concept."""
+  justMastered: Boolean!
+  timestamp: DateTime!
+}

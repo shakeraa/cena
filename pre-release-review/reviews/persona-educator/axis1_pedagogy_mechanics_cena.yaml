@@ -1,0 +1,307 @@
+doc_path: pre-release-review/axis1_pedagogy_mechanics_cena.md
+reviewer: persona-educator
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 pedagogy-mechanics features (interleaving, spaced mastery challenge,
+  retrieval micro-checks, elaborative interrogation, productive-struggle hint governor,
+  desirable-difficulty targeting, near-to-far transfer sequencing, adaptive worked-
+  example fading). Recommends SHIP for features 1-4, SHORTLIST for 5-8.
+
+system_purpose_fit: 4
+  rationale:
+    - Direct fit with Bagrut prep: interleaving, spacing, worked-examples all target
+      the exact skills the matriculation exam measures (far transfer, strategy
+      discrimination under mixed conditions).
+    - Respects CAS oracle (ADR-0002) — most features explicitly defer mathematical
+      correctness to CAS and use LLM only for scaffolding wrapper.
+    - Respects ADR-0003 by scoping discrimination scores and self-explanation
+      responses to session or aggregate, never to student misconception profile.
+    - Minus one point because hint-governor (F5) and desirable-difficulty (F6)
+      conflate "60% success rate" targets with anxious/LD cohort reality — a
+      veteran classroom teacher would insist on 70-80% for those students.
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Cena has an adaptive scheduler" -> src/actors/Cena.Actors/Mastery/AdaptiveScheduler.cs:113
+    - "Scaffolding service exists for worked-example pedagogy" -> src/actors/Cena.Actors/Mastery/ScaffoldingService.cs:43
+    - "BKT tracer for mastery tracking exists" -> src/actors/Cena.Actors/Mastery/BktTracer.cs:12
+    - "Interleaving logic exists in tutor actor + mobile adaptive" -> src/actors/Cena.Actors/Tutoring/TutorActor.cs, src/mobile/lib/core/services/adaptive_interleaving.dart
+    - "Self-explanation rubric pipeline (Pedagogy/ExplainItBack) already ships per RDY-074" -> src/actors/Cena.Actors/Pedagogy/ExplainItBack.cs:84-112
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Adaptive fading is driven by BKT with literature-fixed parameters (F8)" -> BKT calculator exists (Mastery/BktPlusCalculator.cs) but I cannot verify whether the fading surface layer is wired to BKT or still pending.
+
+adr_alignment:
+  honored:
+    - ADR-0002 (CAS oracle validates answers in all features)
+    - ADR-0003 (discrimination scores, retrieval responses, self-explanation
+      responses all explicitly session-scoped in every feature section)
+    - ADR-0037 (affective signal in pedagogy) — F5 hint governor aligns with
+      affective-signal-aware hint delay
+  violated: []
+  missing_adr_needed:
+    - Worked-example fading policy — when fading is adaptive (F8) and uses
+      BKT estimates, the fading cadence + reveal-gate rules warrant an ADR
+      similar in spirit to ADR-0002's turn-budget section.
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 5 (Productive Struggle Hint Governor) hardcodes 30/60/90s delays
+      with a "penalty factor" up to +120s for chronic hint-seekers. In a real
+      classroom, an LD student who hits a wall at second 10 will not endure a
+      30s countdown — they will close the tab. The doc mitigates with a "skip
+      to example" escape, but making that *primary* rather than a footnote is
+      essential. A classroom teacher would recommend: hint available
+      immediately, *quality* of hint degrades toward Level 1 unless student
+      works through N seconds.
+    evidence: axis1_pedagogy_mechanics_cena.md:L267-271
+    lens_note: |
+      30 years in the classroom teaches you that "productive struggle" is not
+      the same as "forced struggle." Kapur's PF research happened in tightly
+      facilitated small groups with rich discussion, not in front of a lonely
+      student staring at a locked hint button. Translating PF to a solo-web
+      context needs much gentler parameters than the doc suggests.
+  - severity: P1
+    finding: |
+      Feature 6 (Desirable Difficulty) fixes 60% success rate as target and
+      proposes 65% "for flagged anxious students." This is upside-down. A
+      student who fails 4/10 problems in a session leaves feeling defeated,
+      regardless of the research label "desirable difficulty." In IL
+      Bagrut prep, where the exam itself is high-stress, practice should be
+      at 75-85% success with occasional stretch items flagged as "challenge" —
+      the student's sense of progress is the engagement variable, not the
+      raw success rate.
+    evidence: axis1_pedagogy_mechanics_cena.md:L300, L346
+    lens_note: |
+      The EDM 2023 paper's "60% maintained" was observed outcome, not intended
+      target. Turning an observation into a design target is a common research-
+      to-product error. For Bagrut students close to exam date, the target must
+      move up, not be A/B tested in both directions.
+  - severity: P2
+    finding: |
+      Feature 3 (Retrieval Micro-Checks) frames prompts as "Before you see the
+      solution, write the formula for [concept] from memory." For 4-unit/5-unit
+      Israeli students who have a very specific formula-sheet policy on the
+      Bagrut exam, the framing should be: "on the Bagrut you'll have this in
+      the formula sheet — but try to recall the key condition that tells you
+      to use it." Active recall of application conditions >>> rote formula
+      recall.
+    evidence: axis1_pedagogy_mechanics_cena.md:L161-163
+    lens_note: |
+      In Israel the formula sheet (דף נוסחאות) is the exam reality. Asking
+      students to memorize formulas we know they'll have on the exam sheet is
+      training for a world that doesn't exist. Retrieval should target the
+      *trigger* ("this problem wants the product-to-sum identity because...")
+      not the formula itself.
+  - severity: P2
+    finding: |
+      Feature 4 (Elaborative Interrogation) suggests menu-based "why" prompts
+      after worked-example step 2 of 4. Menu options narrow the explanation
+      space and can short-circuit real elaboration. For the top-leverage
+      concepts (quadratic discriminant sign, chain-rule recognition, unit-
+      circle angle addition), a hybrid — 2-3 menu options + optional free-text
+      "or explain in your own words" — is what the CAS-gated + ExplainItBack
+      pipeline (src/actors/Cena.Actors/Pedagogy/ExplainItBack.cs) was built for
+      and already supports.
+    evidence: axis1_pedagogy_mechanics_cena.md:L213, src/actors/Cena.Actors/Pedagogy/ExplainItBack.cs
+    lens_note: |
+      The doc's own Aleven et al. (2002) citation shows menu-based helps some
+      contexts, not all. For conceptual anchors, free text with LLM-judged
+      rubric (which Cena already has) is richer.
+  - severity: P2
+    finding: |
+      Feature 8 (Adaptive worked-example fading) thresholds P>0.7 fade / P<0.5
+      re-introduce are too tight. In my classroom experience students can
+      hover at P=0.6 for weeks — the fading needs hysteresis (e.g., 3
+      consecutive sessions at ≥0.7 before a step is faded, 2 sessions at ≤0.5
+      before re-introduction). Otherwise the UI oscillates and students feel
+      the scaffolding is "flickering."
+    evidence: axis1_pedagogy_mechanics_cena.md:L441-443
+    lens_note: |
+      Students lose trust in the system if scaffolding appears and disappears
+      within a single session. Hysteresis is basic ITS practice (Corbett &
+      Anderson 1995 BKT literature) and worth calling out.
+
+already_built:
+  - feature: "Adaptive interleaving scheduler (F1)"
+    evidence: src/actors/Cena.Actors/Mastery/AdaptiveScheduler.cs, src/actors/Cena.Actors/Tutoring/TutorActor.cs, src/mobile/lib/core/services/adaptive_interleaving.dart
+    note: |
+      Doc treats F1 as a proposal but the adaptive scheduler + interleaving
+      exists. What may NOT exist is the *strategy-discrimination score* layer
+      the doc proposes (per-skill-pair tracking). That sub-feature is the
+      only novel piece — retire the "build interleaving" framing, keep only
+      the strategy-discrimination sub-proposal.
+  - feature: "Self-explanation / elaborative interrogation (partial F4)"
+    evidence: src/actors/Cena.Actors/Pedagogy/ExplainItBack.cs (RDY-074)
+    note: |
+      The Pedagogy/ExplainItBack pipeline already ships with rubric
+      categories, prompt-fatigue gate, and LLM-judge sidecar. F4's proposal
+      to "add menu-based self-explanation" is a UI variant on a backend that
+      already exists. Retire the "new feature" framing; scope to the
+      worked-example menu-option surface only.
+  - feature: "Scaffolding / worked-example support (partial F8)"
+    evidence: src/actors/Cena.Actors/Mastery/ScaffoldingService.cs:43, src/actors/Cena.Actors/Mastery/ScaffoldingLevel.cs
+    note: |
+      ScaffoldingService with scaffolding-level enum exists. The *adaptive
+      fading* wiring to BKT is the new piece, not scaffolding itself.
+
+duplicates_of_other_docs:
+  - feature-discovery-2026-04-20.md: FD-001 Interleaved Adaptive Scheduler (same as F1)
+  - cena_dr_nadia_pedagogical_review_20_findings.md: FD-001 (PASS, deduped)
+  - cena_cross_domain_feature_innovation.md: Feature 4 Adaptive Flow Sessions (overlaps F6)
+  - axis2_motivation_self_regulation_findings.md: Feature 1 Socratic Self-Explanation (overlaps F4)
+
+extracted_tasks:
+  - title: "Add strategy-discrimination scores to adaptive scheduler"
+    priority: P1
+    estimate: M
+    suggested_assignee: claude-subagent-pedagogy
+    queue_body: |
+      ## Goal
+      Extend AdaptiveScheduler to track per-skill-pair strategy-discrimination
+      scores (e.g., "can student distinguish quadratic-formula problems from
+      completing-the-square problems?"). Scores update after each problem from
+      (a) correct-strategy-selected, (b) time-to-strategy-selection, (c)
+      subsequent correctness. Scheduler uses these to weight the interleaving
+      mix: high-discrimination students get more blocked practice on weak
+      sub-skills; low-discrimination get more interleaved practice.
+      ## Files
+      - src/actors/Cena.Actors/Mastery/AdaptiveScheduler.cs
+      - src/actors/Cena.Actors/Mastery/ItemSelector.cs
+      - src/actors/Cena.Actors.Tests/Mastery/AdaptiveSchedulerInterleavingTests.cs (new)
+      ## Definition of Done
+      - Scores stored session-scoped only (ADR-0003) — no SQL persistence
+        under StudentState.
+      - Tests: two synthetic students with different discrimination profiles
+        receive different mix ratios.
+      - Integration test: scheduler output threads through LearningSessionActor
+        without breaking existing session replays.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-pedagogy --result "<branch>: strategy-discrimination scheduler layer"
+    source_doc_lines: [L46-L66]
+  - title: "Soften hint-governor delays for LD/anxious cohort"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Revise the hint-availability timing in the proposed hint-governor
+      (Feature 5) so that hints are *always* available immediately at Level 1
+      (conceptual pointer) and the delay gate applies only to Level 2/3
+      (procedural + full walkthrough). Frame the delay as "work a bit before
+      the next hint unlocks" rather than "hint locked." Ensure an always-visible
+      "show me the solution" escape hatch on every problem.
+      ## Files
+      - docs/adr/ (new ADR "hint-governor-delay-policy")
+      - src/actors/Cena.Actors/Hints/DeliveryGate.cs
+      - src/actors/Cena.Actors/Services/HintGenerationService.cs
+      - src/actors/Cena.Actors.Tests/Hints/DeliveryGateLDFriendlyTests.cs (new)
+      ## Definition of Done
+      - Level 1 hint never delayed.
+      - Level 2/3 delay configurable per student cohort (default anxious/LD: 10s, others: 45s).
+      - "Show me the solution" CTA visible on every problem screen at all times.
+      - ADR records the policy decision.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: LD-friendly hint-governor"
+    source_doc_lines: [L267-L294]
+  - title: "Raise desirable-difficulty default to 75% for IL Bagrut cohort"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Cap desirable-difficulty target at 75% default (not 60% as proposed),
+      with 85% opt-in for "confidence-building" mode on anxious students
+      within 60 days of the Bagrut exam. Update DifficultyAdjuster defaults.
+      ## Files
+      - src/actors/Cena.Actors/Mastery/EloScoring.cs
+      - src/actors/Cena.Actors/Services/EloDifficultyService.cs
+      - docs/adr/ (new ADR "desirable-difficulty-targets-by-cohort")
+      ## Definition of Done
+      - Configurable target success rate per cohort, default 0.75.
+      - "Pre-Bagrut confidence mode" toggle at 0.85 for students with
+        <60d-to-exam and self-declared anxious.
+      - ADR records rationale + rejects the 60% target.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>: desirable-difficulty cohort defaults"
+    source_doc_lines: [L300, L346]
+  - title: "Reframe retrieval prompts from formulas to application triggers"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      When building retrieval-micro-check prompts (Feature 3), target the
+      *application condition* ("what in this problem told you to use the
+      quadratic formula?") rather than the formula itself, since IL Bagrut
+      provides a formula sheet. The prompt library should be seeded with 3
+      prompts per top-20 Bagrut formulas, all in trigger-recognition form.
+      ## Files
+      - src/actors/Cena.Actors/Pedagogy/ (new RetrievalPromptLibrary.cs)
+      - content seed data (top-20 Bagrut formulas with trigger-condition prompts)
+      ## Definition of Done
+      - Prompt library seeded, 60 prompts (3 x 20), Hebrew + Arabic.
+      - No formula-recall-from-memory prompts (since students have the sheet).
+      - Session-scoped response storage (ADR-0003).
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: trigger-based retrieval prompts"
+    source_doc_lines: [L131-L180]
+  - title: "Add hysteresis to adaptive worked-example fading thresholds"
+    priority: P2
+    estimate: S
+    suggested_assignee: claude-subagent-pedagogy
+    queue_body: |
+      ## Goal
+      Before shipping Feature 8 adaptive fading, add hysteresis: fade only
+      after 3 consecutive sessions at P(mastered) ≥ 0.7 for the step; re-
+      introduce scaffolding only after 2 consecutive sessions at P ≤ 0.5.
+      Prevents within-session flicker.
+      ## Files
+      - src/actors/Cena.Actors/Mastery/ScaffoldingService.cs
+      - src/actors/Cena.Actors/Mastery/BktTracer.cs
+      - src/actors/Cena.Actors.Tests/Mastery/FadingHysteresisTests.cs (new)
+      ## Definition of Done
+      - Consecutive-session counter wired into scaffolding decisions.
+      - Tests verify no oscillation for a student in the 0.5-0.7 band.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-pedagogy --result "<branch>: fading-hysteresis"
+    source_doc_lines: [L441-L443]
+
+verdict: revise
+verdict_reason: |
+  The 8 features as a set are pedagogically sound and largely compliant, but
+  three parameter choices (hint delays, 60% difficulty target, step-fading
+  thresholds) misread what actually helps the struggling 16-year-old sitting
+  in front of us. Extract the strategy-discrimination and hysteresis pieces;
+  revise parameters; retire the "build interleaving from scratch" framing
+  because the scheduler already exists.
+
+cross_lens_handoff:
+  - to: persona-a11y
+    about: |
+      Feature 3's "Free-text input (not multiple choice — active recall, not
+      recognition)" interaction model needs RTL + IME review for Arabic
+      students entering mathematical text; also audio-input accessibility for
+      dyscalculic students.
+  - to: persona-cogsci
+    about: |
+      The doc cites Rohrer 2014 d=1.05 prominently for interleaving; persona-
+      cogsci should validate whether the Brunmair & Richter 2019 meta-analytic
+      d=0.34 is the right effect-size to communicate internally (matches
+      finding_assessment_dr_rami.md concern on FD-001).
+  - to: persona-privacy
+    about: |
+      "skill_discrimination_matrix" (doc L58) and "fading_state" (doc L451)
+      are proposed as persistent data. persona-privacy should verify whether
+      storing these *per student* (even without raw misconception tags) runs
+      afoul of ADR-0003's "never on student profile" rule when combined with
+      student ID.
+  - to: persona-ministry
+    about: |
+      The retrieval-micro-check reframing I propose (trigger recognition, not
+      formula recall) depends on the formula-sheet policy being stable across
+      3/4/5-unit Bagrut tracks. persona-ministry should confirm formula-sheet
+      coverage for each track before the prompts are authored.

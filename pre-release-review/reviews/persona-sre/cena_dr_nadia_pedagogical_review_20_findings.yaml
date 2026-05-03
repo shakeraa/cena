@@ -1,0 +1,75 @@
+doc_path: pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md
+reviewer: persona-sre
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr Nadia's pedagogical pass over 20 SHIP-recommended findings. Verdicts: 17 PASS, 3 WARNING, 0 REJECT. Operational value is
+  the enumerated warnings (FD-009 Socratic friction, FD-014 XAI thin evidence, FD-016 cooperative comp complexity).
+system_purpose_fit: 4
+  rationale:
+    - Re-confirms ADR-0002/ADR-0003/RDY-080 posture in doc review.
+    - Operationally, "required guardrail" notes are deployable constraints for SRE.
+code_reality_check:
+  claims_verified_in_code:
+    - "Feature flag actor + retention worker + exception scrubber (see axis9 YAML refs)"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Redis session storage with auto-purge for misconception data — still not in deploy manifests"
+adr_alignment:
+  honored: [ADR-0002, ADR-0003, RDY-080]
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Nadia's "Required Guardrails" column is effectively an ops checklist. SRE should wire each into the shipgate scanner
+      (e.g. FD-001 "no unit label in UI", FD-003 "Redis-only store verified") instead of treating them as doc narrative.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md (whole doc)
+    lens_note: Turn pedagogy constraints into enforceable gates.
+  - severity: P1
+    finding: |
+      FD-009 WARNING: Socratic tutor frustration needs an escape hatch. Operationally, that means the feature flag must include
+      a "crisis mode" bit to flip to direct-answer mode during the last 30 days pre-Bagrut, along with alerting on frustration
+      signals (rage-click rate, session abandonment).
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md FD-009 WARNING
+    lens_note: Behavioral feature flags must be observable.
+  - severity: P1
+    finding: |
+      FD-016 WARNING (cooperative competitions XL complexity, moderation): matches axis7 UGC findings. Block until UGC SLA is
+      published.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md FD-016 WARNING
+    lens_note: Moderation infrastructure is a pre-req.
+already_built:
+  - feature: Shipgate + banned-term scanner
+    evidence: docs/engineering/shipgate.md; docs/engineering/ci-prohibited-metrics-rules.md
+    note: Extend with Nadia's guardrail statements, one CI rule per feature.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md (all 20 items reference this index)."
+  - "finding_assessment_dr_rami.md (same FD set, honesty lens)."
+extracted_tasks:
+  - title: Encode Dr Nadia's "Required Guardrails" as shipgate CI rules per feature
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Each of the 20 findings lists pedagogy constraints. Translate each into a shipgate rule (regex, test, or PR template field)
+      so a future PR cannot land a feature that breaks its own pedagogy constraint.
+      ## Files
+      docs/engineering/shipgate.md
+      docs/engineering/ci-prohibited-metrics-rules.md
+      .github/workflows/ci.yml
+      ## Definition of Done
+      - At least one CI rule per FD in Nadia's list
+      - Failing sample PR blocked
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/nadia-rules"
+    source_doc_lines: []
+verdict: adopt
+verdict_reason: |
+  Clean review — adopt its warnings as operational constraints.
+cross_lens_handoff:
+  - to: persona-ethics
+    about: Socratic escape hatch UX framing in crisis mode.
+  - to: persona-educator
+    about: Warning-to-rule translation correctness.

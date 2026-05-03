@@ -1,0 +1,18 @@
+{
+  "tasks": {
+    "task-1774535192935-qjtvkv": {
+      "taskId": "task-1774535192935-qjtvkv",
+      "type": "implementation",
+      "description": "Generate full production-grade contracts for Cena platform: data layer (Marten event store, Neo4j graph schema, Redis cache), backend (Proto.Actor actors, domain services, gRPC protos, NATS subjects), LLM layer (ACL interfaces, prompt templates, routing), frontend (React Native components, state, offline sync). All layers must be implementable.",
+      "priority": "normal",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [],
+      "createdAt": "2026-03-26T14:26:32.935Z",
+      "startedAt": null,
+      "completedAt": null
+    }
+  },
+  "version": "3.0.0"
+}

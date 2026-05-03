@@ -1,0 +1,209 @@
+doc_path: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md
+reviewer: persona-educator
+reviewed_at: 2026-04-20
+doc_summary: |
+  7 collaboration/social features: anonymized peer-explanation circles,
+  teacher-mediated micro groups, cooperative (not competitive) team
+  challenges, async anonymous Q&A, "I'm confused too" signal, reciprocal
+  peer tutoring matcher, collaborative math whiteboard with teacher oversight.
+  RDY-076 (two-sided consent + DPIA gate) compliance required throughout.
+
+system_purpose_fit: 3
+  rationale:
+    - Peer learning has strong pedagogical research base (Mazur peer
+      instruction, Crouch & Mazur 2001, Chi et al. 1989 self-explanation).
+    - But: Cena's primary wedge is *individual* Bagrut prep. Peer features
+      are value-add, not core.
+    - The doc's consent architecture (two-sided consent + teacher moderation)
+      is sound; the pedagogical concern is about fit-to-Bagrut rather than
+      compliance.
+    - Minus two because (a) the highest-ROI student experience for Bagrut
+      is direct practice with CAS + tutor, not peer explanation; (b) IL
+      Jewish-Arab classroom dynamics in mixed school districts need
+      careful educator-specific guardrails the doc understates.
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Tenancy/institute scoping exists" -> src/actors/Cena.Actors/Management/
+    - "Outreach/messaging infrastructure" -> src/actors/Cena.Actors/Outreach/
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - Peer explanation storage, anonymous avatar system, collaborative
+      whiteboard — all appear new.
+
+adr_alignment:
+  honored:
+    - Ship-gate non-negotiables — no public leaderboards, no streaks (F3
+      cooperative no leaderboards explicit)
+    - ADR-0003 — "ephemeral retention, session-scoped"; content auto-
+      deleted 24h-30d windows depending on feature
+  violated: []
+  missing_adr_needed:
+    - Minor-student peer-interaction ADR — moving beyond RDY-076 to
+      explicitly document what under-13 and 13-17 students may/may not do
+      with peers on the platform.
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 1 (Anonymized Peer Explanation Circles) — the pedagogical
+      premise (Mazur peer instruction) was demonstrated in *synchronous in-
+      class* settings. Translating to 24-hour-async anonymous voice
+      recordings is a research stretch. Also: a wrong explanation from
+      "Math Owl #7" that another student mimics and then fails on the
+      Bagrut is a real scenario. CAS-verify explanations before they go to
+      the recipient, OR require teacher approval of explanations before
+      they surface to peers. Without one of those, this feature could
+      *degrade* student learning.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md:L33-L100
+    lens_note: |
+      I've watched study-group WhatsApp chats where wrong methods spread
+      like wildfire. Peer explanations without a correctness gate are
+      pedagogical risk.
+  - severity: P1
+    finding: |
+      Feature 3 (Team vs. Challenge Cooperative Competitions) is XL effort
+      and the doc cites Ke & Grabowski 2007 (d ≈ "equal learning, better
+      attitudes"). The Israeli Bagrut context is individual and high-stakes.
+      Investing XL engineering for affective gains on a feature that doesn't
+      improve individual exam outcomes is poor prioritization. Dr Nadia
+      marked this WARNING for the same reason. Defer to Phase 3.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md:L173-L270, cena_dr_nadia_pedagogical_review_20_findings.md FD-016 WARNING
+    lens_note: |
+      Time-and-engineering-poor teams should not build games. Build the
+      exam-prep engine first.
+  - severity: P1
+    finding: |
+      Feature 2 (Teacher-Mediated Micro Groups) — teacher-moderation queue
+      for every message is realistic for a 3-4-student group only if the
+      teacher is already highly engaged with Cena. In the field, teachers
+      barely have time to check Mashov once a day. Automatic scrubbing +
+      post-hoc moderation (with immediate teacher notification on flagged
+      content) will be the realistic default, not pre-approval. Design
+      accordingly or the feature will be unused.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md:L126-L140
+    lens_note: |
+      Teacher workflow is the constraint. Make moderation opt-in
+      intensive, default light-touch.
+  - severity: P2
+    finding: |
+      Feature 5 ("I'm Confused Too" Anonymous Signal) — excellent feature,
+      low effort. Classroom teachers will love this; it surfaces confusion
+      without the stigma of raising hand. One caveat: the signal must
+      never persist past the class period. Doc implies this ("session-
+      scoped") but should verify implementation auto-clears on class end.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md Feature 5 section
+    lens_note: |
+      Best feature in this doc. Cheap, useful, compliant.
+  - severity: P2
+    finding: |
+      Feature 6 (Reciprocal Peer Tutoring Matcher) matches students by
+      complementary strengths. In practice, matching requires student-
+      mastery profile visibility — which is sensitive data. Keep matching
+      fully teacher-driven (teacher sees class dashboard, assigns pairs);
+      reject algorithmic matching that exposes student-pair mastery deltas.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md Feature 6 section
+    lens_note: |
+      Algorithmic peer-matching = implicit ability tracking leaked between
+      matched students. Teacher keeps autonomy.
+
+already_built: []
+
+duplicates_of_other_docs:
+  - cena_cross_domain_feature_innovation.md: Feature 6 Study Circles (overlaps F4 async Q&A)
+  - feature-discovery-2026-04-20.md: FD-030 "I'm Confused Too" (same as F5)
+
+extracted_tasks:
+  - title: "Ship I'm-Confused-Too anonymous class-period signal"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F5 "I'm Confused Too" button during live class sessions. Student taps
+      → anonymous aggregate counter visible only to teacher. Auto-resets
+      on class end. No per-student record retained.
+      ## Files
+      - src/actors/Cena.Actors/Sessions/ (new ConfusionSignalTracker.cs)
+      - src/admin/full-version/src/views/apps/classroom/ (teacher live view)
+      - src/student/student-web/ (confusion-signal button)
+      ## Definition of Done
+      - Aggregate counter only (no student identity).
+      - Auto-clears at session end; no DB persistence.
+      - Works over SignalR for real-time teacher view.
+      - Test: 5 students tap → teacher sees "5 students confused"; no
+        SQL row remains after session end.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: confusion-signal"
+    source_doc_lines: [AXIS_7_Collaboration_Social_Features_Cena.md Feature 5 section]
+  - title: "Defer F1 anonymized peer explanation circles pending CAS-gate design"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      ADR deferring F1 peer-explanation circles. Rationale: wrong
+      explanations propagated between students can *degrade* Bagrut
+      outcomes. Revisit only when a CAS-or-teacher-approval gate is
+      designed and acceptance tested.
+      ## Files
+      - docs/adr/ (new ADR: "peer-explanation-requires-correctness-gate")
+      - pre-release-review/reviews/retired.md (append as deferred-with-reason)
+      ## Definition of Done
+      - ADR explicit on the defer condition.
+      - Condition: "when CAS verifies or teacher approves every peer
+        explanation before it's shown to a recipient."
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>: peer-explanation-defer-ADR"
+    source_doc_lines: [AXIS_7_Collaboration_Social_Features_Cena.md Feature 1 section]
+  - title: "Default teacher-micro-group moderation to post-hoc + flagged alerts"
+    priority: P2
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F2 teacher-moderated groups. Default moderation = post-hoc with
+      automated profanity/PII scan + teacher alert on flagged content.
+      Pre-approval moderation is opt-in (for teachers who want it).
+      ## Files
+      - src/actors/Cena.Actors/Outreach/ (new GroupMessageModerationPipeline.cs)
+      - src/actors/Cena.Actors/Safeguarding/ (reuse existing classifier)
+      - src/admin/full-version/src/views/apps/classroom/group-moderation.vue
+      ## Definition of Done
+      - Two modes: post-hoc (default) + pre-approval (opt-in).
+      - PII/profanity auto-scan; flag→ teacher push notification.
+      - Test: flagged message not visible to other students until teacher
+        reviews (pre-approval) or remains visible with teacher flag
+        notification (post-hoc).
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: group-moderation-default-post-hoc"
+    source_doc_lines: [L126-L170]
+
+verdict: revise
+verdict_reason: |
+  Most features are defensible with tightened guardrails; F1 peer-explanation
+  should be deferred until a correctness gate is designed; F3 cooperative
+  competitions is poor ROI relative to core Bagrut-prep work; F5 confusion
+  signal is a clear ship-soon. The consent/privacy architecture is sound
+  across all features.
+
+cross_lens_handoff:
+  - to: persona-privacy
+    about: |
+      RDY-076 / two-sided consent / under-16 parent consent → primary
+      privacy-lens review territory for all 7 features.
+  - to: persona-redteam
+    about: |
+      F1 voice-recording de-anonymization risk (doc mentions voice
+      distortion as mitigation — redteam should verify that's adequate);
+      F4 anonymous Q&A abuse potential.
+  - to: persona-ethics
+    about: |
+      F3 cooperative challenges milestone design — must not slip into
+      variable-ratio rewards.
+  - to: persona-a11y
+    about: |
+      F7 collaborative math whiteboard — multi-user RTL + math input for
+      Arabic students; F1 voice + text fallback for hearing-impaired.

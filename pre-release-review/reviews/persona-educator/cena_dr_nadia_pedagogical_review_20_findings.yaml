@@ -1,0 +1,190 @@
+doc_path: pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md
+reviewer: persona-educator
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr Nadia's pedagogical review of 20 SHIP-recommended findings from
+  feature-discovery-2026-04-20.md. 17 PASS, 3 WARNING (FD-009 Socratic
+  Tutor, FD-014 Explainable AI, FD-016 Cooperative Competitions), 0 REJECT.
+  Includes cross-cutting analysis on effect-size realism, motivation risk,
+  Arabic-cohort equity ranking, and paired-implementation requirements.
+
+system_purpose_fit: 5
+  rationale:
+    - This is a fellow pedagogue's review. Our lenses largely overlap.
+    - Dr Nadia's paired-implementation matrix (FD-004 IRT-CAT must ship
+      with FD-012 Bayesian small-sample; FD-009 Socratic needs FD-013
+      mother-tongue; etc.) is exactly the kind of gated-sequencing a
+      classroom teacher would insist on.
+    - Effect-size realism check (Cross-Cutting section) is excellent —
+      Dr Rami's honesty assessment corroborates.
+    - I add only a few pedagogue nuances where Nadia and I slightly
+      disagree, primarily around parameter choices.
+
+code_reality_check:
+  claims_verified_in_code:
+    - "ExplainItBack / LlmJudgeSidecar exist (mentioned indirectly via FD-009)" -> src/actors/Cena.Actors/Pedagogy/ExplainItBack.cs + LlmJudgeSidecar.cs
+    - "SymPy + CAS + MathNet fallback (FD-002)" -> src/actors/Cena.Actors/Cas/
+    - "MisconceptionDetectionService + ML-exclusion tests (FD-003)" -> src/actors/Cena.Actors/Services/MisconceptionDetectionService.cs + src/actors/Cena.Actors.Tests/Compliance/MlExclusionEnforcementTests.cs
+    - "IRT + BKT + Elo (FD-004)" -> src/actors/Cena.Actors/Services/IrtCalibrationPipeline.cs, Mastery/*
+    - "TutorMessageService + Socratic enforcement (FD-009 backend)" -> src/actors/Cena.Actors/Tutor/TutorMessageService.cs
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "FD-012 Bayesian small-sample correction with PyMC/Stan" — not
+      apparent in code; likely new work.
+
+adr_alignment:
+  honored:
+    - ADR-0002 (Dr Nadia repeatedly anchors on CAS-as-oracle)
+    - ADR-0003 (FD-003 highlighted as "highest-stakes architectural
+      constraint" — correct framing)
+    - RDY-080 (FD-004, FD-007 flagged appropriately for no-Bagrut-
+      prediction)
+  violated: []
+  missing_adr_needed:
+    - Pairing-requirement ADR: the "Features Requiring Paired
+      Implementation" matrix should be ADR-locked so the pairings are
+      not dropped during sprint prioritisation.
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      Dr Nadia ranks FD-011 Culturally-Contextualized Problem Generator as
+      "highest-impact equity feature" (ES=1.16). Dr Rami REJECTS the 1.16
+      figure as cherry-picked. I agree with Dr Rami on the number but with
+      Dr Nadia on the feature's priority. The resolution: ship the
+      feature, communicate internally at d=0.3-0.6, and do not build
+      marketing or roadmap commitments on the 1.16 figure. This split
+      between honest-ES and still-ship deserves an explicit ADR decision
+      so future teams don't re-argue it.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md FD-011 section, finding_assessment_dr_rami.md FD-011 REJECT
+    lens_note: |
+      Two experts reviewing one feature disagreeing on effect size is
+      normal. What's not normal is leaving that disagreement in flight
+      indefinitely.
+  - severity: P1
+    finding: |
+      Dr Nadia's FD-009 Socratic Tutor WARNING correctly requires escape-
+      hatch + opt-in. I go further: Cena's TutorMessageService already
+      enforces turn-budget (ADR-0002 Decision 6). The "escape hatch" is
+      already designed architecturally; the work is surfacing it in the
+      UI. Retire the "required revision: make Socratic mode OPT-IN per
+      session" framing because the system already gates answer-reveal —
+      the revision is a UX surfacing task, not a pedagogical change.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md FD-009 section, docs/adr/0002-sympy-correctness-oracle.md Decision 5 + 6
+    lens_note: |
+      Architectural gate exists; surfacing it to the student is the
+      remaining work. Don't re-propose the underlying pedagogy.
+  - severity: P1
+    finding: |
+      Dr Nadia flags FD-014 Explainable AI as "thin research base." I
+      agree. But the review recommends "embed minimal explanation (one
+      sentence)" — I'd scope even tighter: embed only on recommendation-
+      disagreement moments ("Why is Cena giving me this instead of what
+      my teacher assigned?"), not on every problem. Cuts cognitive load
+      to zero on 90% of problems while preserving the trust function.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md FD-014 section
+    lens_note: |
+      Minimal ≠ omnipresent. Explain only when explanation is genuinely
+      needed.
+  - severity: P2
+    finding: |
+      Dr Nadia's "effect size realism check" table on FD-001 suggests
+      d=0.34-0.50 is realistic for interleaving. My axis1 review goes
+      slightly more conservative (30-year classroom experience: well-
+      implemented interleaving gets d=0.20-0.35 in IL-Bagrut-age cohorts
+      because students already interleave across problem sets from
+      multiple teachers). Not a blocker; just a note that internal
+      metrics language should reflect the lower end.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md Cross-Cutting → Effect Size Realism Check row FD-001
+    lens_note: |
+      Interleaving is a real but modest gain for Bagrut-age students.
+  - severity: P2
+    finding: |
+      Dr Nadia's FD-016 Cooperative Competitions WARNING ("defer to Phase
+      3") is correct. I additionally note: even in Phase 3, mixed
+      Jewish-Arab class dynamics make this a social-design problem, not
+      just a gamification problem. Teacher must have full control over
+      team composition, and "shared-victory celebration" copy must be
+      trialed with IL-mixed-schools educators before shipping. This
+      nuance is worth preserving in any Phase-3 scope doc.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md FD-016 section
+    lens_note: |
+      Israeli classroom cooperation features are not value-neutral
+      mechanics.
+
+already_built: []
+
+duplicates_of_other_docs:
+  - feature-discovery-2026-04-20.md: This review is explicitly *about* the feature-discovery doc; every FD-NNN entry is a review of that doc
+  - finding_assessment_dr_rami.md: Same 20 findings, different lens (statistical honesty); primary source for cross-reference
+
+extracted_tasks:
+  - title: "ADR locking effect-size communication language for FD-011"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Resolve Dr Nadia / Dr Rami disagreement on FD-011 ES. Ship the
+      feature; communicate at d=0.3-0.6. ADR documents both positions and
+      the decision so future teams don't re-argue.
+      ## Files
+      - docs/adr/ (new ADR: "cultural-context-effect-size-language")
+      ## Definition of Done
+      - ADR cites Zayyadi 2024 source and range of plausible estimates.
+      - Explicit rule: internal metrics + roadmap use d=0.3-0.6; no
+        d=1.16 in any roadmap/marketing artifact.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>: cultural-context-ES-policy"
+    source_doc_lines: [FD-011 section + cross-cutting ES table]
+  - title: "Pairing-requirement ADR enforcing Nadia's dependency matrix"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      ADR locking the pairing requirements Dr Nadia identified:
+      FD-004 IRT-CAT ships only with FD-012 Bayesian small-sample
+      correction; FD-009 Socratic Tutor ships only with FD-013 mother-
+      tongue hints; FD-007 Crisis Mode ships only with FD-005 formative-
+      summative split; FD-008 AI Grading ships only with FD-020 Bagrut
+      rubric engine. Prevents un-paired shipping during sprint crunches.
+      ## Files
+      - docs/adr/ (new ADR: "feature-pairing-requirements")
+      ## Definition of Done
+      - ADR names each pairing + rationale + Arab-cohort-equity reason.
+      - Task-queue template includes "pair-with" field.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>: feature-pairing-ADR"
+    source_doc_lines: [Features Requiring Paired Implementation table]
+
+verdict: adopt
+verdict_reason: |
+  Dr Nadia's review is the most aligned-with-lens doc in the corpus. I
+  endorse the 17 PASS / 3 WARNING split with minor annotations: tighten
+  FD-014 to disagreement-only explanations; lock FD-011 ES language at
+  d=0.3-0.6; ADR the pairing matrix. FD-016 deferral to Phase 3 is
+  correct.
+
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: |
+      The whole "Effect Size Realism Check" cross-cutting table is a
+      cogsci-lens artifact — cogsci should audit whether the range
+      estimates are defensible for Cena's age cohort.
+  - to: persona-ministry
+    about: |
+      FD-004/007/008/020 — all have RDY-080 Bagrut-prediction risks;
+      ministry-lens should validate every "readiness" or "Bagrut-aligned"
+      output.
+  - to: persona-enterprise
+    about: |
+      Paired-implementation matrix implies coordinated release planning;
+      enterprise should see how the pairing cascades through bounded-
+      context dependencies.
+  - to: persona-privacy
+    about: |
+      FD-003 misconception tagging architectural constraint (Redis-only,
+      TTL) — privacy should audit the actual implementation.

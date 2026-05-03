@@ -1,0 +1,104 @@
+# =============================================================================
+# Ship-gate whitelist: error-message-blame rule pack
+# =============================================================================
+# Files that legitimately need to reference the banned blame-framed error
+# copy (policy docs, the replacement-map contract, task bodies, research
+# notes, and the positive-test fixture).
+# =============================================================================
+
+whitelist:
+  - path: "scripts/shipgate/error-message-blame.yml"
+    reason: "The rule pack itself (patterns quoted in rule definitions)"
+
+  - path: "scripts/shipgate/error-message-blame-whitelist.yml"
+    reason: "This whitelist (self)"
+
+  - path: "scripts/shipgate/rulepack-scan.mjs"
+    reason: "Scanner source references pack name in comments"
+
+  - path: "shipgate/fixtures/error-message-blame-sample.md"
+    reason: "Positive-test fixture: deliberately contains every banned pattern"
+
+  - path: "tests/shipgate/**"
+    reason: "Test fixtures/specs reference banned patterns"
+
+  - path: "contracts/copy/error-message-replacements.yml"
+    reason: "Curated replacement map: pairs banned copy with neutral alternative (policy artefact)"
+
+  - path: "contracts/copy/**"
+    reason: "Copy contracts describe the replacement map and reference banned phrasing in 'from' columns"
+
+  - path: "docs/adr/**"
+    reason: "ADRs describe error-message ban rationale"
+
+  - path: "docs/engineering/**/*.md"
+    reason: "Engineering policy docs cite banned phrasing in rejection context"
+
+  - path: "docs/design/**/*.md"
+    reason: "Design docs describe anti-patterns"
+
+  - path: "docs/research/**"
+    reason: "Research notes analyse self-determination-theory literature on error framing"
+
+  - path: "docs/feature-specs/**/*.md"
+    reason: "Feature specs may cite the banned framing in rationale"
+
+  - path: "docs/handoff/**"
+    reason: "Handoff notes may mention shipgate scanner expansions"
+
+  - path: "pre-release-review/**"
+    reason: "Pre-release review corpus"
+
+  - path: "tasks/pre-release-review/TASK-PRR-142-*.md"
+    reason: "Task body defines error-message ban"
+
+  - path: "tasks/pre-release-review/EPIC-PRR-D-*.md"
+    reason: "Epic body"
+
+  - path: "CLAUDE.md"
+    reason: "Project rules"
+
+  - path: "AGENTS.md"
+    reason: "Cross-agent rules"
+
+  - path: ".agentdb/**"
+    reason: "Task queue protocol docs"
+
+  - path: "src/actors/Cena.Actors.Tests/**"
+    reason: "Test assertions may reference banned copy in DoesNotContain checks"
+
+  - path: "src/api/**/*Tests*/**"
+    reason: "API test projects may assert banned copy is absent"
+
+  - path: "src/api/**/*.Tests/**"
+    reason: "API test projects (dotted variant) may assert banned copy is absent"
+
+  # ---- Pre-existing internal domain code (2026-04-21 scan) --------------
+  # These are C# services that CLASSIFY or REASON ABOUT wrong answers
+  # internally — they use "wrong answer" as a domain term describing what
+  # the algorithm analyses, not as student-facing error copy. The services
+  # downstream of these never render the phrase to a student; the scanner
+  # catches student-facing surfaces via the Vue/locale/prompt paths.
+  - path: "src/actors/Cena.Actors/Diagnosis/**"
+    reason: "Diagnostic classifiers describe 'wrong answer' as an internal signal, not student-facing copy"
+
+  - path: "src/actors/Cena.Actors/Mastery/ScaffoldingService.cs"
+    reason: "Scaffolding service describes 'wrong answer' as an internal scaffolding trigger signal"
+
+  - path: "src/actors/Cena.Actors/Projections/**"
+    reason: "Read-model projections use 'wrong answer' as a domain term in aggregation logic"
+
+  - path: "src/actors/Cena.Actors/Services/**"
+    reason: "Internal services (confusion detection, error classification, misconception detection, etc.) use 'wrong answer' as internal vocabulary — not user copy"
+
+  - path: "src/admin/full-version/src/pages/apps/questions/**"
+    reason: "Admin question-authoring pages reference 'wrong?' in educator-facing UI (author selects which answers are correct/wrong — admin surface)"
+
+  - path: "src/api/Cena.Admin.Api/**"
+    reason: "Admin API services classify attempts internally (teacher-facing, not student-facing)"
+
+  - path: "src/api/Cena.Api.Contracts/Sessions/**"
+    reason: "Session DTOs model 'wrong answer' as a transport term (internal contract, not student copy)"
+
+  - path: "src/api/Cena.Student.Api.Host/Endpoints/SessionEndpoints.cs"
+    reason: "Session endpoint references 'wrong answer' as internal routing vocabulary (the student-facing rendering is in the Vue layer, which IS scanned)"

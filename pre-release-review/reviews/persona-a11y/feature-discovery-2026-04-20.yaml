@@ -1,0 +1,156 @@
+doc_path: pre-release-review/feature-discovery-2026-04-20.md
+reviewer: persona-a11y
+reviewed_at: 2026-04-20
+doc_summary: |
+  Mega-index of 55 findings distilled from 97 across 10 axes + competitive +
+  cross-domain, cross-examined by 5 reviewers. 18 SHIP, 22 SHORTLIST, 12 DEFER,
+  3 REJECT. A11y/l10n-touched findings: FD-013 color-blind charts, FD-014 Arabic
+  RTL Math, FD-016 MathML screen reader, FD-018 bilingual parent dashboard,
+  FD-010 wise feedback, FD-013 (competitive) mother-tongue hints.
+system_purpose_fit: 4
+  rationale:
+    - Index consolidates the six canonical a11y/l10n items across the corpus
+    - Tamar (accessibility reviewer) is named — confirms lens is present in upstream synthesis
+    - Hebrew/Arabic cohort explicitly central
+code_reality_check:
+  claims_verified_in_code:
+    - "Arabic RTL partial impl (FD-014): src/student/full-version/tests/a11y/math-ltr-wrapper.spec.ts"
+    - "Color-contrast scanner (FD-013 adjacent): src/student/full-version/tests/a11y/color-contrast.spec.ts"
+    - "MathAriaLabels skeleton (FD-016): src/shared/Cena.Infrastructure/Accessibility/MathAriaLabels.cs"
+    - "Arabic-first locale inference: src/student/full-version/src/composables/useLocaleInference.ts"
+    - "Hebrew gate: src/student/full-version/src/components/onboarding/LanguagePicker.vue"
+  claims_contradicted_by_code:
+    - "Doc characterizes FD-014 as 'new' but code already has <bdi> approach with scanner tests"
+  claims_unverifiable:
+    - "Russian/Amharic support for FD-018 (bilingual parent dashboard) — no locale files"
+    - "TTS voice pipeline for FD-016 Hebrew/Arabic speech rules"
+adr_alignment:
+  honored:
+    - "ADR-0002 throughout"
+    - "ADR-0003 via session-scoped features"
+    - "Hebrew-gate language strategy"
+  violated: []
+  missing_adr_needed:
+    - "Locale scope ADR (he/ar/en vs expansion)"
+    - "Animation/motion policy ADR"
+    - "TTS vendor/strategy ADR"
+    - "Privacy copy reading-level ADR"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: "FD-014 Arabic RTL Math Renderer is listed as SHIP but existing repo has a partial impl using <bdi dir=\"ltr\"> element wrapping with scanner enforcement. Index must reflect 'extend, don't greenfield' — otherwise coordinator may assign a new build that regresses existing work."
+    evidence: "feature-discovery...md:FD-014; src/student/full-version/tests/a11y/math-ltr-wrapper.spec.ts; WorkedExamplePanel.vue:17"
+    lens_note: "Single largest a11y risk in the full corpus: parallel re-implementation of an existing feature."
+  - severity: P0
+    finding: "FD-016 MathML screen reader listed as SHORTLIST 'specialized audience'. Per WCAG 2.2 AA and Israeli public-sector accessibility requirements, math a11y is not 'specialized' — it's required. Should be SHIP-tier alongside FD-014."
+    evidence: "feature-discovery...md:FD-016"
+    lens_note: "De-prioritizing MathML leaves blind Bagrut students without independent access; upgrade priority."
+  - severity: P1
+    finding: "FD-013 color-blind safe charts listed as quick-win SHIP — good. But index doesn't call out that Vuexy primary #7367F0 is ADR-locked; palette work must be chart-only."
+    evidence: "feature-discovery...md:FD-013; docs/accessibility/WCAG-AA-Primary-Color-Analysis.md"
+    lens_note: "Top-10 synthesizer must fence 'palette' to data-viz, not theme primary."
+  - severity: P1
+    finding: "FD-018 Bilingual Parent Dashboard (he/ar) is SHIP — consistent with code. But doc hints at Russian/Amharic expansion; locale scope needs an ADR before those land."
+    evidence: "feature-discovery...md:FD-018"
+    lens_note: "Same finding as AXIS 4 review."
+  - severity: P1
+    finding: "The index does not carry a dedicated Mother-Tongue Hint (lang-attribute) finding. The concept appears under translanguaging in AXIS 8 F6, but as an a11y lang-attribute requirement it has no FD slot. Synthesizer should create one."
+    evidence: "feature-discovery...md (no dedicated FD for mother-tongue hint a11y contract)"
+    lens_note: "New FD-xxx: 'Per-paragraph lang attribute for multilingual content'."
+  - severity: P1
+    finding: "Index does not call out admin/full-version a11y gap. All teacher/parent features will route through admin; admin currently lacks the a11y scanners student-web has."
+    evidence: "feature-discovery...md (no admin-a11y FD); src/admin/full-version/ (no tests/a11y/ directory visible)"
+    lens_note: "Top-10 should include extending scanners to admin."
+  - severity: P2
+    finding: "Index uses '55 findings after dedup' but several items still duplicate at the persona-review level (FD-014 vs AXIS 3 F7 vs AXIS 8 F4). Synthesizer dedup must coalesce with code-reality."
+    evidence: "feature-discovery...md executive summary"
+    lens_note: "Multiplicity is itself an a11y risk because competing impls regress."
+  - severity: P2
+    finding: "Index mentions Tamar (accessibility reviewer) cross-examined — good. But Tamar's findings don't surface as FDs in the SHIP list (e.g., no FD for prefers-reduced-motion, no FD for keyboard-only coverage gates). Those are treated as implicit, not first-class."
+    evidence: "feature-discovery...md:L5"
+    lens_note: "Making a11y gates first-class in the synthesis prevents them from slipping."
+already_built:
+  - feature: "Arabic RTL Math (FD-014) — partial"
+    evidence: "tests/a11y/math-ltr-wrapper.spec.ts; WorkedExamplePanel.vue:17"
+    note: "Extend, don't greenfield"
+  - feature: "Color-contrast scanner (FD-013 adjacent)"
+    evidence: "tests/a11y/color-contrast.spec.ts"
+    note: "New palettes integrate here"
+  - feature: "MathAriaLabels C# util (FD-016)"
+    evidence: "src/shared/Cena.Infrastructure/Accessibility/MathAriaLabels.cs"
+    note: "Localize + wire in, don't greenfield"
+  - feature: "Arabic-first locale + Hebrew gate"
+    evidence: "useLocaleInference.ts; LanguagePicker.vue"
+    note: "FD-018 and anything touching locales must honor"
+  - feature: "Reduced-motion, touch-target, aria-live scanners"
+    evidence: "tests/a11y/*.spec.ts"
+    note: "Implicit gates for all new features"
+duplicates_of_other_docs:
+  - "All axis docs collapse into FD-xxx entries here; dedup is the index's job"
+extracted_tasks:
+  - title: "Upgrade FD-016 MathML screen reader from SHORTLIST to SHIP"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Re-classify FD-016 MathML screen-reader pipeline as SHIP-tier. WCAG 2.2 AA and Israeli public-sector accessibility (IS 5568) make math a11y a required baseline, not 'specialized.' This updates synthesis dedup priorities.
+      ## Files
+      - pre-release-review/reviews/SYNTHESIS.md (when synthesizer runs)
+      ## Definition of Done
+      - SYNTHESIS.md reflects FD-016 at SHIP tier
+      - Paired with localized MathAriaLabels task (see AXIS 3 task)
+      ## Reporting
+      decision captured in synthesis
+    source_doc_lines: [FD-016 row in index]
+  - title: "Add a11y-scanner-coverage-for-admin FD (new)"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Feature index lacks a dedicated finding for admin/full-version a11y parity. Create one so it lands in top-10.
+      ## Files
+      - pre-release-review/reviews/SYNTHESIS.md
+      ## Definition of Done
+      - New FD entry: 'Admin dashboard a11y-scanner parity with student-web'
+      - Linked to AXIS 5 task 'Extend math-LTR + a11y scanners to admin/full-version'
+      ## Reporting
+      decision captured in synthesis
+    source_doc_lines: [index structure]
+  - title: "Add 'Per-paragraph lang attribute for multilingual content' FD (new)"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Mother-tongue hints (AXIS 8 F6) and LLM outputs that mix he/ar/en need a dedicated lang-attribute contract FD. Currently scattered across persona reviews without a home in the index.
+      ## Files
+      - pre-release-review/reviews/SYNTHESIS.md
+      ## Definition of Done
+      - New FD entry captures lang-attribute contract
+      - Linked to AXIS 8 extracted task
+      ## Reporting
+      decision captured in synthesis
+    source_doc_lines: [AXIS 8 F6 crossref]
+verdict: revise
+verdict_reason: "Mega-index is accurate but misses three things from a11y lens: (1) FD-014 is already partially built, (2) FD-016 should be SHIP, (3) admin/full-version a11y and multilingual lang-attribute contracts need dedicated FD slots. Synthesizer must incorporate these before publishing the top-40."
+cross_lens_handoff:
+  - to: persona-enterprise
+    about: "Dedup architecture across FD-014 / AXIS 3 F7 / AXIS 8 F4"
+  - to: persona-educator
+    about: "FD-001 through FD-020 pedagogical validity (mostly covered by Nadia)"
+  - to: persona-privacy
+    about: "FD-003 ADR-0003 compliance; FD-008 DPA §7 violation"
+  - to: persona-finops
+    about: "FD-016 TTS cost and FD-014 font-stack bandwidth impact"
+  - to: persona-ministry
+    about: "FD-011 cultural contextualization review board; FD-020 Bagrut rubric"
+  - to: persona-sre
+    about: "SLO for a11y scanner coverage in CI"
+  - to: persona-ethics
+    about: "FD-017 therapy-claim line and FD-018 energy tracker"
+  - to: persona-redteam
+    about: "FD-003 session-scope enforcement"
+  - to: persona-cogsci
+    about: "All effect-size interpretations"

@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "legal_posture": "reference-only per ADR-0033 / memory:bagrut_reference_only; no student-facing text",
+  "papers_analyzed": 6,
+  "by_track": {
+    "4u": {
+      "papers": 3,
+      "topic_hits": {
+        "calculus.derivatives": 12,
+        "algebra.equations": 8
+      },
+      "format_hits": {
+        "multiple_choice": 10,
+        "proof": 3
+      }
+    },
+    "5u": {
+      "papers": 3,
+      "topic_hits": {
+        "calculus.integrals": 7,
+        "trigonometry": 4
+      },
+      "format_hits": {
+        "computation": 6,
+        "proof": 5
+      }
+    }
+  },
+  "papers": []
+}

@@ -1,0 +1,202 @@
+doc_path: pre-release-review/AXIS_10_Operational_Integration_Features.md
+reviewer: persona-ministry
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight operational/integration features: Google SSO, Mashov read-only
+  gradebook sync, CSV bulk roster import, offline-first practice with
+  optimistic progress, multi-device session continuity, school IT admin
+  dashboard, Google Classroom assignment + grade passback, student data
+  portability export. Ministry lens: Mashov integration + Classroom
+  grade passback are the items that touch Ministry-observable school
+  infrastructure directly.
+system_purpose_fit: 3
+  rationale:
+    - Mashov sync (F2) + Classroom grade passback (F7) are the
+      Ministry-visible rails. Mashov is an Israeli K-12 gradebook; any
+      sync to it is under real-world school audit.
+    - SSO + CSV + admin dashboard are Ministry-neutral.
+    - F8 Data portability export is mandated by Israeli Privacy Law —
+      Ministry-adjacent compliance.
+    - F7 Grade passback is the highest-risk feature: writing a grade to
+      Google Classroom that a teacher then sees as authoritative. This
+      grade MUST not be a Cena-invented "readiness score" nor a Bagrut
+      prediction; it can only be a raw mock-exam score the student
+      took. RDY-080 compliance.
+code_reality_check:
+  claims_verified_in_code:
+    - 'PWA-first mobile per non-negotiable #6 — F4 offline-first aligns'
+    - 'Event-sourced domain per non-negotiable #8 — F5 multi-device session continuity can ride it'
+    - 'ADR-0001 multi-institute enrollment — F3 CSV roster import must respect tenant scoping'
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - 'Mashov API stability — doc correctly flags as "community API" (FD-019); no existing integration code found'
+    - 'Google Classroom grade-passback existing implementation — none found'
+adr_alignment:
+  honored:
+    - 'ADR-0001 multi-institute enrollment — F3 roster import and F6 admin dashboard must respect tenant scoping'
+    - 'Non-negotiable #6 (PWA-first) — F4 offline-first aligns'
+    - 'Non-negotiable #7 (REST+SignalR only) — all integrations use REST'
+  violated: []
+  missing_adr_needed:
+    - 'Grade-passback policy ADR — specifies what grade/signal may be written to Mashov / Classroom, and bans writing predicted/readiness scores'
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 7 "Google Classroom Assignment & Grade Passback" — if this
+      passes back a Cena-invented "readiness", "predicted Bagrut", or
+      "mastery %" as a grade, we have published a Ministry-observable
+      prediction to a gradebook. RDY-080 territory. Only raw scores
+      from student-taken assessments (mock exams, CAS-gated problems
+      actually solved) may be written back. The doc does not specify
+      which scoring surface feeds the passback.
+    evidence: 'AXIS_10_Operational_Integration_Features.md:L511 (F7 entry — full section not read in detail); pre-release-review/finding_assessment_dr_rami.md (RDY-080 pattern)'
+    lens_note: |
+      Ministry lens: a grade in a gradebook is regulated speech. It
+      must reflect a real attempt, not a model output.
+  - severity: P1
+    finding: |
+      Feature 2 "Mashov Gradebook Sync (Read-Only)" is correctly
+      framed as read-only (FD-019 verdict PASS). However, Mashov''s
+      community API is unofficial. Ministry-lens: any read of official
+      Israeli gradebook data is PII under PPL §7; we must have (a) a
+      tenant-scoped audit trail of every read, (b) a kill-switch if
+      Mashov API contract changes, (c) a documented legal posture
+      because the API is unofficial.
+    evidence: 'AXIS_10_Operational_Integration_Features.md:L507 (F2 entry); pre-release-review/finding_assessment_dr_rami.md:L35 (FD-019 PASS with "API is unofficial")'
+    lens_note: |
+      Ministry lens: unofficial API use on regulated data needs a
+      stated legal posture — same shape as scripts/README-bagrut-
+      reference.md for Ministry PDF scraping.
+  - severity: P1
+    finding: |
+      Feature 3 "CSV Bulk Roster Import" — a roster CSV with 200
+      students carries BagrutTrack expectations (3U/4U/5U) per student.
+      Import must validate that each student''s declared track is
+      compatible with their current grade year (e.g. a grade-9 student
+      cannot be placed on 5U without evidence of early mastery). This
+      is a Ministry-track-fidelity constraint, not a privacy one.
+    evidence: 'AXIS_10_Operational_Integration_Features.md:L508 (F3 entry); docs/adr/0034-syllabus-advancement-model.md:L97 (BagrutTrack enum)'
+    lens_note: |
+      Ministry lens: mass-import of mistracked students would mis-place
+      a cohort at exam time. Hard-fail import with warnings.
+  - severity: P2
+    finding: |
+      Feature 4 "Offline-First Practice Mode" must still respect CAS
+      gating on displayed items. Local cache of CAS-gated items is
+      fine (Verified binding cached alongside); locally-generated
+      items (e.g., a parametric template instantiated offline) must
+      not be shown offline unless pre-verified and cached. Edge case
+      in doc.
+    evidence: 'AXIS_10_Operational_Integration_Features.md:L509 (F4 entry); docs/adr/0032-cas-gated-question-ingestion.md §16.1 (single-writer invariant)'
+    lens_note: |
+      Ministry lens: "offline-first" does not waive ADR-0002.
+already_built:
+  - feature: Multi-institute tenancy (ADR-0001 Phase 1)
+    evidence: 'memory:project_tenancy_rollout.md (TENANCY-P1 in-flight)'
+    note: |
+      F3 CSV import + F6 admin dashboard must honor tenant scope —
+      phase 1 is in-flight, phase 2 is blocked; coordinate.
+  - feature: Event-sourced aggregates
+    evidence: Per CLAUDE.md non-negotiable #8
+    note: |
+      F5 multi-device session continuity can ride existing event
+      streams; doc should reference them.
+duplicates_of_other_docs:
+  - 'feature-discovery-2026-04-20.md: FD-042 Google SSO (F1), FD-044 CSV Bulk Roster (F3), FD-019 Mashov Sync (F2)'
+extracted_tasks:
+  - title: Grade-passback scope ADR + whitelist check
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Define and enforce which signals may be written to Google
+      Classroom / Mashov (F7). Whitelist: scores on actual student-
+      taken mock exams (a single submission, timestamped). Blacklist:
+      readiness %, predicted Bagrut score, mastery %, chapter-coverage
+      %. Architecture test fails if passback payload contains banned
+      fields.
+
+      ## Files
+      - docs/adr/00XX-grade-passback-scope.md (new)
+      - src/integrations/GoogleClassroom/GradePassbackService.cs
+        (new or check)
+      - src/integrations/GoogleClassroom.Tests/
+        GradePassbackPayloadWhitelistTest.cs (new)
+
+      ## Definition of Done
+      - ADR drafted
+      - Whitelist + blacklist encoded as explicit DTO fields
+      - Architecture test passes on empty implementation
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L511]
+  - title: BagrutTrack validation on CSV roster import
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F3 CSV roster import must hard-fail if any row declares a
+      BagrutTrack incompatible with the student''s grade year (5U for
+      grade 9 without explicit override flag).
+
+      ## Files
+      - src/api/Cena.Admin.Api/Roster/CsvRosterImportService.cs (new or
+        check)
+      - Tests in src/api/Cena.Admin.Api.Tests/Roster/
+
+      ## Definition of Done
+      - Import rejects rows with (grade=9, track=5U) without override
+      - Tenant scoping: import is scoped to the admin''s institute
+      - Architecture test verifies no cross-tenant writes
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L508]
+  - title: Mashov legal-posture doc + kill-switch
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Mirror scripts/README-bagrut-reference.md''s legal-posture pattern
+      for Mashov sync: explicit "unofficial API, read-only, institute-
+      scoped audit trail, kill-switch env var".
+
+      ## Files
+      - docs/integrations/mashov-legal-posture.md (new)
+      - src/integrations/Mashov/MashovSyncService.cs (kill-switch env
+        check)
+
+      ## Definition of Done
+      - Doc drafted, linked from ADR index
+      - Kill-switch `CENA_MASHOV_SYNC_ENABLED=true` default false
+      - Read audit trail writes per-institute
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L507]
+verdict: revise
+verdict_reason: |
+  F7 grade passback is P0 — need scope ADR + payload whitelist before any
+  shipping. F2 Mashov + F3 CSV need Ministry-defensibility tweaks. Other
+  features are adopt-grade.
+cross_lens_handoff:
+  - to: persona-redteam
+    about: |
+      F1 SSO, F2/F7 external-integration attack surfaces (token theft,
+      CSRF on grade passback).
+  - to: persona-privacy
+    about: |
+      F2, F7, F8 PII flows — privacy owns PPL/COPPA specifics.
+  - to: persona-sre
+    about: |
+      F4 offline-first sync-reconciliation + F2/F7 integration kill-
+      switch + observability — SRE is canonical.
+  - to: persona-enterprise
+    about: |
+      All tenancy-crossing features (F3, F6) and event-sourced session
+      continuity (F5) — enterprise owns bounded-context placement.

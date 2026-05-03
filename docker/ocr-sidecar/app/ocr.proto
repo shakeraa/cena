@@ -1,0 +1,95 @@
+// =============================================================================
+// Cena OCR Sidecar — gRPC contract (ADR-0033)
+//
+// Called by Cena.Infrastructure.Ocr.Runners.SuryaSidecarClient and
+// Pix2TexSidecarClient. Field names mirror OcrCascadeResult JSON shape
+// where possible so the C# side can deserialise directly.
+//
+// Proto file is shared with the .NET side via Grpc.Tools — any change here
+// must be reflected in the C# record contracts in
+// src/shared/Cena.Infrastructure/Ocr/Contracts/.
+// =============================================================================
+
+syntax = "proto3";
+
+package cena.ocr.v1;
+
+option csharp_namespace = "Cena.Infrastructure.Ocr.Grpc";
+
+// -----------------------------------------------------------------------------
+// Service
+// -----------------------------------------------------------------------------
+service OcrSidecar {
+  // Layer 1 + Layer 2a: layout detect + Hebrew/English text OCR via Surya.
+  rpc DetectLayoutAndRecognize(RecognizeRequest) returns (RecognizeResponse);
+
+  // Layer 2b: math-to-LaTeX via pix2tex on a pre-cropped math region.
+  rpc RecognizeMath(MathRequest) returns (MathResponse);
+
+  // Readiness probe — exercises a tiny synthetic input through both
+  // models. Returns SERVING only when models are warm on the device.
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+// -----------------------------------------------------------------------------
+// Messages
+// -----------------------------------------------------------------------------
+message RecognizeRequest {
+  bytes image_bytes = 1;           // PNG or JPEG
+  string language_hint = 2;        // "he" | "en" | "" (auto)
+  bool include_figures = 3;
+}
+
+message TextLine {
+  string text = 1;
+  BoundingBox bbox = 2;
+  double confidence = 3;
+  bool is_rtl = 4;
+  string language = 5;             // detected language
+}
+
+message Figure {
+  BoundingBox bbox = 1;
+  string kind = 2;                 // "figure" | "table" | "plot"
+}
+
+message BoundingBox {
+  double x = 1;
+  double y = 2;
+  double w = 3;
+  double h = 4;
+  int32 page = 5;
+}
+
+message RecognizeResponse {
+  repeated TextLine text_lines = 1;
+  repeated Figure figures = 2;
+  repeated BoundingBox math_regions = 3;  // regions detected as math — pass to RecognizeMath
+  double overall_confidence = 4;
+  double latency_seconds = 5;
+}
+
+message MathRequest {
+  bytes image_bytes = 1;           // cropped math region (Layer 1 output)
+}
+
+message MathResponse {
+  string latex = 1;
+  double confidence = 2;
+  double latency_seconds = 3;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  enum Status {
+    UNKNOWN = 0;
+    NOT_READY = 1;                 // models not yet loaded
+    SERVING = 2;
+    DEGRADED = 3;                  // one model up, one down
+  }
+  Status status = 1;
+  string message = 2;
+  bool surya_loaded = 3;
+  bool pix2tex_loaded = 4;
+}

@@ -1,0 +1,259 @@
+# =============================================================================
+# Cena Platform — Helm Values (RDY-025)
+# =============================================================================
+# Resource limits below are placeholder estimates until pilot metrics exist.
+# Tune after observing real workload via Prometheus. See deploy/DEPLOYMENT.md.
+# =============================================================================
+
+# -- Global settings ----------------------------------------------------------
+
+nameOverride: ""
+fullnameOverride: ""
+aspnetcoreEnvironment: Production
+
+logging:
+  level: Information
+
+# -- External service secrets -------------------------------------------------
+# All secrets are REFERENCED by name, never embedded. Create these secrets out-
+# of-band (kubectl create secret, sealed-secrets, external-secrets-operator).
+
+database:
+  # Keys: connection-string-migrator, connection-string-student,
+  #       connection-string-admin, connection-string-actors
+  secretName: cena-db-credentials
+
+redis:
+  # Keys: connection-string (format: "host:port,password=...,ssl=true")
+  secretName: cena-redis-credentials
+
+nats:
+  # Keys: connection-string, nats-user, nats-password
+  secretName: cena-nats-credentials
+
+firebase:
+  projectId: cena-platform
+  # Keys: credentials.json (full service-account JSON for Firebase Admin SDK)
+  secretName: cena-firebase-credentials
+
+# -- Actor Host ---------------------------------------------------------------
+# Proto.Actor cluster member. NOT horizontally autoscaled — cluster membership
+# stability is more valuable than quick scale. Use replicaCount + node sizing.
+
+actors:
+  replicaCount: 3
+  image:
+    repository: ghcr.io/cena-platform/cena-actors-host
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    httpPort: 5050
+    gossipPort: 8090
+  cluster:
+    name: cena-cluster
+    provider: kubernetes  # matches Cluster:Provider in appsettings; overrides via env
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi     # higher than APIs — event store + snapshot cache
+    limits:
+      cpu: "2"
+      memory: 4Gi
+  probes:
+    readiness:
+      path: /health/ready
+      initialDelaySeconds: 30    # gossip convergence + Marten warmup
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 5
+    liveness:
+      path: /health/live
+      initialDelaySeconds: 60    # lenient — cluster drift recovery takes time
+      periodSeconds: 30
+      failureThreshold: 5
+      timeoutSeconds: 10
+  pdb:
+    enabled: true
+    minAvailable: 2       # keep quorum during drains; scale with replicaCount
+  # Long grace period: drain in-flight actors + flush events
+  terminationGracePeriodSeconds: 60
+  env: []
+
+# -- Migrator Job (pre-install / pre-upgrade hook) ----------------------------
+
+migrator:
+  image:
+    repository: ghcr.io/cena-platform/cena-db-migrator
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+
+# -- Student API Host ---------------------------------------------------------
+
+student:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/cena-platform/cena-student-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 5051
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+  probes:
+    readiness:
+      path: /health/ready
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      failureThreshold: 3
+      timeoutSeconds: 5
+    liveness:
+      path: /health/live
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 5
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 80
+  pdb:
+    enabled: true
+    minAvailable: 1
+  env: []
+
+# -- Admin API Host -----------------------------------------------------------
+
+admin:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/cena-platform/cena-admin-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 5052
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  probes:
+    readiness:
+      path: /health/ready
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      failureThreshold: 3
+      timeoutSeconds: 5
+    liveness:
+      path: /health/live
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 5
+  hpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 85
+  pdb:
+    enabled: false          # single-replica admin tolerates full restarts
+    minAvailable: 0
+  studentSoakSeconds: 60
+  env: []
+
+# -- Ingress (path-based routing) ---------------------------------------------
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  # Production example:
+  #   nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  #   cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: cena.example.com
+      paths:
+        - path: /api/student
+          pathType: Prefix
+          service: student
+        - path: /api/admin
+          pathType: Prefix
+          service: admin
+  tls: []
+  # - secretName: cena-tls
+  #   hosts:
+  #     - cena.example.com
+
+# -- Image pull secrets -------------------------------------------------------
+
+imagePullSecrets: []
+# - name: ghcr-credentials
+
+# -- Service account ----------------------------------------------------------
+
+serviceAccount:
+  create: true
+  name: ""
+  # ADR-0058: attach the IRSA role ARN here for EKS production:
+  #   annotations:
+  #     eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/cena-ingest-reader"
+  # The SDK picks it up via projected OIDC token — no static keys needed.
+  annotations: {}
+
+# -- Admin ingestion providers (ADR-0058) -------------------------------------
+# S3 block is disabled by default. Prod overlays set enabled=true and fill
+# region + allowedBuckets. IRSA path: no static keys needed (rely on the
+# serviceAccount.annotations above). Non-EKS path: set accessKeySecretName
+# to a K8s Secret with AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY keys.
+ingestion:
+  s3:
+    enabled: false
+    region: "us-east-1"
+    allowedBuckets: []    # e.g. ["cena-ingest-prod"]
+    # For non-IRSA environments only. Leave "" in EKS prod.
+    accessKeySecretName: ""
+    # Dev-only override to point at LocalStack / MinIO. Leave "" in prod.
+    serviceUrl: ""
+    forcePathStyle: false
+  maxBatchFiles: 1000
+  maxBatchBytes: 10737418240   # 10 GiB
+
+# -- Pod-level settings -------------------------------------------------------
+
+podAnnotations: {}
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

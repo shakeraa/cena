@@ -1,0 +1,182 @@
+name: cena
+description: >
+  Cena — Adaptive AI Learning Platform for Israeli Bagrut STEM exams.
+  Personal AI mentor for high school students with knowledge graph visualization,
+  offline-first architecture, and gamified learning sessions.
+publish_to: 'none'
+
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # ---------------------------------------------------------------------------
+  # State Management
+  # ---------------------------------------------------------------------------
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # ---------------------------------------------------------------------------
+  # Networking
+  # ---------------------------------------------------------------------------
+  web_socket_channel: ^3.0.1        # WebSocket transport (SignalR-compatible)
+  dio: ^5.7.0                       # REST API client
+  graphql_flutter: ^5.2.0-beta.7    # GraphQL client for knowledge graph queries
+  connectivity_plus: ^6.1.0         # Network connectivity monitoring
+
+  # ---------------------------------------------------------------------------
+  # Local Database & Storage (Offline-First)
+  # ---------------------------------------------------------------------------
+  drift: ^2.22.1                    # SQLite ORM — offline event queue, mastery cache
+  sqlite3_flutter_libs: ^0.5.28     # SQLite native libraries
+  hive_ce: ^2.7.0                   # Fast key-value store — settings, analytics buffer
+  hive_ce_flutter: ^2.2.0           # Hive Flutter integration
+  flutter_secure_storage: ^9.2.3    # Secure credential storage
+  path_provider: ^2.1.5             # App directory paths
+  path: ^1.9.1                      # Path utilities
+
+  # ---------------------------------------------------------------------------
+  # Serialization
+  # ---------------------------------------------------------------------------
+  freezed_annotation: ^2.4.6        # Immutable model annotations
+  json_annotation: ^4.9.0           # JSON serialization annotations
+
+  # ---------------------------------------------------------------------------
+  # UI & Animation
+  # ---------------------------------------------------------------------------
+  flutter_animate: ^4.5.0           # Declarative animations
+  rive: ^0.13.17                    # Rive animations (graph node effects)
+  fl_chart: ^0.69.2                 # Charts (progress, analytics)
+  flutter_svg: ^2.0.16              # SVG rendering for diagrams
+  cached_network_image: ^3.4.1      # Cached image loading
+  shimmer: ^3.0.0                   # Loading placeholders
+
+  # ---------------------------------------------------------------------------
+  # Math & LaTeX Rendering
+  # ---------------------------------------------------------------------------
+  flutter_math_fork: ^0.7.2         # LaTeX math rendering
+
+  # ---------------------------------------------------------------------------
+  # Authentication
+  # ---------------------------------------------------------------------------
+  firebase_core: ^3.8.1             # Firebase core SDK
+  firebase_auth: ^5.3.4             # Firebase Authentication
+
+  # ---------------------------------------------------------------------------
+  # Push Notifications
+  # ---------------------------------------------------------------------------
+  firebase_messaging: ^15.1.6       # FCM for push notifications
+  flutter_local_notifications: ^18.0.1  # Local notification scheduling
+
+  # ---------------------------------------------------------------------------
+  # Internationalization (Hebrew + Arabic + English)
+  # ---------------------------------------------------------------------------
+  intl: ^0.19.0                     # i18n utilities, Hebrew/Arabic calendar support
+
+  # ---------------------------------------------------------------------------
+  # Utilities
+  # ---------------------------------------------------------------------------
+  uuid: ^4.5.1                      # UUID generation for idempotency keys
+  crypto: ^3.0.6                    # SHA-256 hashing for analytics privacy
+  collection: ^1.19.0               # Collection utilities
+  equatable: ^2.0.7                 # Value equality
+  logger: ^2.5.0                    # Structured logging
+  package_info_plus: ^8.1.2         # App version info
+  url_launcher: ^6.3.1              # External URL handling
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # ---------------------------------------------------------------------------
+  # Code Generation
+  # ---------------------------------------------------------------------------
+  build_runner: ^2.4.13             # Code generation runner
+  freezed: ^2.5.7                   # Immutable model generator
+  json_serializable: ^6.8.0         # JSON serialization generator
+  riverpod_generator: ^2.6.2        # Riverpod provider generator
+  drift_dev: ^2.22.1                # Drift schema generator
+  hive_ce_generator: ^1.7.0         # Hive type adapter generator
+
+  # ---------------------------------------------------------------------------
+  # Testing
+  # ---------------------------------------------------------------------------
+  mocktail: ^1.0.4                  # Mock library (null-safe)
+  patrol: ^3.13.2                   # Integration testing framework
+  golden_toolkit: ^0.15.0           # Golden (snapshot) testing
+  fake_async: ^1.3.2                # Async test utilities
+
+  # ---------------------------------------------------------------------------
+  # Linting
+  # ---------------------------------------------------------------------------
+  flutter_lints: ^5.0.0             # Official Flutter lint rules
+  custom_lint: ^0.7.0               # Custom lint rules
+  riverpod_lint: ^2.6.2             # Riverpod-specific lints
+
+flutter:
+  uses-material-design: true
+  generate: true                    # Enable flutter_gen for localization
+
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/animations/
+    - assets/fonts/
+
+  fonts:
+    # Hebrew primary font
+    - family: Heebo
+      fonts:
+        - asset: assets/fonts/Heebo-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Heebo-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Heebo-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Heebo-ExtraBold.ttf
+          weight: 800
+
+    # Arabic font — Noto Sans Arabic (Google Fonts, supports all Arabic diacritics)
+    # Covers: MSA, Palestinian dialect, Gulf Arabic glyphs
+    - family: Noto Sans Arabic
+      fonts:
+        - asset: assets/fonts/NotoSansArabic-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/NotoSansArabic-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/NotoSansArabic-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/NotoSansArabic-ExtraBold.ttf
+          weight: 800
+
+    # Latin font (English fallback + formulas)
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/JetBrainsMono-Medium.ttf
+          weight: 500
+
+# l10n configuration for flutter_gen
+# l10n:
+#   arb-dir: lib/l10n
+#   template-arb-file: app_he.arb
+#   output-localization-file: app_localizations.dart

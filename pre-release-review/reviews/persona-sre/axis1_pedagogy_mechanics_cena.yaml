@@ -1,0 +1,109 @@
+doc_path: pre-release-review/axis1_pedagogy_mechanics_cena.md
+reviewer: persona-sre
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight pedagogy features (interleaving scheduler, spaced mastery, retrieval checks, elaborative interrogation,
+  hint governor, desirable difficulty, near-to-far transfer, adaptive worked-example fading). All session-scoped,
+  mostly rule-based; two features touch BKT thresholds (#8) and LLM coherence scoring (#4/#7).
+system_purpose_fit: 4
+  rationale:
+    - Features respect ADR-0002/0003 in principle but lack concrete observability + rollback plans.
+    - "Session-local" claims are asserted at doc level but not specified as TTL + schema constraints.
+code_reality_check:
+  claims_verified_in_code:
+    - "CAS gating is live across session/answer endpoints -> src/api/Cena.Student.Api.Host/Endpoints/*.cs + Layer5CasValidationTests"
+    - "Spaced-repetition / prerequisite DAG scheduler work already merged (RDY-073) -> recent commit log"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Hint governor telemetry (time-to-first-hint, hint-level escalation) — no existing hint metric in alerting-rules.yaml"
+    - "LLM coherence-scoring latency budget for retrieval/elaboration prompts — not wired to ADR-026 tier"
+adr_alignment:
+  honored: [ADR-0002, ADR-0003]
+  violated: []
+  missing_adr_needed:
+    - "Hint governor state eviction policy (session-local vs per-problem TTL)"
+    - "BKT fixed-parameter vs learned-parameter rule (feature 8 borderline)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 5 (Hint Governor) delays hints up to +120s. Any visible-timer UI needs a freshness-tested client clock and a
+      server-authoritative "hint-available-at" stamp; client-only timers drift and would turn into angry-parent tickets on exam day.
+    evidence: axis1_pedagogy_mechanics_cena.md:L265-L275
+    lens_note: UI timers must be monotonic across offline/online transitions; needs structured log event per hint.
+  - severity: P1
+    finding: |
+      Feature 8 (Adaptive Worked-Example Fading) proposes BKT with literature-fixed parameters as mitigation. SRE concern is
+      runtime tuning churn: if parameters are hard-coded, any "wrong parameter" issue becomes a code deploy + CAS regression run.
+      Need a feature-flagged config channel so we can ramp/rollback without rebuild.
+    evidence: axis1_pedagogy_mechanics_cena.md:L439-L463
+    lens_note: Ship with flag; flags need auditable audit-log table per tenant.
+  - severity: P1
+    finding: |
+      None of the eight features define an SLO (answer-latency, scheduler-decision latency, end-to-end session-start latency).
+      Without a target, any slow rollout of feature N will be blamed on the platform, not the feature.
+    evidence: axis1_pedagogy_mechanics_cena.md (whole doc)
+    lens_note: SLO missing = no rollback trigger = ship-gate violation.
+  - severity: P2
+    finding: |
+      Feature 7 (Near-to-Far Transfer) requires ~20-30 curated problems per skill × 4 tiers × top-10 Bagrut topics = 800-1200 items
+      gated by CAS. Content pipeline throughput should be an explicit load-test target before SHIP.
+    evidence: axis1_pedagogy_mechanics_cena.md:L389-L404
+    lens_note: Ingestion bursts frequently overwhelm CAS sidecars; pipeline must be back-pressured.
+already_built:
+  - feature: F7 compression / prerequisite DAG scheduler
+    evidence: commit 11fcaed feat(rdy-073)
+    note: Feature 1 interleaving scheduler partially overlaps — reconcile before a new task.
+  - feature: Student trajectory endpoint
+    evidence: commit 8f56440 feat(rdy-071)
+    note: Feature 5/6 dashboard-style reporting may already be fed by trajectory.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-001..FD-008 match this axis 1-for-1."
+  - "cena_dr_nadia_pedagogical_review_20_findings.md: pedagogy re-review."
+extracted_tasks:
+  - title: Publish per-endpoint SLOs for student session lifecycle (start, answer, hint)
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Set p50/p95/p99 SLOs for /session/start, /session/answer, /session/hint and land them as recording rules + burn-rate
+      alerts in deploy/observability/alerting-rules.yaml.
+      ## Files
+      deploy/observability/alerting-rules.yaml
+      docs/operations/deploy-runbook.md
+      docs/ops/runbooks/student-session-slo.md (new)
+      ## Definition of Done
+      - SLOs published and CI-enforced
+      - Burn-rate alerts fire in load test
+      - Runbook ladder documents rollback
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch:sre/student-session-slo"
+    source_doc_lines: [L1-L540]
+  - title: Gate Feature 8 (adaptive fading) behind per-tenant feature flag with audit log
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Route BKT threshold + fade-level config through the existing FeatureFlagActor, with tenant-scoped audit log and a
+      runbook step to flip off per tenant in <1 minute.
+      ## Files
+      src/actors/Cena.Actors/Infrastructure/FeatureFlagActor.cs
+      src/actors/Cena.Actors/Services/ (new FadingConfigProvider)
+      docs/ops/runbooks/worked-example-fading.md (new)
+      ## Definition of Done
+      - Flag on/off verified via integration test
+      - Audit row per flag toggle
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/fading-flag"
+    source_doc_lines: [L439-L463]
+verdict: revise
+verdict_reason: |
+  Pedagogy is solid; SRE-readiness (SLOs, flags, rollback path) is not specified. Revise each feature to require an SLO + runbook
+  stub before entering the queue.
+cross_lens_handoff:
+  - to: persona-finops
+    about: LLM calls in features 3/4/7 without explicit ADR-026 tier routing.
+  - to: persona-privacy
+    about: Session-local stores for discrimination/hint/fading state — confirm true non-persistence at schema level.

@@ -1,0 +1,186 @@
+doc_path: pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md
+reviewer: persona-ministry
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight parent-engagement features ("Why This Topic" card, bilingual dashboard,
+  parent-teacher bridge, privacy-preserving cohort context, weekly chapter
+  snapshot + celebration, growth-framed SMS nudges, culturally-localized
+  parent views, Bagrut countdown dashboard). Ministry lens: parents and
+  Ministry inspectors are overlapping audiences — any claim about Bagrut
+  readiness / recommendation / countdown must be defensible.
+system_purpose_fit: 3
+  rationale:
+    - Bilingual dashboard (F2) + culturally-localized views (F7) = Arabic-
+      medium parity; Ministry-aligned.
+    - "Why This Topic" card (F1) leaning on non-LLM template-based NLG is
+      good hygiene — no hallucination that might mis-describe a Bagrut
+      chapter.
+    - Feature 8 "Crisis Mode: Bagrut Countdown Dashboard" is a RDY-080 trip
+      wire: any dashboard that scores the student against Bagrut readiness
+      must not publish a Bagrut prediction without a calibrated concordance
+      study. Doc is ambiguous on this.
+    - Feature 5 "Weekly Chapter Snapshot" touches the Ministry chapter
+      taxonomy directly — the term "chapter" must match the ADR-0034
+      SyllabusDocument/ChapterDocument structure, not a parallel notion.
+code_reality_check:
+  claims_verified_in_code:
+    - 'ChapterDocument + SyllabusDocument exist: src/shared/Cena.Infrastructure/Documents/SyllabusDocument.cs'
+    - 'Teacher-facing StudentSyllabusAdvancement view landed per ADR-0034 §Migration path step 5'
+    - 'Translation infrastructure exists: docs/content/translation-gap-2026-04-19.md tracks Hebrew/Arabic gap'
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - 'F8 "Bagrut Countdown Dashboard" — no existing code path inspected; need to confirm it does not produce a Bagrut-score estimate'
+    - 'F4 "Privacy-Preserving Cohort Context" differential privacy claim — no DP implementation found in grep of src/'
+adr_alignment:
+  honored:
+    - 'F1 uses template NLG not LLM — avoids ADR-0002-adjacent hallucination risks on pedagogy claims'
+    - 'F5 chapter snapshot can ride the existing ChapterDocument projection (ADR-0034)'
+  violated: []
+  missing_adr_needed:
+    - 'Parent-facing Bagrut-readiness framing policy — spells out what parents may see (progress, chapter coverage) vs what they must not see (predicted score, comparative percentile)'
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 8 "Crisis Mode: Bagrut Countdown Dashboard" as described risks
+      drifting into Bagrut-score prediction: a "countdown" with readiness
+      mapping is exactly what RDY-080 bans absent a calibrated concordance
+      study. Dr. Rami has flagged this pattern (FD-004, FD-007). From a
+      Ministry-lens, a parent-facing dashboard that implies "your child
+      is on-track for N units" without peer-reviewed concordance evidence
+      is defensibility-grade trouble — a school district would drop us.
+    evidence: 'AXIS_4_Parent_Engagement_Cena_Research.md:L208 (F8 row); pre-release-review/finding_assessment_dr_rami.md:L19-L20 (RDY-080 pattern)'
+    lens_note: |
+      Ministry lens: RDY-080 exists because the Ministry treats exam
+      prediction claims as regulated speech. Parent-facing is the worst
+      venue to violate it — parents escalate to schools who escalate to
+      the Ministry.
+  - severity: P1
+    finding: |
+      Feature 5 "Weekly Chapter Snapshot" must use the ADR-0034
+      ChapterDocument definition as the source of truth for "chapter",
+      not a parent-friendly renaming. If marketing copy says "Your child
+      completed Chapter 3 of Functions" but the underlying
+      StudentAdvancement aggregate says something else, we have created
+      two chapter ontologies.
+    evidence: 'AXIS_4_Parent_Engagement_Cena_Research.md:L207 (F5 row); docs/adr/0034-syllabus-advancement-model.md:L56-L66 (Chapter hierarchy)'
+    lens_note: |
+      Ministry lens: the Ministry syllabus has named chapters. Parents
+      expect those. Schools verify those. If we display a synthetic
+      chapter name, inspectors catch it.
+  - severity: P1
+    finding: |
+      Feature 1 "Why This Topic" explanation card must describe the
+      recommendation in terms of Ministry chapters + prereqs, not "AI
+      thinks". The doc correctly avoids LLM (template NLG) but does not
+      explicitly require the template to reference the SyllabusDocument
+      chapter name + prereq chapter name. Without that, parents get
+      explanations detached from the Ministry curriculum they expect.
+    evidence: 'AXIS_4_Parent_Engagement_Cena_Research.md:L214-L240 (F1 description); docs/adr/0034-syllabus-advancement-model.md:L39 (SyllabusDocument is projection from YAML manifest)'
+    lens_note: |
+      Ministry lens: "we recommended this because the Ministry syllabus
+      says chapter X requires Y first" is defensible speech. "We
+      recommended this because the AI thought so" is not.
+  - severity: P2
+    finding: |
+      Feature 6 "Encouragement Nudges (Growth-Framed SMS)" via SMS is
+      copy the Ministry/schools sometimes audit for content. Any template
+      referencing Bagrut performance, comparison to peers, or exam-
+      likelihood is banned (shipgate dark-pattern ban + RDY-080).
+      Templates should be reviewable before launch.
+    evidence: 'AXIS_4_Parent_Engagement_Cena_Research.md:L206 (F6 row); docs/engineering/shipgate.md (shipgate scanner)'
+    lens_note: |
+      Ministry lens: SMS is a formal channel. We must have a reviewable
+      template register — not free-text generation.
+already_built:
+  - feature: Chapter + Syllabus structure for snapshot use
+    evidence: docs/adr/0034-syllabus-advancement-model.md + src/shared/Cena.Infrastructure/Documents/SyllabusDocument.cs
+    note: |
+      F5 snapshot should project from these documents, not create new
+      parent-facing chapter records.
+  - feature: Teacher-facing advancement UI
+    evidence: 'docs/adr/0034-syllabus-advancement-model.md:L167 (StudentSyllabusAdvancement landed)'
+    note: |
+      F3 "Parent-Teacher Bridge" overlaps — teacher already has a
+      syllabus-advancement view; F3 becomes a note-passing surface on
+      top, not a new data shape.
+duplicates_of_other_docs:
+  - 'axis9_data_privacy_trust_mechanics.md: F1 "Why this Problem" explainable AI overlaps F1 Why This Topic'
+  - 'feature-discovery-2026-04-20.md: FD-034 Auto-Translation for Parents and FD-014 Explainable Recommendations — canonical index entries'
+  - 'feature-discovery-2026-04-20.md: FD-007 Crisis Mode overlaps F8 Bagrut Countdown'
+extracted_tasks:
+  - title: Strip Bagrut-score prediction from Crisis/Countdown feature
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Reframe "Bagrut Countdown Dashboard" (F8) and the related Crisis
+      Mode (FD-007) so neither surfaces a predicted Bagrut score /
+      readiness-percentage / comparative-percentile. Allowed: days-
+      remaining, chapters-covered vs syllabus-chapters, practice minutes.
+      Banned: "likely to score N", "on track for 5U", "X% ready".
+
+      ## Files
+      - pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md
+        (revise F8 spec)
+      - docs/engineering/shipgate.md (extend banned-term scanner
+        patterns to catch Bagrut-prediction copy)
+      - New: docs/adr/00XX-parent-facing-bagrut-readiness-framing.md
+
+      ## Definition of Done
+      - F8 doc revised to exclude any score/percentile output
+      - Shipgate scanner adds patterns: /bagrut[- ]score[- ]predict/i,
+        /on track for [345]U/i, /likely to pass/i (examples; refine
+        with stakeholder)
+      - New ADR linked from docs/adr/README
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L208]
+  - title: Require Ministry chapter name references in "Why This Topic" templates
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Enforce that every "Why This Topic" (F1) explanation template
+      slot references a ChapterDocument-valid chapter id + localized
+      name, not an ad-hoc string. This binds parent-facing explanations
+      to Ministry curriculum nomenclature.
+
+      ## Files
+      - src/api/Cena.Admin.Api/Content/ExplanationTemplateService.cs
+        (if exists) or new scaffolding
+      - Architecture test asserting templates only reference
+        ChapterDocument ids
+
+      ## Definition of Done
+      - Template schema requires chapter_id (FK to ChapterDocument)
+      - Test: no template string contains a chapter name not in
+        SyllabusDocument manifest
+      - Full sln build green
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L214-L240]
+verdict: revise
+verdict_reason: |
+  F1–F3 and F5–F7 are fine with chapter-id binding. F8 Countdown must be
+  reframed before shipping to stop RDY-080 drift. This is an auto-P1 (and
+  arguably P0) because it is parent-facing — the highest-sensitivity
+  audience for Bagrut-prediction claims.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: |
+      F4 Privacy-Preserving Cohort Context claims differential privacy —
+      privacy lens owns whether the proposed DP implementation actually
+      delivers it.
+  - to: persona-cogsci
+    about: |
+      "Chapter snapshot celebration" motivational framing — whether
+      "celebration" crosses into variable-ratio reward territory.
+  - to: persona-a11y
+    about: |
+      Bilingual dashboard (F2) + culturally-localized views (F7) —
+      RTL/bidi and locale-negotiation details.

@@ -1,0 +1,95 @@
+name: SBOM (CycloneDX)
+
+# RDY-029 sub-task 1 — Software Bill of Materials.
+# Generates a CycloneDX SBOM for each of the four deployable .NET hosts
+# on every push to main, every release, and on-demand via dispatch.
+# Uploads as workflow artifacts so release tags carry the exact package
+# graph that shipped.
+#
+# Tool: CycloneDX/cyclonedx-dotnet — pure managed, no native deps.
+# Format: CycloneDX JSON (consumed directly by GitHub Dependency Graph,
+# Grype, Trivy, and most supply-chain scanners).
+#
+# Security: release-tag attachment uses the built-in GITHUB_TOKEN via an
+# env: block — no user-input strings enter any run: body.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/actors/**'
+      - 'src/api/**'
+      - 'src/shared/**'
+      - 'src/emulator/**'
+      - '**/*.csproj'
+      - '.github/workflows/sbom.yml'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN:    ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Install CycloneDX SBOM tool
+        run: dotnet tool install --global CycloneDX
+
+      - name: Restore dependencies
+        run: |
+          dotnet restore src/actors/Cena.Actors.Host/Cena.Actors.Host.csproj
+          dotnet restore src/api/Cena.Admin.Api.Host/Cena.Admin.Api.Host.csproj
+          dotnet restore src/api/Cena.Student.Api.Host/Cena.Student.Api.Host.csproj
+          dotnet restore src/api/Cena.Db.Migrator/Cena.Db.Migrator.csproj
+
+      # Generate one SBOM per deployable host. Cross-project refs are
+      # followed (default recursive behavior) so shared / actor / api
+      # graphs roll up into each host's SBOM.
+      - name: Generate SBOMs
+        run: |
+          mkdir -p ops/sbom
+          dotnet CycloneDX src/actors/Cena.Actors.Host/Cena.Actors.Host.csproj     --json --out ops/sbom/actors-host.json
+          dotnet CycloneDX src/api/Cena.Admin.Api.Host/Cena.Admin.Api.Host.csproj  --json --out ops/sbom/admin-api.json
+          dotnet CycloneDX src/api/Cena.Student.Api.Host/Cena.Student.Api.Host.csproj --json --out ops/sbom/student-api.json
+          dotnet CycloneDX src/api/Cena.Db.Migrator/Cena.Db.Migrator.csproj        --json --out ops/sbom/db-migrator.json
+
+      # Lint: reject an SBOM that contains no components — usually means
+      # the tool pointed at the wrong file or the restore failed silently.
+      - name: Validate SBOMs are non-empty
+        run: |
+          for f in ops/sbom/*.json; do
+            count=$(jq '.components | length' "$f")
+            if [ "$count" -eq 0 ]; then
+              echo "::error::SBOM $f has zero components — aborting"
+              exit 1
+            fi
+            echo "$f: $count components"
+          done
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cena-sbom-cyclonedx
+          path: ops/sbom/*.json
+          retention-days: 90
+
+      # When this runs against a release tag, attach SBOMs to the release
+      # itself so downstream consumers (security scanners, vendor-
+      # questionnaire requests) can grab them without hitting the
+      # workflow artifact UI. RELEASE_TAG comes from env: above.
+      - name: Attach SBOMs to release
+        if: github.event_name == 'release'
+        run: |
+          for f in ops/sbom/*.json; do
+            gh release upload "$RELEASE_TAG" "$f" --clobber
+          done

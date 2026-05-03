@@ -1,0 +1,77 @@
+# =============================================================================
+# Ship-gate whitelist: banned-citations rule pack
+# =============================================================================
+# Files that legitimately need to cite the banned patterns (review docs,
+# retirement logs, task bodies that explain *why* the citations are banned,
+# and the positive-test fixture). Anything not on this list is scanned.
+#
+# Each path is matched as a glob against repo-relative file paths.
+# Add a one-line reason per entry.
+# =============================================================================
+
+whitelist:
+  - path: "pre-release-review/reviews/retired.md"
+    reason: "Retirement log: documents rejected claims by design"
+
+  - path: "pre-release-review/reviews/retired/**"
+    reason: "Retirement archives: document the claims being rejected"
+
+  - path: "pre-release-review/finding_assessment_dr_rami.md"
+    reason: "Dr. Rami's assessment: source-of-truth list of rejected citations"
+
+  - path: "pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md"
+    reason: "Dr. Nadia pedagogical review: quotes rejected figures in context"
+
+  - path: "pre-release-review/reviews/banned-citation-historical-scan.md"
+    reason: "Retroactive scan report: catalogs the historical hits"
+
+  - path: "pre-release-review/reviews/SYNTHESIS.md"
+    reason: "Synthesis doc: references the rejected claims by ID"
+
+  - path: "pre-release-review/reviews/conflicts.md"
+    reason: "Conflict log: documents unresolved claim disagreements"
+
+  - path: "pre-release-review/reviews/persona-*/**"
+    reason: "Persona reviews: quote rejected claims in critique context"
+
+  - path: "pre-release-review/reviews/audit/**"
+    reason: "Audit logs: reference rejected citations under review"
+
+  - path: "pre-release-review/reviews/tasks.jsonl"
+    reason: "Canonical task JSON: may reference banned-citation IDs"
+
+  - path: "tasks/pre-release-review/TASK-PRR-005-*.md"
+    reason: "Task body: defines the rule pack"
+
+  - path: "tasks/pre-release-review/TASK-PRR-027-*.md"
+    reason: "FD-003 remediation task body"
+
+  - path: "tasks/pre-release-review/TASK-PRR-028-*.md"
+    reason: "FD-008 remediation task body"
+
+  - path: "tasks/pre-release-review/TASK-PRR-121-*.md"
+    reason: "FD-011 retirement task body"
+
+  - path: "tasks/pre-release-review/TASK-PRR-170-*.md"
+    reason: "Interleaving ES correction task body"
+
+  - path: "tasks/pre-release-review/EPIC-PRR-D-*.md"
+    reason: "Epic body: describes the banned citations"
+
+  - path: "shipgate/fixtures/banned-citation-sample.md"
+    reason: "Positive-test fixture: deliberately contains every banned pattern"
+
+  - path: "scripts/shipgate/banned-citations.yml"
+    reason: "The rule pack itself (patterns quoted in comments)"
+
+  - path: "scripts/shipgate/banned-citations-whitelist.yml"
+    reason: "This whitelist (self)"
+
+  - path: "tests/shipgate/**"
+    reason: "Test fixtures / spec files may reference banned patterns"
+
+  - path: "docs/research/**"
+    reason: "Research notes may analyse rejected claims (pre-production)"
+
+  - path: "docs/decisions/**"
+    reason: "Decision notes may cite the rejected claims while rejecting them"

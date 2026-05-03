@@ -1,0 +1,263 @@
+doc_path: pre-release-review/axis1_pedagogy_mechanics_cena.md
+reviewer: persona-cogsci
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight cognitive-science features for Cena: adaptive interleaving, spaced mastery,
+  embedded retrieval, elaborative interrogation, productive-struggle hint governor,
+  desirable difficulty targeting, near-to-far transfer, and adaptive worked-example
+  fading. Strongest citation base of any doc in the corpus.
+system_purpose_fit: 5
+  rationale:
+    - All 8 features map directly to cognitive-load / retrieval / transfer theory
+      and to the existing Cena mastery/hint/worked-example infrastructure
+      (docs/learning-science-srs-research.md:58-62, docs/cognitive-load-progressive-disclosure-research.md:93-113).
+    - Every feature is framed as complement to the CAS oracle, not a replacement
+      (axis1:44, 59, 115, 226, 286, 345, 396, 462) — respects non-negotiable 1.
+    - No streak/variable-ratio/loss-aversion mechanics proposed; wording is explicitly
+      "mastery/retention/desirable difficulty" — honors non-negotiable 3.
+code_reality_check:
+  claims_verified_in_code:
+    - "HLR / Ebbinghaus decay is live -> src/actors/Cena.Actors/Mastery/HlrCalculator.cs (referenced in docs/learning-science-srs-research.md:58-62)"
+    - "Hint ladder exists in LearningSessionActor.HintRequest -> docs/adr/0036-stuck-type-ontology.md:17-21"
+    - "BKT + HLR + FSRS fields on ConceptMasteryState are already implemented -> docs/learning-science-srs-research.md:8"
+    - "CAS router (MathNet + SymPy) locked by ADR-0002 -> docs/adr/0031-error-pattern-matching-approach.md:14-16"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Schadenberg et al. EDM 2023 DOI 10.5281/zenodo.8115316 — verifiable in principle but Cena has no code-side DDA yet; feature is truly new"
+    - "'Strategy discrimination' auto-classifier via LLM (axis1:61) — no such service in tree; would be net-new LLM call subject to ADR-026 routing"
+  claims_unsupported_in_literature:
+    - "axis1:27 cites Rohrer 2014 d=1.05 alongside Brunmair 2019 d=0.34 meta-analytic mean. Dr. Rami (finding_assessment_dr_rami.md:17) flags this as cherry-picking the upper tail; doc must lead with d=0.34 and disclose time-on-task confound."
+    - "axis1:304 claims DDA targeting 60-70% success maximizes learning rate 'based on EDM research' but cites only one primary study (Schadenberg 2023) — thin evidence for a headline design decision."
+adr_alignment:
+  honored:
+    - ADR-0002 (CAS remains oracle — axis1:341, 464)
+    - ADR-0003 (session-scoped data — axis1:58, 114, 168, 223, 279, 337, 392, 453)
+    - ADR-0026 (model routing — feature 8 uses LLM for self-explanation quality, must be tiered)
+  violated: []
+  missing_adr_needed:
+    - "Interleaving 'strategy discrimination' scoring — is it session-only or aggregate? Needs explicit ADR, especially if LLM classifies student strategy (axis1:61)."
+    - "DDA target success rate (60% vs 65% vs 70%) — this is a pedagogy policy choice with equity implications and deserves an ADR before A/B testing starts."
+    - "BKT parameter policy — ADR needed to lock 'no student-data fitting; literature defaults only' (axis1:462) so later refactors cannot silently turn it into an ML model subject to DPA §7."
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 5 (Productive Struggle Hint Governor) cites Kapur's Productive Failure
+      literature as the warrant. Kapur's PF is a *group generation without scaffolding*
+      manipulation; transferring d to an individual-adaptive hint-delay system is a
+      conceptual stretch that the doc itself half-acknowledges (axis1:245). Claim
+      should be softened: PF supports "struggle before help" as a design heuristic,
+      but the hint-delay intervention has no direct RCT evidence in this doc.
+    evidence: axis1_pedagogy_mechanics_cena.md:245-251
+    lens_note: |
+      Cognitive-science warrant review: d-claims must match the intervention mechanism,
+      not the ancestral theory. Dunlosky 2013 also rates productive-failure-style
+      "desirable difficulties" as only *moderate* utility on their own.
+  - severity: P1
+    finding: |
+      Feature 6 (Desirable Difficulty Targeting) hands a 60% target to all students
+      by default, with 65% for "anxious". This conflates Vygotsky ZPD (a per-learner
+      construct varying by concept and moment) with a session-level success-rate
+      knob. The flow-theory citation (Csikszentmihalyi 1990) is not a warrant for
+      a *specific* numeric target. Without per-concept calibration, 40% failure rate
+      will amplify math anxiety for the LD/anxious cohorts the doc claims to help.
+    evidence: axis1_pedagogy_mechanics_cena.md:300-306, 344-347
+    lens_note: |
+      Cognitive load budget: intrinsic load on Bagrut-level material is already high
+      (docs/cognitive-load-progressive-disclosure-research.md:36-42). A 40% extrinsic
+      failure rate pushes total load over capacity for exactly the students who most
+      need scaffolding. DDA must be bounded *per concept* and *per session history*,
+      not a global knob.
+  - severity: P1
+    finding: |
+      Feature 8 (Adaptive Worked-Example Fading) acknowledges ML-training tension
+      at axis1:462 and suggests "fixed BKT parameters (literature values)" as
+      mitigation. Good — but the doc then also proposes using an LLM to "evaluate
+      self-explanation quality for mastery estimation" (axis1:459). If that LLM
+      output drives fade decisions, the student's free text becomes an input to
+      mastery inference — which is the exact pattern ADR-0003 and ADR-0037 are
+      built to prevent (affective/metacognitive signal leaking into mastery model).
+      This must be explicitly scoped: self-explanation quality may inform UI
+      (show model explanation next) but must NOT update any mastery posterior.
+    evidence: axis1_pedagogy_mechanics_cena.md:459-463
+    lens_note: |
+      Cogsci view: self-explanation elicitation is a germane-load intervention;
+      scoring it and feeding that into a model is a different construct. The doc
+      blurs the two. Aleven & Koedinger's classic finding on menu-based SE was a
+      learning gain, not a mastery-estimation input.
+  - severity: P2
+    finding: |
+      Feature 3 (Embedded Retrieval Micro-Checks) cites Murray 2025 meta-analysis
+      g=0.18 with CI crossing zero for math retrieval practice (axis1:136). Doc then
+      leans on Dunlosky 2013 "high utility" framing and Agarwal 2017 "narrows gap".
+      The CI-crossing-zero fact is buried; a cogsci-clean framing would lead with
+      "evidence in math specifically is modest and heterogeneous" and position the
+      feature as low-cost-so-worth-it rather than big-lever.
+    evidence: axis1_pedagogy_mechanics_cena.md:136
+    lens_note: |
+      Citation hygiene. Dunlosky rates *practice testing* as high utility in general,
+      but the doc's feature is *pre-problem formula recall*, a narrower intervention.
+  - severity: P2
+    finding: |
+      Feature 4 (Elaborative Interrogation) and Feature 8 both rely on menu-based
+      self-explanation. The doc does not discuss the expertise-reversal risk — once
+      a student crosses ~P(known)=0.7, forcing menu-based SE adds extraneous load
+      (cognitive-load-progressive-disclosure-research.md:99-101). Fading is mentioned
+      in F8 but not in F4; F4 should inherit the same fade rule or document why not.
+    evidence: axis1_pedagogy_mechanics_cena.md:219-223
+    lens_note: |
+      Expertise reversal (Kalyuga et al. 2003) is a first-order cogsci constraint.
+      Any SE feature must plan for fade-out or it actively harms advanced learners.
+already_built:
+  - feature: "Spacing / HLR recall computation (Feature 2's core math)"
+    evidence: src/actors/Cena.Actors/Mastery/HlrCalculator.cs (per docs/learning-science-srs-research.md:58-62)
+    note: |
+      F2's "Spaced Mastery Challenge with Adaptive Intervals" proposes building what
+      already exists. The novel piece is the *interval-per-difficulty-tier* policy
+      (axis1:99-103), not the decay math. Scope the task to the scheduling policy only.
+  - feature: "Hint ladder / hint governor substrate (Feature 5)"
+    evidence: docs/adr/0036-stuck-type-ontology.md:17-21 (LearningSessionActor.HintRequest)
+    note: |
+      The hint ladder exists; F5 adds timing/throttling on top. The feature should be
+      re-scoped as "hint-timing governor built on existing ladder + ADR-0036 stuck-type
+      router", not a greenfield hint system.
+  - feature: "CAS-gated validation for any step (Features 3, 4, 8)"
+    evidence: docs/adr/0002-sympy-correctness-oracle.md
+    note: "Already locked. Features must route through ICasRouterService."
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-001 (Interleaving) = F1; FD-002 (CAS variation) related to F4 tooling; FD-008 (worked-example fading) overlaps F8"
+  - "axis2_motivation_self_regulation_findings.md: F1 (Socratic Self-Explanation) duplicates F4 here with different framing"
+  - "AXIS_6_Assessment_Feedback_Research.md: F5 Per-Session Error Analysis overlaps F5 Hint Governor"
+extracted_tasks:
+  - title: "Adopt interleaving scheduler with meta-analytic d=0.34 framing + time-on-task control"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Ship F1 (Adaptive Interleaving Scheduler) with Brunmair & Richter 2019 d=0.34
+      as headline effect, disclose time-on-task confound, and require problem stem
+      to NOT reveal topic label (core mechanism for strategy discrimination).
+
+      ## Files
+      - src/actors/Cena.Actors/Scheduling/InterleavingScheduler.cs (new)
+      - src/actors/Cena.Actors/LearningSessionActor.cs (wire scheduler into session init)
+      - docs/adr/00XX-interleaving-scheduler.md (new ADR: session-only discrimination scores, no student profile)
+
+      ## Definition of Done
+      - Scheduler returns a ~10-item packet mixing 3-5 active topics by recency + discrimination score
+      - Problem stem has no topic label in UI
+      - Strategy-discrimination scores are session-scoped (ADR-0003 compliant) and never written to StudentState
+      - Unit tests cover: 3-topic mix, expertise-reversal fade, edge case where only 1 topic is active
+      - ADR written and linked from axis1 doc
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-interleaving-scheduler"
+    source_doc_lines: [L20-L68]
+  - title: "Pre-problem retrieval prompts (F3) as session-local low-stakes recall"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Ship F3 Embedded Retrieval Micro-Checks with explicit low-stakes framing;
+      responses session-scoped, no grading, no cross-session retention.
+
+      ## Files
+      - src/actors/Cena.Actors/Retrieval/RetrievalPromptService.cs (new)
+      - src/student-web/src/components/RetrievalPromptModal.vue (new)
+      - Cena.Admin API: GET/POST /retrieval-prompts (session-scoped only)
+
+      ## Definition of Done
+      - Prompt appears before worked example for a configurable subset of problems
+      - Student free-text stored in Redis session cache only; purged on session end
+      - CAS validates formula equivalence if prompt asks for a formula; no grade displayed
+      - Framing copy explicitly says "memory builder" not "quiz"; P1 anxiety finding mitigated
+      - Feature flag allows per-cohort opt-out (for anxious-cohort pilot)
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-retrieval-microchecks"
+    source_doc_lines: [L129-L181]
+  - title: "Lock BKT fixed-parameter policy via ADR before F8 worked-example fading"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Write ADR documenting that Cena uses fixed BKT parameters (literature values)
+      — no per-student parameter fitting, no ML training on response data, no
+      self-explanation-quality signal feeding mastery posteriors. Locks the cogsci
+      boundary before F8 ships.
+
+      ## Files
+      - docs/adr/00XX-bkt-fixed-parameter-policy.md (new)
+
+      ## Definition of Done
+      - ADR explicitly forbids (a) per-student BKT parameter learning, (b) LLM-derived
+        mastery updates from free-text explanations, (c) affective-signal leakage into
+        mastery (cross-ref ADR-0037).
+      - Links axis1 F8 tension (L459-L463) and the F1/F4/F8 shared self-explanation
+        scoring risk.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-bkt-policy-adr"
+    source_doc_lines: [L459-L463]
+  - title: "Re-scope F6 Desirable Difficulty Targeting from global knob to per-concept bounds"
+    priority: P1
+    estimate: M
+    suggested_assignee: claude-subagent-pedagogy
+    queue_body: |
+      ## Goal
+      Replace the single 60/65/70% session-target with per-concept ZPD bounds driven
+      by recent HLR recall + discrimination score. No student sees a "success rate"
+      percentage. Add cohort A/B harness that is opt-in, not default.
+
+      ## Files
+      - src/actors/Cena.Actors/Difficulty/DifficultyAdjuster.cs
+      - src/actors/Cena.Actors/LearningSessionActor.cs
+      - Cena.Admin experiments UI (opt-in flag)
+
+      ## Definition of Done
+      - Target success band is computed from (current HLR recall, concept
+        discrimination, most recent 5 session accuracies on that concept).
+      - No global 60% knob; no student-facing percentage.
+      - Anxious-cohort students (self-reported per ADR-0037) get a tighter lower
+        bound — never looser.
+      - A/B flag is explicit and auditable.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-pedagogy --result "branch: claude-subagent-pedagogy/<id>-per-concept-zpd"
+    source_doc_lines: [L297-L349]
+verdict: revise
+verdict_reason: |
+  The research base is the strongest in the corpus, but three features (F5, F6, F8)
+  leak from their actual mechanism onto richer theoretical warrants than the
+  evidence supports, and F6 + F8 touch ADR-0003/ADR-0037 boundaries that need
+  explicit ADRs before code. Revise with narrower effect-size claims, per-concept
+  DDA bounds, and a BKT-fixed-parameter ADR; then ship F1, F2, F3, F4.
+cross_lens_handoff:
+  - to: persona-educator
+    about: |
+      Is the "no topic label on problem stem" (F1 core mechanism) acceptable for
+      Israeli Bagrut prep where students benefit from *knowing* the exam unit?
+      Pure cognitive-science says hide the label; pedagogy-in-context may disagree.
+  - to: persona-privacy
+    about: |
+      F1 "strategy discrimination matrix" and F8 "self-explanation responses" — even
+      session-local, both are rich enough to constitute behavioral profiles if logs
+      persist. Need privacy review of the Redis TTL story and log-scrubbing.
+  - to: persona-ethics
+    about: |
+      F5 hint-delay and F6 DDA 40% failure target both risk student frustration for
+      vulnerable cohorts. Ship-gate review of "desirable difficulty" copy to avoid
+      sliding into variable-ratio-adjacent territory.
+  - to: persona-finops
+    about: |
+      F4 (menu-based SE), F8 (LLM-evaluated SE quality), and F1 (LLM strategy
+      auto-classifier axis1:61) all introduce per-problem LLM calls. Confirm
+      ADR-026 tier routing (Haiku acceptable for coherence scoring; Sonnet not
+      required).
+  - to: persona-enterprise
+    about: |
+      F1's "skill_discrimination_matrix" is a new aggregate. Is it a new aggregate
+      root or part of LearningSessionState (ADR-0012)? Cross-check before coding.

@@ -1,0 +1,279 @@
+# =============================================================================
+# Ship-gate rule pack: multi-target dark-pattern mechanics (EPIC-PRR-F / PRR-224)
+# =============================================================================
+# Source: TASK-PRR-224 (persona-ethics review of MULTI-TARGET-EXAM-PLAN-001)
+#         + persona-cogsci findings (cross-target cohort-shaming)
+#         + ADR-0050 Operational rules for code review (§10 — 14-day lock is
+#           scheduler-only; daysUntil/countdown/streak/timeLeft identifiers
+#           are banned anywhere in src/).
+#
+# Policy: Multi-target student plans introduce NEW failure modes beyond the
+#         single-target bans already in banned-mechanics.yml:
+#
+#           1. "Only N days until Bagrut" identifier + copy (time-pressure
+#              across a sitting-coded deadline, which ADR-0050 bans in favour
+#              of sitting-tuple derivation).
+#           2. "You're falling behind in Physics" — per-target shaming copy
+#              that weaponizes the multi-target data model (EPIC-PRR-F's data
+#              model rejects this by construction at the aggregate level,
+#              but the UI layer could still emit it).
+#           3. Cohort-shaming across targets — "other students studying
+#              Physics are ahead of you" (crosses the persona-cogsci red line
+#              + the existing prr-091 scores-as-identity ban, but targeted at
+#              the new multi-target surface).
+#           4. Identifier-name bans: daysUntil / countdown / streakCount /
+#              timeLeft / deadlinePressure anywhere in src/*.vue|*.ts|*.cs.
+#              This catches the leakage mode where the COPY is clean but the
+#              IDENTIFIER encodes the banned mechanic (which tends to leak
+#              into telemetry field names, aria-labels computed from var
+#              names, and logged fields visible in observability dashboards).
+#
+# Exceptions:
+#   - `plannedDeadline: DateTimeOffset` on data contracts is allowed (no
+#     rendering logic). The regex requires `daysUntil` / `daysLeft` / etc.
+#     as a WORD — `plannedDeadline` does not match.
+#   - `_scheduled_for` / `scheduled_for` — allowed (internal scheduling field,
+#     not student-facing).
+#   - Legitimate physics content (e.g. "speed of light", velocity-as-rate)
+#     in content docs is unaffected; rules scope to code identifiers and
+#     student-facing locale keys.
+#
+# Locale coverage: en / he / ar. Hebrew and Arabic variants cover the specific
+# multi-target cohort-shaming framings that persona-ministry flagged as
+# particularly prevalent in Israeli Bagrut test-prep marketing copy.
+#
+# Rule shape: see banned-citations.yml header.
+# =============================================================================
+
+rules:
+  # --------------------------------------------------------------------------
+  # PRR-224 #1 — multi-target countdown/days-until framing (English)
+  # These patterns are narrower than the existing banned-mechanics.yml
+  # countdown rules because they specifically target the multi-target
+  # "per-subject deadline" framing introduced by ADR-0050.
+  # --------------------------------------------------------------------------
+  - id: days-until-bagrut-subject
+    reason: "Banned 'N days until [subject]' multi-target countdown (PRR-224 — ADR-0050 sitting-tuple-only)"
+    pattern: "\\b\\d{1,3}\\s+days?\\s+until\\s+(your|the)?\\s*(bagrut|exam|math|physics|chemistry|biology|english|sat|pet|psychometric|psychometry)"
+    flags: i
+
+  - id: only-n-days-multi-target
+    reason: "Banned 'only N days — [target]' multi-target urgency (PRR-224 — ADR-0050)"
+    pattern: "only\\s+\\d{1,3}\\s+days?\\s*[—-]\\s*(bagrut|math|physics|chemistry|biology|english|sat|pet|psychometric)"
+    flags: i
+
+  - id: dont-miss-your-bagrut
+    reason: "Banned 'don't miss your Bagrut/exam/SAT' loss-aversion (PRR-224 — cohort-shaming variant)"
+    pattern: "don'?t\\s+miss\\s+(your\\s+)?(bagrut|exam|sat|pet|math|physics|chemistry|biology|english)"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # PRR-224 #2 — per-target "falling behind" shaming (English)
+  # --------------------------------------------------------------------------
+  - id: falling-behind-target
+    reason: "Banned 'falling behind in [subject]' per-target shaming (PRR-224 — persona-ethics)"
+    pattern: "falling\\s+behind\\s+in\\s+(your\\s+)?(bagrut|math|physics|chemistry|biology|english|sat|pet|psychometric|history|tanakh|civics)"
+    flags: i
+
+  - id: behind-on-target
+    reason: "Banned 'behind on [subject]' per-target shaming (PRR-224 — persona-ethics)"
+    pattern: "(you'?re|you\\s+are)\\s+behind\\s+on\\s+(your\\s+)?(bagrut|math|physics|chemistry|biology|english|sat|pet|psychometric)"
+    flags: i
+
+  - id: you-are-behind-in-target
+    reason: "Banned 'you are behind in [subject]' per-target shaming (PRR-224 — persona-ethics)"
+    pattern: "(you'?re|you\\s+are)\\s+behind\\s+in\\s+(your\\s+)?(bagrut|math|physics|chemistry|biology|english|sat|pet|psychometric|history|tanakh|civics)"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # PRR-224 #3 — cross-target cohort-shaming (English)
+  # Extends prr-091 (scores-as-identity) into the multi-target surface.
+  # --------------------------------------------------------------------------
+  - id: other-students-ahead-target
+    reason: "Banned 'other students studying [subject] are ahead' cross-target cohort-shaming (PRR-224)"
+    pattern: "other\\s+students\\s+(studying|preparing\\s+for|taking)\\s+(bagrut|math|physics|chemistry|biology|english|sat|pet|psychometric).{0,40}(ahead|further|farther|further\\s+along)"
+    flags: i
+
+  - id: cohort-ahead-target
+    reason: "Banned 'your cohort is ahead in [subject]' cross-target cohort-shaming (PRR-224)"
+    pattern: "(cohort|peers|class|classmates)\\s+(is|are)\\s+ahead\\s+(of\\s+you\\s+)?in\\s+(bagrut|math|physics|chemistry|biology|english|sat|pet)"
+    flags: i
+
+  - id: target-pace-pressure
+    reason: "Banned 'at this pace you won't finish [target]' multi-target pace-pressure (PRR-224 — loss-aversion variant)"
+    pattern: "at\\s+this\\s+pace.{0,40}(won'?t|will\\s+not|can'?t|cannot)\\s+(finish|complete|pass|master)\\s+(your\\s+)?(bagrut|math|physics|chemistry|biology|english|sat|pet)"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # PRR-224 #4 — identifier-name bans (JS/TS/Vue/C#)
+  # Source: ADR-0050 Operational rules §10 — daysUntil/countdown/streak/
+  # timeLeft identifiers are banned anywhere in src/. The word-boundary
+  # prefix is `\b`; suffix matches camelCase (Count, Days, Left, Remaining).
+  # Exception (NOT matched by construction): plannedDeadline, _scheduled_for,
+  # scheduled_for, dueAt, sittingCode (canonical ADR-0050 identifiers).
+  # --------------------------------------------------------------------------
+  - id: ident-days-until
+    reason: "Banned identifier 'daysUntil*' — ADR-0050 §10 (use SittingCode derivation, never a days counter)"
+    pattern: "\\b(days_?[Uu]ntil|[Dd]aysUntil|DAYS_UNTIL)\\w*"
+    flags: ""
+
+  - id: ident-days-left
+    reason: "Banned identifier 'daysLeft*' — ADR-0050 §10 (loss-aversion semantics)"
+    pattern: "\\b(days_?[Ll]eft|[Dd]aysLeft|DAYS_LEFT)\\w*"
+    flags: ""
+
+  # NOTE: `timeLeft` / `timeRemaining` identifiers are NOT in this pack because
+  # they have legitimate uses as in-session-duration readouts (time-awareness,
+  # not time-pressure per docs/design/exam-prep-positive-framing.md). The
+  # multi-target ban targets days-until-Bagrut semantics; the in-session
+  # hours:minutes remaining readout is acceptable. Copy rules above still
+  # catch days-until / urgency framings.
+
+  - id: ident-countdown
+    reason: "Banned identifier 'countdown*' / 'count_down*' — ADR-0050 §10 (scheduler-only lock, never UX)"
+    pattern: "\\b(countdown|count_down|Countdown|COUNTDOWN)\\w*"
+    flags: ""
+
+  - id: ident-streak
+    reason: "Banned identifier 'streak*' / 'dayStreak*' / 'consecutiveSessions*' — GD-004 hard ban"
+    pattern: "\\b(streak[Cc]ount|streak_count|[Ss]treakCount|STREAK_COUNT|day[Ss]treak|day_streak|[Dd]ayStreak|DAY_STREAK|streak[Dd]ays|streak_days|[Ss]treakDays|consecutive_?[Ss]essions|[Cc]onsecutiveSessions|consecutive_?[Dd]ays|[Cc]onsecutiveDays)\\w*"
+    flags: ""
+
+  - id: ident-deadline-pressure
+    reason: "Banned identifier 'deadlinePressure*' / 'urgency*' — ADR-0050 §10"
+    pattern: "\\b(deadline_?[Pp]ressure|[Dd]eadlinePressure|urgency_?[Ll]evel|[Uu]rgencyLevel|urgency_?[Ss]core|[Uu]rgencyScore)\\w*"
+    flags: ""
+
+  # --------------------------------------------------------------------------
+  # Hebrew variants (best-effort; verify with native-speaker team)
+  # --------------------------------------------------------------------------
+  - id: he-days-until-bagrut
+    reason: "Hebrew 'N days until Bagrut/subject' (PRR-224 — verify w/ native speaker)"
+    pattern: "\\d{1,3}\\s+ימים?\\s+עד\\s+(ה?בגרות|ה?מבחן|ה?פסיכומטרי|ה?SAT)"
+    flags: u
+    locale: he
+
+  - id: he-dont-miss-bagrut
+    reason: "Hebrew 'don't miss your Bagrut' (PRR-224 — loss-aversion multi-target)"
+    pattern: "(אל\\s+תחמיץ|אל\\s+תפספס|אל\\s+תפסיד)\\s+(את\\s+)?(ה?בגרות|ה?מבחן|ה?פסיכומטרי)"
+    flags: u
+    locale: he
+
+  - id: he-falling-behind-target
+    reason: "Hebrew 'falling behind in [subject]' per-target shaming (PRR-224 — verify w/ native speaker)"
+    pattern: "(את[ה]?|אתם)\\s+מפגר(ים|ת)?\\s+ב(מתמטיקה|פיזיקה|כימיה|ביולוגיה|אנגלית|היסטוריה|תנ\"ך|אזרחות|בגרות)"
+    flags: u
+    locale: he
+
+  - id: he-cohort-ahead-target
+    reason: "Hebrew 'cohort/peers are ahead in [subject]' cross-target (PRR-224 — verify w/ native speaker)"
+    pattern: "(החברים|בני\\s+הכיתה|התלמידים\\s+האחרים|המחזור)\\s+(מקדימים|לפניך)\\s+ב(מתמטיקה|פיזיקה|כימיה|ביולוגיה|אנגלית|בגרות|פסיכומטרי)"
+    flags: u
+    locale: he
+
+  # --------------------------------------------------------------------------
+  # Arabic variants (best-effort; verify with native-speaker team)
+  # --------------------------------------------------------------------------
+  - id: ar-days-until-bagrut
+    reason: "Arabic 'N days until Bagrut/subject' (PRR-224 — verify w/ native speaker)"
+    pattern: "\\d{1,3}\\s+(يوم|أيام)\\s+(حتى|على|قبل)\\s+(ال?بجروت|الامتحان|البسيخومتري|الاختبار)"
+    flags: u
+    locale: ar
+
+  - id: ar-dont-miss-bagrut
+    reason: "Arabic 'don't miss your Bagrut' (PRR-224 — loss-aversion multi-target)"
+    pattern: "(لا\\s+تفوّت|لا\\s+تفوت|لا\\s+تخسر)\\s+(بجروت[كك]?|امتحان[كك]?|البجروت|الامتحان|البسيخومتري)"
+    flags: u
+    locale: ar
+
+  - id: ar-falling-behind-target
+    reason: "Arabic 'falling behind in [subject]' per-target shaming (PRR-224 — verify w/ native speaker)"
+    pattern: "(أنت|انت)\\s+متأخر(ة|ون)?\\s+في\\s+(الرياضيات|الفيزياء|الكيمياء|الأحياء|الإنجليزية|التاريخ|البجروت|البسيخومتري)"
+    flags: u
+    locale: ar
+
+  - id: ar-cohort-ahead-target
+    reason: "Arabic 'cohort/peers ahead in [subject]' cross-target (PRR-224 — verify w/ native speaker)"
+    pattern: "(زملاؤك|الطلاب\\s+الآخرون|صفّك|صفك)\\s+(متقدمون|يسبقونك|أمامك)\\s+في\\s+(الرياضيات|الفيزياء|الكيمياء|الأحياء|الإنجليزية|البجروت|البسيخومتري)"
+    flags: u
+    locale: ar
+
+  # --------------------------------------------------------------------------
+  # PRR-264 — Hide-reveal timer / auto-hide bans (identifier-level, EN copy)
+  # --------------------------------------------------------------------------
+  # Source: STUDENT-INPUT-MODALITIES-002 §3.1 — persona-ethics rejected
+  # Option C (silent auto-hide of MC options after N seconds) because it
+  # converts a hide-reveal pedagogy primitive into a time-pressure mechanic
+  # in violation of ADR-0048 exam-prep-positive-framing and CLAUDE.md
+  # Design Non-Negotiable #3 (no variable-ratio / loss-aversion mechanics).
+  # The identifiers below catch the leakage pattern where copy is clean but
+  # the variable name encodes the banned mechanic (telemetry field, aria-
+  # label, observability log field). AST-level enforcement of setTimeout /
+  # setInterval inside hide-reveal files is a follow-up that requires a
+  # real JS parser in the CI runner; regex catches the identifier + copy
+  # surface which is where the documented §3.1 concern lives.
+
+  - id: hide-reveal-auto-hide-identifier
+    reason: "Banned 'autoHide*' identifier in hide-reveal context (PRR-264)"
+    pattern: "\\bautoHide(Options|After|Ms|Seconds|Timer)[A-Za-z0-9_]*\\b"
+
+  - id: hide-reveal-reveal-timer-identifier
+    reason: "Banned 'optionsRevealTimer' / 'revealTimer' identifier (PRR-264)"
+    pattern: "\\b(options?)?RevealTimer[A-Za-z0-9_]*\\b"
+
+  - id: hide-reveal-reveal-countdown-identifier
+    reason: "Banned 'revealCountdown' identifier (PRR-264 — time-pressure leakage)"
+    pattern: "\\brevealCountdown[A-Za-z0-9_]*\\b"
+
+  - id: hide-reveal-scheduled-hide-identifier
+    reason: "Banned 'scheduledHideAt' state field (PRR-264 — server-side force-hide)"
+    pattern: "\\bscheduled_?hide_?at\\b"
+    flags: i
+
+  - id: hide-reveal-hide-countdown-copy-en
+    reason: "Banned 'options disappear in N seconds' copy (PRR-264)"
+    pattern: "options?\\s+(disappear|hide|vanish|go\\s+away)\\s+in\\s+\\d"
+    flags: i
+    locale: en
+
+  - id: hide-reveal-you-have-seconds-en
+    reason: "Banned 'you have N seconds' before-hide copy (PRR-264)"
+    pattern: "you\\s+have\\s+\\d+\\s+seconds?\\s+(before|until|to\\s+(hide|reveal|pick))"
+    flags: i
+    locale: en
+
+  - id: hide-reveal-hurry-before-hide-en
+    reason: "Banned 'hurry before options hide' urgency copy (PRR-264)"
+    pattern: "hurry\\s+(up\\s+)?(before|or)\\s+(options|answers|choices)\\s+(hide|disappear|vanish|lock)"
+    flags: i
+    locale: en
+
+  # --------------------------------------------------------------------------
+  # PRR-264 — Hebrew hide-reveal timer / auto-hide bans
+  # --------------------------------------------------------------------------
+  - id: he-hide-reveal-options-disappear
+    reason: "Hebrew 'options disappear in N seconds' (PRR-264 — verify w/ he reviewer)"
+    pattern: "(האפשרויות|התשובות|התשובה)\\s+(ייעלמו|נעלמות|יסגרו|ייסגרו)\\s+בעוד\\s+\\d"
+    flags: u
+    locale: he
+
+  - id: he-hide-reveal-you-have-seconds
+    reason: "Hebrew 'you have N seconds before hide' (PRR-264 — verify w/ he reviewer)"
+    pattern: "יש\\s+לך\\s+\\d+\\s+שניות\\s+(לפני|עד)"
+    flags: u
+    locale: he
+
+  # --------------------------------------------------------------------------
+  # PRR-264 — Arabic hide-reveal timer / auto-hide bans
+  # --------------------------------------------------------------------------
+  - id: ar-hide-reveal-options-disappear
+    reason: "Arabic 'options disappear in N seconds' (PRR-264 — verify w/ native speaker)"
+    pattern: "(الخيارات|الإجابات|الإجابة)\\s+(ستختفي|تختفي|ستُغلق)\\s+(خلال|في)\\s+\\d"
+    flags: u
+    locale: ar
+
+  - id: ar-hide-reveal-you-have-seconds
+    reason: "Arabic 'you have N seconds before hide' (PRR-264 — verify w/ native speaker)"
+    pattern: "لديك\\s+\\d+\\s+(ثوان|ثانية)\\s+(قبل|حتى)"
+    flags: u
+    locale: ar

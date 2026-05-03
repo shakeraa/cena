@@ -1,0 +1,122 @@
+{
+  "$schema": "prerequisite-graph-schema",
+  "version": "1.0.0",
+  "description": "Canonical prerequisite graph for Israeli Bagrut Math 5-unit curriculum. Source of truth for concept dependencies — all other representations (CurriculumSeedData.cs, Neo4j, seed questions) must agree with this file.",
+  "subject": "math_5u",
+  "concepts": [
+    { "id": "ALG-001", "name": "Number Properties",       "cluster": "algebra",       "depth": 1 },
+    { "id": "ALG-002", "name": "Linear Equations",        "cluster": "algebra",       "depth": 1 },
+    { "id": "ALG-003", "name": "Inequalities",            "cluster": "algebra",       "depth": 1 },
+    { "id": "ALG-004", "name": "Quadratic Equations",     "cluster": "algebra",       "depth": 2 },
+    { "id": "ALG-005", "name": "Systems of Equations",    "cluster": "algebra",       "depth": 2 },
+    { "id": "ALG-006", "name": "Polynomials",             "cluster": "algebra",       "depth": 2 },
+    { "id": "ALG-007", "name": "Rational Expressions",    "cluster": "algebra",       "depth": 3 },
+    { "id": "ALG-008", "name": "Sequences & Series",      "cluster": "algebra",       "depth": 3 },
+
+    { "id": "FUN-001", "name": "Function Basics",         "cluster": "functions",     "depth": 1 },
+    { "id": "FUN-002", "name": "Linear Functions",        "cluster": "functions",     "depth": 1 },
+    { "id": "FUN-003", "name": "Quadratic Functions",     "cluster": "functions",     "depth": 2 },
+    { "id": "FUN-004", "name": "Exponential Functions",   "cluster": "functions",     "depth": 2 },
+    { "id": "FUN-005", "name": "Logarithmic Functions",   "cluster": "functions",     "depth": 2 },
+    { "id": "FUN-006", "name": "Composite Functions",     "cluster": "functions",     "depth": 3 },
+    { "id": "FUN-007", "name": "Inverse Functions",       "cluster": "functions",     "depth": 3 },
+
+    { "id": "GEO-001", "name": "Angles & Lines",          "cluster": "geometry",      "depth": 1 },
+    { "id": "GEO-002", "name": "Triangles",               "cluster": "geometry",      "depth": 1 },
+    { "id": "GEO-003", "name": "Circle Properties",       "cluster": "geometry",      "depth": 2 },
+    { "id": "GEO-004", "name": "Coordinate Geometry",     "cluster": "geometry",      "depth": 2 },
+    { "id": "GEO-005", "name": "Trigonometric Ratios",    "cluster": "geometry",      "depth": 2 },
+    { "id": "GEO-006", "name": "Area & Volume",           "cluster": "geometry",      "depth": 2 },
+    { "id": "GEO-007", "name": "Analytic Geometry",       "cluster": "geometry",      "depth": 3 },
+
+    { "id": "TRG-001", "name": "Trig Identities",         "cluster": "trigonometry",  "depth": 2 },
+    { "id": "TRG-002", "name": "Trig Equations",          "cluster": "trigonometry",  "depth": 2 },
+    { "id": "TRG-003", "name": "Sine & Cosine Rules",     "cluster": "trigonometry",  "depth": 3 },
+    { "id": "TRG-004", "name": "Radian Measure",          "cluster": "trigonometry",  "depth": 2 },
+
+    { "id": "CAL-001", "name": "Limits",                  "cluster": "calculus",      "depth": 2 },
+    { "id": "CAL-002", "name": "Derivative Definition",   "cluster": "calculus",      "depth": 2 },
+    { "id": "CAL-003", "name": "Derivative Rules",        "cluster": "calculus",      "depth": 3 },
+    { "id": "CAL-004", "name": "Applications of Deriv.",   "cluster": "calculus",      "depth": 3 },
+    { "id": "CAL-005", "name": "Integrals Intro",         "cluster": "calculus",      "depth": 3 },
+    { "id": "CAL-006", "name": "Definite Integrals",      "cluster": "calculus",      "depth": 3 },
+
+    { "id": "PRB-001", "name": "Counting Principles",     "cluster": "probability",   "depth": 1 },
+    { "id": "PRB-002", "name": "Basic Probability",       "cluster": "probability",   "depth": 1 },
+    { "id": "PRB-003", "name": "Conditional Probability",  "cluster": "probability",   "depth": 2 },
+    { "id": "PRB-004", "name": "Binomial Distribution",   "cluster": "probability",   "depth": 2 },
+    { "id": "PRB-005", "name": "Normal Distribution",     "cluster": "probability",   "depth": 3 },
+    { "id": "PRB-006", "name": "Statistical Inference",   "cluster": "probability",   "depth": 3 },
+
+    { "id": "VEC-001", "name": "Vector Basics",           "cluster": "vectors",       "depth": 2 },
+    { "id": "VEC-002", "name": "Dot Product",             "cluster": "vectors",       "depth": 2 },
+    { "id": "VEC-003", "name": "Cross Product",           "cluster": "vectors",       "depth": 3 },
+    { "id": "VEC-004", "name": "Vector Applications",     "cluster": "vectors",       "depth": 3 }
+  ],
+  "edges": [
+    { "from": "ALG-001", "to": "ALG-002", "strength": 1.0 },
+    { "from": "ALG-001", "to": "ALG-003", "strength": 1.0 },
+    { "from": "ALG-002", "to": "ALG-004", "strength": 1.0 },
+    { "from": "ALG-002", "to": "ALG-005", "strength": 1.0 },
+    { "from": "ALG-004", "to": "ALG-006", "strength": 1.0 },
+    { "from": "ALG-006", "to": "ALG-007", "strength": 1.0 },
+    { "from": "ALG-004", "to": "ALG-008", "strength": 1.0 },
+
+    { "from": "ALG-001", "to": "FUN-001", "strength": 1.0 },
+    { "from": "FUN-001", "to": "FUN-002", "strength": 1.0 },
+    { "from": "ALG-004", "to": "FUN-003", "strength": 1.0 },
+    { "from": "FUN-002", "to": "FUN-003", "strength": 1.0 },
+    { "from": "FUN-002", "to": "FUN-004", "strength": 1.0 },
+    { "from": "FUN-004", "to": "FUN-005", "strength": 1.0 },
+    { "from": "FUN-003", "to": "FUN-006", "strength": 1.0 },
+    { "from": "FUN-004", "to": "FUN-006", "strength": 1.0 },
+    { "from": "FUN-002", "to": "FUN-007", "strength": 1.0 },
+
+    { "from": "GEO-001", "to": "GEO-002", "strength": 1.0 },
+    { "from": "GEO-002", "to": "GEO-003", "strength": 1.0 },
+    { "from": "GEO-001", "to": "GEO-004", "strength": 1.0 },
+    { "from": "ALG-002", "to": "GEO-004", "strength": 1.0 },
+    { "from": "GEO-002", "to": "GEO-005", "strength": 1.0 },
+    { "from": "GEO-002", "to": "GEO-006", "strength": 1.0 },
+    { "from": "GEO-004", "to": "GEO-007", "strength": 1.0 },
+    { "from": "FUN-002", "to": "GEO-007", "strength": 1.0 },
+
+    { "from": "GEO-005", "to": "TRG-001", "strength": 1.0 },
+    { "from": "TRG-001", "to": "TRG-002", "strength": 1.0 },
+    { "from": "GEO-005", "to": "TRG-003", "strength": 1.0 },
+    { "from": "TRG-001", "to": "TRG-003", "strength": 1.0 },
+    { "from": "GEO-005", "to": "TRG-004", "strength": 1.0 },
+
+    { "from": "FUN-003", "to": "CAL-001", "strength": 1.0 },
+    { "from": "ALG-006", "to": "CAL-001", "strength": 1.0 },
+    { "from": "CAL-001", "to": "CAL-002", "strength": 1.0 },
+    { "from": "CAL-002", "to": "CAL-003", "strength": 1.0 },
+    { "from": "CAL-003", "to": "CAL-004", "strength": 1.0 },
+    { "from": "CAL-003", "to": "CAL-005", "strength": 1.0 },
+    { "from": "CAL-005", "to": "CAL-006", "strength": 1.0 },
+
+    { "from": "ALG-001", "to": "PRB-001", "strength": 1.0 },
+    { "from": "PRB-001", "to": "PRB-002", "strength": 1.0 },
+    { "from": "PRB-002", "to": "PRB-003", "strength": 1.0 },
+    { "from": "PRB-003", "to": "PRB-004", "strength": 1.0 },
+    { "from": "PRB-004", "to": "PRB-005", "strength": 1.0 },
+    { "from": "PRB-005", "to": "PRB-006", "strength": 1.0 },
+
+    { "from": "GEO-004", "to": "VEC-001", "strength": 1.0 },
+    { "from": "TRG-001", "to": "VEC-001", "strength": 1.0 },
+    { "from": "VEC-001", "to": "VEC-002", "strength": 1.0 },
+    { "from": "VEC-002", "to": "VEC-003", "strength": 1.0 },
+    { "from": "VEC-002", "to": "VEC-004", "strength": 1.0 }
+  ],
+  "foundational_concepts": [
+    "ALG-001", "GEO-001", "PRB-001"
+  ],
+  "validation": {
+    "total_concepts": 42,
+    "total_edges": 47,
+    "max_depth": 3,
+    "clusters": ["algebra", "functions", "geometry", "trigonometry", "calculus", "probability", "vectors"],
+    "is_acyclic": true,
+    "all_reachable_from_roots": true
+  }
+}

@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cena — Question Figure Samples</title>
+
+  <!-- KaTeX for math typesetting -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true},{left: '$', right: '$', display: false}]});">
+  </script>
+
+  <!-- function-plot for math graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="https://cdn.jsdelivr.net/npm/function-plot@1/dist/function-plot.js"></script>
+
+  <style>
+    :root {
+      --cena-primary: #7367F0;
+      --cena-primary-light: #9E95F5;
+      --cena-surface: #FFFFFF;
+      --cena-surface-variant: #F7F7F9;
+      --cena-on-surface: #4B465C;
+      --cena-on-surface-secondary: #6F6B7D;
+      --cena-border: #DBDADE;
+      --cena-success: #28C76F;
+      --cena-warning: #FF9F43;
+      --cena-error: #EA5455;
+      --cena-info: #00CFE8;
+      --cena-shadow: 0 2px 12px rgba(75, 70, 92, 0.08);
+      --cena-radius: 10px;
+      --cena-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .dark {
+      --cena-surface: #2F3349;
+      --cena-surface-variant: #25293C;
+      --cena-on-surface: #CFD3EC;
+      --cena-on-surface-secondary: #8692D0;
+      --cena-border: #434968;
+      --cena-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--cena-font);
+      background: var(--cena-surface-variant);
+      color: var(--cena-on-surface);
+      padding: 2rem;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+    }
+
+    .page-header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--cena-on-surface);
+    }
+
+    .theme-toggle {
+      background: var(--cena-primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .samples {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2rem;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    .question-card {
+      background: var(--cena-surface);
+      border-radius: var(--cena-radius);
+      box-shadow: var(--cena-shadow);
+      padding: 1.5rem;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    .question-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.2rem 0.75rem;
+      border-radius: 50px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .chip--primary {
+      background: rgba(115, 103, 240, 0.16);
+      color: var(--cena-primary);
+    }
+
+    .chip--bagrut {
+      background: rgba(40, 199, 111, 0.16);
+      color: var(--cena-success);
+    }
+
+    .progress-text {
+      font-size: 0.8rem;
+      color: var(--cena-on-surface-secondary);
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--cena-surface-variant);
+      border-radius: 3px;
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+    }
+
+    .progress-bar__fill {
+      height: 100%;
+      background: var(--cena-primary);
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+
+    .question-figure {
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--cena-border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--cena-surface);
+      position: relative;
+    }
+
+    .question-figure__plot {
+      width: 100%;
+      min-height: 300px;
+    }
+
+    .question-figure__caption {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      color: var(--cena-on-surface-secondary);
+      border-top: 1px solid var(--cena-border);
+      background: var(--cena-surface-variant);
+    }
+
+    .question-figure__plot svg {
+      width: 100% !important;
+      height: auto !important;
+    }
+
+    .dark .question-figure__plot .x.axis path,
+    .dark .question-figure__plot .y.axis path,
+    .dark .question-figure__plot .x.axis line,
+    .dark .question-figure__plot .y.axis line {
+      stroke: var(--cena-on-surface-secondary) !important;
+    }
+
+    .dark .question-figure__plot .x.axis text,
+    .dark .question-figure__plot .y.axis text {
+      fill: var(--cena-on-surface-secondary) !important;
+    }
+
+    .dark .question-figure__plot .x.grid line,
+    .dark .question-figure__plot .y.grid line {
+      stroke: var(--cena-border) !important;
+    }
+
+    .question-stem {
+      font-size: 1.125rem;
+      font-weight: 500;
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+      color: var(--cena-on-surface);
+    }
+
+    .choices {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .choice {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.875rem 1rem;
+      border: 1px solid var(--cena-border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.1s, border-color 0.15s, background 0.15s;
+    }
+
+    .choice:hover {
+      transform: translateY(-1px);
+      border-color: var(--cena-primary-light);
+    }
+
+    .choice.selected {
+      background: rgba(115, 103, 240, 0.08);
+      border-color: var(--cena-primary);
+    }
+
+    .choice__radio {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid var(--cena-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: border-color 0.15s;
+    }
+
+    .choice.selected .choice__radio {
+      border-color: var(--cena-primary);
+      background: var(--cena-primary);
+    }
+
+    .choice.selected .choice__radio::after {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: white;
+    }
+
+    .choice__label {
+      font-weight: 600;
+      color: var(--cena-on-surface-secondary);
+      min-width: 1.5rem;
+    }
+
+    .choice__text {
+      font-size: 0.95rem;
+      color: var(--cena-on-surface);
+    }
+
+    .actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.625rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn--primary {
+      background: var(--cena-primary);
+      color: white;
+    }
+
+    .btn--hint {
+      background: rgba(255, 159, 67, 0.16);
+      color: var(--cena-warning);
+    }
+
+    .btn:hover { opacity: 0.85; }
+
+    .physics-diagram {
+      width: 100%;
+      min-height: 340px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .physics-diagram svg {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .section-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--cena-on-surface-secondary);
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .worked-example {
+      background: rgba(0, 207, 232, 0.08);
+      border-left: 3px solid var(--cena-info);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.25rem;
+      font-size: 0.875rem;
+      line-height: 1.6;
+      color: var(--cena-on-surface);
+    }
+
+    .worked-example__title {
+      font-weight: 600;
+      font-size: 0.8rem;
+      color: var(--cena-info);
+      margin-bottom: 0.25rem;
+    }
+
+    .rtl-card {
+      direction: rtl;
+      text-align: right;
+    }
+
+    .rtl-card .question-figure {
+      direction: ltr;
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 1rem; }
+      .question-card { padding: 1rem; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page-header">
+    <h1>Cena Question Samples</h1>
+    <button class="theme-toggle" onclick="toggleTheme()">Toggle Dark Mode</button>
+  </div>
+
+  <div class="samples">
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SAMPLE 1: Math — Quadratic with function plot              -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="section-label">Sample 1 — Math: Quadratic Function (EN, Light)</div>
+    <div class="question-card" id="sample-math-en">
+      <div class="question-card__header">
+        <div style="display:flex;gap:0.5rem">
+          <span class="chip chip--primary">Math</span>
+          <span class="chip chip--bagrut">5 Units</span>
+        </div>
+        <span class="progress-text">Question 3 / 12</span>
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-bar__fill" style="width: 25%"></div>
+      </div>
+
+      <figure class="question-figure" role="img"
+        aria-label="Parabola opening upward with vertex at (2, -1). The curve crosses the x-axis at x = 1 and x = 3.">
+        <div class="question-figure__plot" id="plot-quadratic"></div>
+        <figcaption class="question-figure__caption">
+          Graph of $f(x) = x^2 - 4x + 3$
+        </figcaption>
+      </figure>
+
+      <div class="question-stem">
+        The graph above shows the function $f(x) = x^2 - 4x + 3$.
+        Find the coordinates of the vertex and determine the range of the function.
+      </div>
+
+      <div class="worked-example">
+        <div class="worked-example__title">Worked Example</div>
+        For $g(x) = x^2 - 2x - 3$, we complete the square:
+        $g(x) = (x - 1)^2 - 4$. The vertex is $(1, -4)$ and the range is $[-4, \infty)$.
+      </div>
+
+      <div class="choices" role="radiogroup" aria-label="Answer choices">
+        <div class="choice selected" role="radio" aria-checked="true">
+          <div class="choice__radio"></div>
+          <span class="choice__label">A</span>
+          <span class="choice__text">Vertex $(2, -1)$, range $[-1, \infty)$</span>
+        </div>
+        <div class="choice" role="radio" aria-checked="false">
+          <div class="choice__radio"></div>
+          <span class="choice__label">B</span>
+          <span class="choice__text">Vertex $(2, 1)$, range $[1, \infty)$</span>
+        </div>
+        <div class="choice" role="radio" aria-checked="false">
+          <div class="choice__radio"></div>
+          <span class="choice__label">C</span>
+          <span class="choice__text">Vertex $(-2, -1)$, range $(-\infty, -1]$</span>
+        </div>
+        <div class="choice" role="radio" aria-checked="false">
+          <div class="choice__radio"></div>
+          <span class="choice__label">D</span>
+          <span class="choice__text">Vertex $(4, 3)$, range $[3, \infty)$</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn--hint">Hint (2 remaining)</button>
+        <button class="btn btn--primary">Submit Answer</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SAMPLE 2: Math — Trig function                             -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="section-label">Sample 2 — Math: Trigonometric Function (EN)</div>
+    <div class="question-card" id="sample-trig">
+      <div class="question-card__header">
+        <div style="display:flex;gap:0.5rem">
+          <span class="chip chip--primary">Math</span>
+          <span class="chip chip--bagrut">5 Units</span>
+        </div>
+        <span class="progress-text">Question 7 / 12</span>
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-bar__fill" style="width: 58%"></div>
+      </div>
+
+      <figure class="question-figure" role="img"
+        aria-label="Sine wave with amplitude 2, period pi. The curve oscillates between y = -2 and y = 2.">
+        <div class="question-figure__plot" id="plot-trig"></div>
+        <figcaption class="question-figure__caption">
+          Graph of $f(x) = 2\sin(2x)$
+        </figcaption>
+      </figure>
+
+      <div class="question-stem">
+        Given the function $f(x) = 2\sin(2x)$ shown above, find the amplitude,
+        period, and the $x$-coordinates of the first two positive zeros.
+      </div>
+
+      <div class="choices" role="radiogroup" aria-label="Answer choices">
+        <div class="choice selected" role="radio" aria-checked="true">
+          <div class="choice__radio"></div>
+          <span class="choice__label">A</span>
+          <span class="choice__text">Amplitude $= 2$, period $= \pi$, zeros at $x = \frac{\pi}{2}, \pi$</span>
+        </div>
+        <div class="choice" role="radio" aria-checked="false">
+          <div class="choice__radio"></div>
+          <span class="choice__label">B</span>
+          <span class="choice__text">Amplitude $= 2$, period $= 2\pi$, zeros at $x = \pi, 2\pi$</span>
+        </div>
+        <div class="choice" role="radio" aria-checked="false">
+          <div class="choice__radio"></div>
+          <span class="choice__label">C</span>
+          <span class="choice__text">Amplitude $= 1$, period $= \pi$, zeros at $x = \frac{\pi}{4}, \frac{\pi}{2}$</span>
+        </div>
+        <div class="choice" role="radio" aria-checked="false">
+          <div class="choice__radio"></div>
+          <span class="choice__label">D</span>
+          <span class="choice__text">Amplitude $= 4$, period $= \frac{\pi}{2}$, zeros at $x = \frac{\pi}{4}, \frac{3\pi}{4}$</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <span></span>
+        <button class="btn btn--primary">Submit Answer</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SAMPLE 3: Physics — Inclined Plane (SVG diagram)           -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="section-label">Sample 3 — Physics: Inclined Plane with Force Diagram (EN)</div>
+    <div class="question-card" id="sample-physics-en">
+      <div class="question-card__header">
+        <div style="display:flex;gap:0.5rem">
+          <span class="chip chip--primary">Physics</span>
+          <span class="chip chip--bagrut">5 Units</span>
+        </div>
+        <span class="progress-text">Question 5 / 10</span>
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-bar__fill" style="width: 50%"></div>
+      </div>
+
+      <figure class="question-figure" role="img"
+        aria-label="Inclined plane at 30 degrees. A 5 kilogram block on the surface. Forces shown: gravity mg downward, normal force N perpendicular to surface, kinetic friction up the slope, weight components mg sin theta along the slope and mg cos theta into the surface.">
+        <div class="physics-diagram" id="physics-incline"></div>
+        <figcaption class="question-figure__caption">
+          Free-body diagram: $m = 5\text{ kg}$, $\theta = 30°$, $\mu_k = 0.2$
+        </figcaption>
+      </figure>
+
+      <div class="question-stem">
+        A block of mass $m = 5\text{ kg}$ slides down an inclined plane
+        at angle $\theta = 30°$ as shown. The coefficient of kinetic friction is $\mu_k = 0.2$.
+        <br><br>
+        Find the acceleration of the block down the incline.
+      </div>
+
+      <div class="choices" role="radiogroup" aria-label="Answer choices">
+        <div class="choice selected" role="radio" aria-checked="true">
+          <div class="choice__radio"></div>
+          <span class="choice__label">A</span>
+          <span class="choice__text">$a = g(\sin\theta - \mu_k\cos\theta) \approx 3.21\text{ m/s}^2$</span>
+        </div>
+        <div class="choice" role="radio" aria-checked="false">
+          <div class="choice__radio"></div>
+          <span class="choice__label">B</span>
+          <span class="choice__text">$a = g\sin\theta \approx 4.90\text{ m/s}^2$</span>
+        </div>
+        <div class="choice" role="radio" aria-checked="false">
+          <div class="choice__radio"></div>
+          <span class="choice__label">C</span>
+          <span class="choice__text">$a = g\cos\theta \approx 8.49\text{ m/s}^2$</span>
+        </div>
+        <div class="choice" role="radio" aria-checked="false">
+          <div class="choice__radio"></div>
+          <span class="choice__label">D</span>
+          <span class="choice__text">$a = \mu_k g \approx 1.96\text{ m/s}^2$</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn--hint">Hint (1 remaining)</button>
+        <button class="btn btn--primary">Submit Answer</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SAMPLE 4: Math — Arabic RTL with function plot             -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="section-label">Sample 4 — Math: Quadratic (Arabic RTL)</div>
+    <div class="question-card rtl-card" id="sample-math-ar">
+      <div class="question-card__header">
+        <div style="display:flex;gap:0.5rem">
+          <span class="chip chip--primary">رياضيات</span>
+          <span class="chip chip--bagrut">5 وحدات</span>
+        </div>
+        <span class="progress-text">سؤال 3 / 12</span>
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-bar__fill" style="width: 25%"></div>
+      </div>
+
+      <figure class="question-figure" role="img" dir="ltr"
+        aria-label="دالة تربيعية مفتوحة للأعلى، القمة عند (2, -1)، تقطع محور السينات عند x = 1 و x = 3">
+        <div class="question-figure__plot" id="plot-quadratic-ar"></div>
+        <figcaption class="question-figure__caption" dir="rtl">
+          رسم بياني: $f(x) = x^2 - 4x + 3$
+        </figcaption>
+      </figure>
+
+      <div class="question-stem">
+        الرسم البياني أعلاه يُظهر الدالة $f(x) = x^2 - 4x + 3$.
+        <br>
+        أوجد إحداثيات القمة وحدد مدى الدالة.
+      </div>
+
+      <div class="choices" role="radiogroup" aria-label="خيارات الإجابة">
+        <div class="choice selected" role="radio" aria-checked="true">
+          <div class="choice__radio"></div>
+          <span class="choice__label">أ</span>
+          <span class="choice__text">القمة $(2, -1)$، المدى $[-1, \infty)$</span>
+        </div>
+        <div class="choice" role="radio" aria-checked="false">
+          <div class="choice__radio"></div>
+          <span class="choice__label">ب</span>
+          <span class="choice__text">القمة $(2, 1)$، المدى $[1, \infty)$</span>
+        </div>
+        <div class="choice" role="radio" aria-checked="false">
+          <div class="choice__radio"></div>
+          <span class="choice__label">ج</span>
+          <span class="choice__text">القمة $(-2, -1)$، المدى $(-\infty, -1]$</span>
+        </div>
+        <div class="choice" role="radio" aria-checked="false">
+          <div class="choice__radio"></div>
+          <span class="choice__label">د</span>
+          <span class="choice__text">القمة $(4, 3)$، المدى $[3, \infty)$</span>
+        </div>
+      </div>
+
+      <div class="actions" style="flex-direction: row-reverse;">
+        <button class="btn btn--primary">إرسال الإجابة</button>
+        <button class="btn btn--hint">تلميح (2 متبقية)</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SAMPLE 5: Derivative with tangent line                     -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="section-label">Sample 5 — Math: Derivative & Tangent Line (EN)</div>
+    <div class="question-card" id="sample-derivative">
+      <div class="question-card__header">
+        <div style="display:flex;gap:0.5rem">
+          <span class="chip chip--primary">Math</span>
+          <span class="chip chip--bagrut">5 Units</span>
+        </div>
+        <span class="progress-text">Question 9 / 12</span>
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-bar__fill" style="width: 75%"></div>
+      </div>
+
+      <figure class="question-figure" role="img"
+        aria-label="Cubic curve f(x) = x cubed minus 3x plus 1 with a tangent line at x = 1 touching the curve at (1, -1) with slope 0.">
+        <div class="question-figure__plot" id="plot-derivative"></div>
+        <figcaption class="question-figure__caption">
+          $f(x) = x^3 - 3x + 1$ with tangent line at $x = 1$
+        </figcaption>
+      </figure>
+
+      <div class="question-stem">
+        The graph shows $f(x) = x^3 - 3x + 1$ and its tangent line at $x = 1$.
+        Find $f'(1)$ and write the equation of the tangent line.
+      </div>
+
+      <div class="choices" role="radiogroup" aria-label="Answer choices">
+        <div class="choice selected" role="radio" aria-checked="true">
+          <div class="choice__radio"></div>
+          <span class="choice__label">A</span>
+          <span class="choice__text">$f'(1) = 0$, tangent: $y = -1$</span>
+        </div>
+        <div class="choice" role="radio" aria-checked="false">
+          <div class="choice__radio"></div>
+          <span class="choice__label">B</span>
+          <span class="choice__text">$f'(1) = 3$, tangent: $y = 3x - 4$</span>
+        </div>
+        <div class="choice" role="radio" aria-checked="false">
+          <div class="choice__radio"></div>
+          <span class="choice__label">C</span>
+          <span class="choice__text">$f'(1) = -2$, tangent: $y = -2x + 1$</span>
+        </div>
+        <div class="choice" role="radio" aria-checked="false">
+          <div class="choice__radio"></div>
+          <span class="choice__label">D</span>
+          <span class="choice__text">$f'(1) = 1$, tangent: $y = x - 2$</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <span></span>
+        <button class="btn btn--primary">Submit Answer</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="figure-sample.js"></script>
+</body>
+</html>

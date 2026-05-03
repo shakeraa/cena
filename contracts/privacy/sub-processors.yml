@@ -1,0 +1,160 @@
+# Cena Platform — Sub-Processor Registry (prr-035)
+#
+# Source of truth for every third-party data processor Cena routes
+# student, parent, or teacher data through. Parents can request this
+# registry; regulators require it; ship-gate checks it before any new
+# outbound integration merges.
+#
+# Editing rules:
+#   1. Adding an integration in code (any new HttpClient targeting a
+#      third-party hostname, any new SDK client) requires a registry
+#      entry in this file. SubProcessorRegistryCompleteTest fails the
+#      build when an outbound integration is missing its entry.
+#   2. Each entry MUST carry a signed DPA link, SSO method, residency,
+#      and purpose-limit. Missing any field → the entry is rejected at
+#      service load and the arch test fails.
+#   3. DPA links point to private legal storage (not a public URL). The
+#      path shape is `legal://dpa/<vendor>/<effective-date>.pdf` —
+#      resolvable by the compliance admin SPA, not by students/parents.
+#   4. `status: active | suspended | deprecated | pending` — only
+#      `active` integrations may be called from production code.
+#   5. `parent_visible: true` means this entry appears on the parent
+#      transparency surface (privacy dashboard). Default: true.
+#
+# Fields (v1 schema):
+#   - id: stable lowercase slug (e.g. "mashov")
+#   - vendor: display name
+#   - category: one of {sso, sis_api, lms_api, messaging, llm, analytics,
+#       auth, storage, observability}
+#   - purpose: one-line purpose-limitation statement
+#   - data_categories: list of data classes shared (identifiers, grades,
+#       mock-exam answers, parent contact, etc). NO raw PII descriptions
+#       — use the taxonomy below.
+#   - data_residency: region string per vendor's posted residency
+#   - sso_method: how Cena authenticates with the vendor (oauth2, saml2,
+#       client_credentials, hmac_webhook, static_bearer, n/a)
+#   - dpa_link: legal://… reference to the countersigned DPA
+#   - dpa_effective_date: ISO date
+#   - status: active | suspended | deprecated | pending
+#   - parent_visible: bool (defaults true)
+#   - hostnames: list of outbound hostnames the arch test cross-checks
+
+registry_version: "1.0.0"
+updated_at_utc: "2026-04-22T00:00:00Z"
+
+# Canonical taxonomy for data_categories. Arch test rejects unknown tags.
+data_category_taxonomy:
+  - identifiers            # names, email, student-id, parent-id
+  - credentials            # SSO tokens, session cookies (Cena-side only; vendor never receives plaintext)
+  - grades                 # summative grade values
+  - assessment_responses   # per-question attempts, mock-exam responses
+  - progress_signals       # minutes studied, topic mastery, streaks — session-scoped
+  - roster_metadata        # class/section assignments
+  - contact_channel        # phone numbers for SMS, email for notifications
+  - ai_prompt_context      # LLM input context (no PII per ADR-0047)
+  - error_telemetry        # stack traces, request IDs — scrubbed of PII
+  - operational_metrics    # latency, request volumes; no user content
+
+sub_processors:
+  - id: mashov
+    vendor: "Mashov (SIS)"
+    category: sis_api
+    purpose: "Pull class roster, academic calendar, and (opt-in per teacher) grade-passback for Israeli schools using the Mashov SIS."
+    data_categories:
+      - identifiers
+      - roster_metadata
+      - grades
+    data_residency: "Israel (Mashov Computing Ltd, Ramat Gan)"
+    sso_method: client_credentials
+    dpa_link: "legal://dpa/mashov/2026-04-01.pdf"
+    dpa_effective_date: "2026-04-01"
+    status: pending
+    parent_visible: true
+    hostnames:
+      - "web.mashov.info"
+      - "api.mashov.info"
+    notes: >
+      Status `pending` until DPA countersigned. Outbound calls wrapped
+      by MashovSyncCircuitBreaker; teacher opt-in and grade-type
+      whitelist per ADR-0053. Credentials in ISecretStore only
+      (NoHardcodedMashovCredentialsTest architecture gate).
+
+  - id: google_classroom
+    vendor: "Google Classroom"
+    category: lms_api
+    purpose: "Optional classroom roster sync and assignment post-back where teachers opt in."
+    data_categories:
+      - identifiers
+      - roster_metadata
+      - grades
+    data_residency: "Global (EU/US/Israel replica) — per Google Workspace for Education terms"
+    sso_method: oauth2
+    dpa_link: "legal://dpa/google-workspace-education/2026-02-15.pdf"
+    dpa_effective_date: "2026-02-15"
+    status: pending
+    parent_visible: true
+    hostnames:
+      - "classroom.googleapis.com"
+      - "oauth2.googleapis.com"
+    notes: >
+      Status `pending` until Launch. Subject to the same grade-passback
+      policy as Mashov (ADR-0053). Teacher opt-in; whitelisted grade
+      types only.
+
+  - id: twilio
+    vendor: "Twilio"
+    category: messaging
+    purpose: "Transactional SMS for parent-consent flows and critical account notifications (password reset, 2FA)."
+    data_categories:
+      - contact_channel
+      - identifiers
+    data_residency: "US (Twilio Inc) with EU edge replica"
+    sso_method: static_bearer
+    dpa_link: "legal://dpa/twilio/2026-01-20.pdf"
+    dpa_effective_date: "2026-01-20"
+    status: active
+    parent_visible: true
+    hostnames:
+      - "api.twilio.com"
+    notes: >
+      Governed by OutboundSmsPolicyArchitectureTests — transactional
+      only, never marketing. Rate-limited per phone-number per window.
+
+  - id: anthropic
+    vendor: "Anthropic (Claude API)"
+    category: llm
+    purpose: "LLM inference for tutor dialogue, explanation rendering, and OCR post-processing."
+    data_categories:
+      - ai_prompt_context
+    data_residency: "US (Anthropic PBC) — per Anthropic API terms"
+    sso_method: static_bearer
+    dpa_link: "legal://dpa/anthropic/2026-04-10.pdf"
+    dpa_effective_date: "2026-04-10"
+    status: active
+    parent_visible: true
+    hostnames:
+      - "api.anthropic.com"
+    notes: >
+      PII prohibited in prompts (ADR-0047 NoPiiFieldInLlmPromptTest
+      enforces). Prompts + completions stored for <=30 days per ADR-0003
+      session-scope retention.
+
+  - id: firebase_auth
+    vendor: "Firebase Auth (Google)"
+    category: auth
+    purpose: "Identity provider for student and admin sign-in (email, Google SSO)."
+    data_categories:
+      - identifiers
+      - credentials
+    data_residency: "Global (Google Cloud) per Firebase terms"
+    sso_method: oauth2
+    dpa_link: "legal://dpa/google-firebase/2026-02-15.pdf"
+    dpa_effective_date: "2026-02-15"
+    status: active
+    parent_visible: true
+    hostnames:
+      - "identitytoolkit.googleapis.com"
+      - "securetoken.googleapis.com"
+    notes: >
+      Cena stores only the Firebase UID + minimal profile; no plaintext
+      passwords ever hit Cena's systems.

@@ -1,0 +1,124 @@
+doc_path: pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md
+reviewer: persona-ethics
+reviewed_at: 2026-04-20
+doc_summary: |
+  Meta-review of 20 findings across all axes by "Dr. Nadia" (pedagogy lens).
+  17 PASS / 3 WARNING / 0 REJECT. Reviews overlap substantially with the
+  axis docs they synthesize.
+system_purpose_fit: 4
+  rationale:
+    - This is a pedagogical-lens meta-review; not a proposal doc
+    - Ethics lens agrees with most verdicts; Nadia's WARNINGs on
+      FD-009 (Socratic tutor autonomy), FD-014 (Explainable AI evidence),
+      FD-016 (Cooperative Competitions engineering) each touch ethics
+      dimensions my lens would independently flag
+    - Nadia is pedagogy-lens only — misses the Axis 7 confetti/collapse
+      ship-gate violations (FD-016 line item)
+    - Nadia's "Intrinsic Motivation Risk Map" (L345-351) is ethics-
+      aligned — assigns HIGH to no features, MEDIUM to FD-009/014/016
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code:
+    - "Nadia's FD-016 review (L256-269) discusses 'Bronze/Silver/Gold tiers' mitigation but does not flag confetti animation as shipgate violation — this is a pedagogy-lens miss ethics lens catches"
+  claims_unverifiable:
+    - "All effect-size claims — handoff to cogsci"
+adr_alignment:
+  honored:
+    - "Nadia consistently references ADR-0003 session-scope and CAS-oracle ADR-0002"
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Nadia's FD-016 review (L256-269) says Team Challenges "milestone-
+      based design (Bronze/Silver/Gold) avoids shame if implemented
+      correctly — all tiers must be framed positively with no public
+      display of which tier other teams reached." Ethics lens disagrees
+      with "avoids shame if framed positively." Bronze/Silver/Gold is
+      tier-based comparison by definition; framing is not the load-
+      bearing piece; the structural pattern is. This is a pedagogy-
+      lens blind spot. See Axis 7 F3 P0 finding.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md:L265-L269
+    lens_note: |
+      Pedagogy can accept a pattern that shipgate bans. The reviews
+      are independent and the shipgate bans win under the 9 non-
+      negotiables.
+  - severity: P2
+    finding: |
+      FD-009 Socratic Tutor review (L155-167) requires "escape hatch
+      to full worked solutions must be always available and prominently
+      displayed." Ethics lens agrees and strengthens: escape hatch
+      must be EQUALLY prominent as the Socratic prompt, not a
+      secondary option. See axis1 / competitive-analysis finding on
+      help-seeking.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md:L165-L167
+    lens_note: |
+      Equal-prominence is an autonomy requirement. "Prominently
+      displayed" is vague enough to drift.
+  - severity: P2
+    finding: |
+      FD-014 Explainable AI review (L227-239) recommends minimal
+      embedding ("<15 words") and A/B test before investing. Ethics
+      lens adds: explanations must use system-reasoning framing, not
+      student-judgment framing ("the system recommended this because
+      the data showed X" vs "you spent extra time on X"). Same
+      finding as Axis 9 F6.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md:L235
+    lens_note: |
+      Pedagogy says "keep it short;" ethics adds "keep it about the
+      system, not the student."
+  - severity: P2
+    finding: |
+      FD-011 Cultural Context review (L186-196) requires "community
+      review board with cohort representatives" as CRITICAL
+      GUARDRAIL. Ethics lens upgrades this from mitigation to hard
+      requirement; see Axis 8 F5.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md:L195-L196
+    lens_note: |
+      Pedagogy and ethics converge here. Must be governance-level.
+already_built:
+  - feature: "Cena's adaptive engine, CAS oracle, RTL rendering"
+    evidence: "Multiple ADRs already locked: 0002 CAS, 0003 misconception scope"
+    note: "Nadia implicitly assumes these exist (FD-002, FD-003, FD-010 treated as infrastructure)"
+duplicates_of_other_docs:
+  - "This IS a synthesis doc — every finding (FD-001 through FD-020) duplicates an axis doc"
+  - "feature-discovery-2026-04-20.md is the parent index of these FD numbers"
+extracted_tasks:
+  - title: "Formalize 'intrinsic motivation risk map' as design-review tool"
+    priority: P2
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Adopt Nadia's Intrinsic Motivation Risk Map (L345-351) as a
+      design-review artifact for all future features. Every feature
+      PR under pre-release-review/reviews/ gets a three-category
+      rating (Autonomy / Competence / Relatedness impact) with LOW /
+      MEDIUM / HIGH risk flags. Features with any HIGH risk require
+      ADR-level review.
+      ## Files
+      - docs/engineering/design-review-checklist.md (new)
+      - .github/PULL_REQUEST_TEMPLATE.md (add SDT risk check)
+      ## Definition of Done
+      - Checklist doc accepted
+      - PR template updated
+      - First 5 feature specs retrofit-rated
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L345-L351]
+verdict: adopt
+verdict_reason: |
+  Nadia's synthesis is pedagogy-lens ethics-adjacent; ethics lens
+  agrees with her WARNINGs and extends one (FD-016 tier structure is
+  a shipgate issue, not just pedagogical). Adopt Nadia's conclusions;
+  add single ethics-amplifying task (formalize her SDT risk map).
+  No new retire/revise directly from this doc — revisions flow from
+  the axis docs it synthesizes.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: "Primary lens for pedagogy doc — effect-size realism check on every FD-XXX"
+  - to: persona-educator
+    about: "Classroom-practice applicability of each FD-XXX (Miriam lens)"
+  - to: persona-ministry
+    about: "FD-020 Bagrut rubric engine fidelity review"

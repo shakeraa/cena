@@ -1,0 +1,153 @@
+# =============================================================================
+# Error-message replacement map (prr-142 / EPIC-PRR-D D3)
+# =============================================================================
+# Source:  tasks/pre-release-review/TASK-PRR-142 absorbed into EPIC-PRR-D
+# Policy:  Banned blame-framed copy (from `banned-from`) must be replaced
+#          with an education-friendly neutral alternative (`to-options`).
+#          This map is the CANONICAL source for future i18n bulk rewrites;
+#          `scripts/shipgate/error-message-blame.yml` enforces the ban, this
+#          contract prescribes the replacements.
+#
+# Rule for adding entries:
+#   1. `from` is a regex fragment as authored in error-message-blame.yml —
+#      trigger a `fail` rather than inventing new patterns here.
+#   2. `to-options` is an ordered list of neutral alternatives (locale = en).
+#      Order matters for i18n-bulk-rewriters selecting a deterministic
+#      replacement when a pattern has multiple variants.
+#   3. `locale-coverage` lists locales for which a review-approved
+#      replacement exists. Start with `en`; he/ar are filled in as the
+#      native-speaker team signs off (mirrors the verify-with-native-speaker
+#      discipline already used in banned-mechanics.yml).
+#   4. `rationale` is a one-line reviewer note explaining WHY the replacement
+#      is neutral (prevents a reviewer from casually replacing one blame
+#      frame with another).
+# =============================================================================
+
+replacements:
+  # --------------------------------------------------------------------------
+  # "Wrong!" / "Incorrect!" punitive exclamation
+  # --------------------------------------------------------------------------
+  - id: wrong-bang
+    from: "Wrong!"
+    to-options:
+      - "Let's try again."
+      - "Not quite yet — let's revisit."
+      - "Close — check step {n}."
+    locale-coverage: ["en"]
+    rationale: "Replace exclamation punishment with a next-step invitation; 'not quite yet' signals time-extensibility without blame."
+
+  - id: incorrect-bang
+    from: "Incorrect!"
+    to-options:
+      - "Not quite yet."
+      - "Let's try another approach."
+      - "Close — look at step {n} again."
+    locale-coverage: ["en"]
+    rationale: "Same rationale as wrong-bang; 'incorrect' frames the student as the error, 'not quite yet' frames the attempt as in-progress."
+
+  # --------------------------------------------------------------------------
+  # "you failed" / "you have failed"
+  # --------------------------------------------------------------------------
+  - id: you-failed
+    from: "you failed"
+    to-options:
+      - "this one did not reach the threshold yet — let's try again."
+      - "this attempt was short of the target — what would you change on step {n}?"
+      - "not yet — let's go through step {n} once more."
+    locale-coverage: ["en"]
+    rationale: "'You failed' collapses the attempt into an identity verdict. Replacement separates the attempt from the student and points at the concrete next step."
+
+  # --------------------------------------------------------------------------
+  # "you got it wrong"
+  # --------------------------------------------------------------------------
+  - id: you-got-it-wrong
+    from: "you got it wrong"
+    to-options:
+      - "the answer came out different — want to compare step {n} to the worked solution?"
+      - "this attempt landed on a different value — let's trace through step {n} together."
+      - "close — the issue is on step {n}."
+    locale-coverage: ["en"]
+    rationale: "Treats the attempt as data, not judgement; points at a specific step the student can inspect."
+
+  # --------------------------------------------------------------------------
+  # "incorrect answer" / "wrong answer" / "bad answer"
+  # --------------------------------------------------------------------------
+  - id: incorrect-answer
+    from: "incorrect answer"
+    to-options:
+      - "answer came out different from the expected value"
+      - "response did not match the target value"
+      - "this answer is off by {delta} — check the sign on step {n}"
+    locale-coverage: ["en"]
+    rationale: "Moves from label ('bad thing you produced') to specific observation ('different from X by Y')."
+
+  # --------------------------------------------------------------------------
+  # "try harder"
+  # --------------------------------------------------------------------------
+  - id: try-harder
+    from: "try harder"
+    to-options:
+      - "let's break this into smaller steps"
+      - "want to use a hint on step {n}?"
+      - "this is a chunky one — take it one step at a time"
+    locale-coverage: ["en"]
+    rationale: "'Try harder' blames effort. Replacement offers a scaffold (smaller steps, hints) — which is what actually helps."
+
+  # --------------------------------------------------------------------------
+  # "you missed it again"
+  # --------------------------------------------------------------------------
+  - id: missed-again
+    from: "you missed it again"
+    to-options:
+      - "let's try step {n} one more time"
+      - "this step keeps coming up — want a worked example?"
+      - "the same spot tripped us — let's slow down on step {n}"
+    locale-coverage: ["en"]
+    rationale: "Removes the 'again' shaming; reframes repetition as signal that a worked example may help."
+
+  # --------------------------------------------------------------------------
+  # "you made a mistake"
+  # --------------------------------------------------------------------------
+  - id: made-mistake
+    from: "you made a mistake"
+    to-options:
+      - "let's revisit step {n}"
+      - "something in step {n} took the calculation off track"
+      - "the chain of reasoning broke at step {n} — let's look there"
+    locale-coverage: ["en"]
+    rationale: "Locates the issue in the step, not in the student. The student investigates the step with Cena."
+
+  # --------------------------------------------------------------------------
+  # "bad answer" / "terrible attempt" / "poor response"
+  # --------------------------------------------------------------------------
+  - id: bad-answer
+    from: "bad answer"
+    to-options:
+      - "not quite yet — let's compare to the worked solution"
+      - "this answer is off — which step would you check first?"
+    locale-coverage: ["en"]
+    rationale: "Removes the quality-of-person attribution ('bad') and offers a comparison move."
+
+  # --------------------------------------------------------------------------
+  # "not good enough"
+  # --------------------------------------------------------------------------
+  - id: not-good-enough
+    from: "not good enough"
+    to-options:
+      - "close — check step {n}"
+      - "one step short — want to try step {n} again?"
+      - "almost there — the issue is on step {n}"
+    locale-coverage: ["en"]
+    rationale: "Replaces the verdict with a directional cue (close / one step short) plus a concrete next step."
+
+# =============================================================================
+# Locale rollout plan
+# =============================================================================
+# en: all entries populated (approved 2026-04-21 prr-142 landing)
+# he: pending — native-speaker review scheduled (sign-off by Hebrew
+#     translation team). Until then the scanner flags he-locale hits but
+#     the replacement map lists en-only.
+# ar: pending — native-speaker review scheduled (sign-off by Prof. Amjad).
+#     Until then the scanner flags ar-locale hits but the replacement map
+#     lists en-only.
+# =============================================================================

@@ -1,0 +1,33 @@
+# Only Cena platform pods on port 50051 may talk to the sidecar.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cena-ocr-sidecar
+  namespace: cena-platform
+spec:
+  podSelector:
+    matchLabels:
+      app: cena-ocr-sidecar
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: cena-platform
+      ports:
+        - protocol: TCP
+          port: 50051
+  egress:
+    # HF model download (first boot only) + DNS + OTLP collector.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - ports:
+        - protocol: TCP
+          port: 443     # HuggingFace
+        - protocol: TCP
+          port: 4317    # OTLP gRPC

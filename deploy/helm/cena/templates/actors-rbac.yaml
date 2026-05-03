@@ -1,0 +1,59 @@
+# =============================================================================
+# RDY-025b — RBAC for Proto.Cluster.Kubernetes service discovery.
+#
+# Gives the Actor Host pods permission to list/watch pods in their own
+# namespace. Proto.Cluster.Kubernetes uses that watch to discover peer
+# members and seed the cluster membership list from pod IPs.
+#
+# Scope is deliberately tight: only pods, only in the release namespace,
+# no cluster-wide access. Follows principle of least privilege.
+# =============================================================================
+{{- if eq (((.Values.actors).cluster).provider | default "test") "kubernetes" }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "cena.fullname" . }}-actors
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cena.labels" . | nindent 4 }}
+    app.kubernetes.io/component: actors
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "cena.fullname" . }}-actors-discovery
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cena.labels" . | nindent 4 }}
+    app.kubernetes.io/component: actors
+rules:
+  # Proto.Cluster.Kubernetes watches pods in the release namespace. The
+  # watch is permanent (subject to WatchTimeoutSeconds renewal) and only
+  # reads pod metadata + IPs — never execs, never gets secrets.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  # The provider also patches its own pod's labels to advertise cluster
+  # membership. `update` on self-pod only; `patch` scope keeps writes
+  # to a single field (.metadata.labels).
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "cena.fullname" . }}-actors-discovery
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cena.labels" . | nindent 4 }}
+    app.kubernetes.io/component: actors
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "cena.fullname" . }}-actors
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "cena.fullname" . }}-actors-discovery
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

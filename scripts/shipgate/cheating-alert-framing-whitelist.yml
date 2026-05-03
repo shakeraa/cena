@@ -1,0 +1,108 @@
+# =============================================================================
+# Ship-gate whitelist: cheating-alert-framing rule pack
+# =============================================================================
+# Files that legitimately need to reference the banned cheating-alert family
+# (policy docs, the academic-integrity review service interface and its
+# tests, retirement logs, task bodies, and the positive-test fixture).
+#
+# Core principle: any integrity signal MUST route through
+# IAcademicIntegrityReviewService. The service interface, its
+# implementation(s), and its tests are the ONLY code paths allowed to name
+# the banned terms — and then only in documentation comments describing
+# what the service replaces.
+#
+# Pre-existing surfaces:
+#   - src/shared/Cena.Infrastructure/Seed/UserSeedData.cs: demo-user seed
+#     data with "Academic integrity violation" as a suspension reason —
+#     admin-facing demo data, not a student-facing alert. Whitelisted.
+#   - src/admin/full-version/src/views/apps/ingestion/ItemDetailPanel.vue:
+#     content-ingestion plagiarism score (admin-side, reviewing authored
+#     content for originality) — admin-facing content moderation, not a
+#     student-facing cheating alert. Whitelisted.
+# =============================================================================
+
+whitelist:
+  - path: "scripts/shipgate/cheating-alert-framing.yml"
+    reason: "The rule pack itself (patterns quoted in rule definitions)"
+
+  - path: "scripts/shipgate/cheating-alert-framing-whitelist.yml"
+    reason: "This whitelist (self)"
+
+  - path: "scripts/shipgate/rulepack-scan.mjs"
+    reason: "Scanner source references pack name in comments"
+
+  - path: "shipgate/fixtures/cheating-alert-framing-sample.md"
+    reason: "Positive-test fixture: deliberately contains every banned pattern"
+
+  - path: "tests/shipgate/**"
+    reason: "Test fixtures/specs reference banned patterns"
+
+  # IAcademicIntegrityReviewService stub interface + its tests — the seam
+  - path: "src/actors/Cena.Actors/AcademicIntegrity/**"
+    reason: "Academic-integrity review service interface (arch-test-gated seam)"
+
+  - path: "src/actors/Cena.Actors.Tests/Architecture/AcademicIntegrityRoutingTest.cs"
+    reason: "Architecture ratchet asserting integrity signals route via IAcademicIntegrityReviewService"
+
+  # Pre-existing admin-facing surfaces (documented above)
+  - path: "src/shared/Cena.Infrastructure/Seed/UserSeedData.cs"
+    reason: "Demo-user seed data: 'Academic integrity violation' as a suspension reason is admin-demo, not student-facing"
+
+  - path: "src/admin/full-version/src/views/apps/ingestion/ItemDetailPanel.vue"
+    reason: "Content-ingestion plagiarism score: admin-side content moderation of authored material, not student-facing"
+
+  # Content moderation: admin may use "plagiarism"-adjacent vocabulary for
+  # ingested content (not for students). The moderation DTOs live here.
+  - path: "src/api/Cena.Api.Contracts/Admin/Moderation/**"
+    reason: "Admin content-moderation DTOs may reference plagiarism scoring of ingested content"
+
+  - path: "src/api/Cena.Api.Contracts/Admin/Ingestion/**"
+    reason: "Admin content-ingestion DTOs may reference plagiarism scoring of ingested material"
+
+  - path: "src/api/Cena.Admin.Api/**"
+    reason: "Admin API surfaces for content moderation / integrity review"
+
+  - path: "docs/adr/**"
+    reason: "ADRs describe cheating-alert retirement rationale"
+
+  - path: "docs/engineering/**/*.md"
+    reason: "Engineering policy docs cite banned phrasing in rejection context"
+
+  - path: "docs/design/**/*.md"
+    reason: "Design docs describe anti-patterns"
+
+  - path: "docs/research/**"
+    reason: "Research notes analyse academic-integrity literature"
+
+  - path: "docs/feature-specs/**/*.md"
+    reason: "Feature specs may cite the banned framing in rationale"
+
+  - path: "docs/handoff/**"
+    reason: "Handoff notes may mention shipgate scanner expansions"
+
+  - path: "pre-release-review/**"
+    reason: "Pre-release review corpus"
+
+  - path: "tasks/pre-release-review/TASK-PRR-144-*.md"
+    reason: "Task body defines cheating-alert retirement"
+
+  - path: "tasks/pre-release-review/EPIC-PRR-D-*.md"
+    reason: "Epic body"
+
+  - path: "CLAUDE.md"
+    reason: "Project rules"
+
+  - path: "AGENTS.md"
+    reason: "Cross-agent rules"
+
+  - path: ".agentdb/**"
+    reason: "Task queue protocol docs"
+
+  - path: "src/actors/Cena.Actors.Tests/**"
+    reason: "Test assertions may reference banned copy in DoesNotContain checks"
+
+  - path: "src/api/**/*Tests*/**"
+    reason: "API test projects may assert banned copy is absent"
+
+  - path: "src/api/**/*.Tests/**"
+    reason: "API test projects (dotted variant) may assert banned copy is absent"

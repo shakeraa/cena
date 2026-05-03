@@ -1,0 +1,128 @@
+doc_path: pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md
+reviewer: persona-a11y
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 parent-engagement features: why-this-topic card, bilingual parent dashboard
+  (Hebrew/Arabic), parent-teacher bridge messages, privacy-preserving cohort
+  context, weekly chapter snapshot, growth-framed SMS, culturally-localized views,
+  Bagrut-countdown crisis mode. Heavy l10n surface — four languages promised
+  (Hebrew, Arabic, Russian, Amharic).
+system_purpose_fit: 4
+  rationale:
+    - Arabic + Hebrew bilingualism aligned with non-negotiable 6 (RTL) + language policy
+    - Adds Russian and Amharic — scope expansion beyond current build (he/ar/en only)
+    - SMS channel is low-bandwidth-friendly (mirrors PWA-first spirit)
+    - No dark-pattern violations
+code_reality_check:
+  claims_verified_in_code:
+    - "i18n plumbed for 3 locales (he/ar/en): src/student/full-version/src/plugins/i18n/locales/"
+    - "Hebrew-gate build flag (hideable outside IL): src/student/full-version/src/components/onboarding/LanguagePicker.vue:21-60"
+  claims_contradicted_by_code:
+    - "Doc promises Russian (ru) and Amharic (am) locales: no ru.json or am.json in student-web, no gate logic for these"
+  claims_unverifiable:
+    - "Amharic script (Ge'ez) rendering path — no font stack, no RTL/LTR policy, no scanner coverage"
+    - "SMS channel content direction — no infrastructure in repo"
+adr_alignment:
+  honored:
+    - "Hebrew-gate language strategy (memory)"
+  violated: []
+  missing_adr_needed:
+    - "ADR for locale expansion (ru, am): which locales are Tier 1 UI vs Tier 2 parent-only vs stretch? Current memory says en primary, he/ar secondary — adding ru/am is a product decision"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: "Feature 2 and 7 promise Russian + Amharic parent UIs but repo has only he/ar/en locales. Shipping a 'bilingual parent dashboard' that actually only supports he/ar (plus en) mislabels the feature and misses Ethiopian-Israeli families."
+    evidence: "AXIS_4...md:L6 (mentions Hebrew/Arabic/Russian/Amharic); src/student/full-version/src/plugins/i18n/locales/ (only he/ar/en)"
+    lens_note: "Either scope down the claim to he/ar/en or actually add ru/am with a proper ADR and font stack."
+  - severity: P0
+    finding: "Amharic uses Ge'ez script (not Arabic, not Hebrew) — it is LTR. Mixing Amharic UI with Hebrew/Arabic RTL requires explicit dir per language, not a blanket dir='rtl' on <html>."
+    evidence: "AXIS_4...md:F7 section"
+    lens_note: "A naive RTL application with Amharic added would render Ge'ez backwards or misaligned. Must do per-view dir switching tied to locale."
+  - severity: P1
+    finding: "Feature 6 (growth-framed SMS) — SMS has no markup, so math inside SMS bodies (e.g., 'Your child mastered x²+3x-7=0 today') cannot use <bdi>. Needs a plain-text bidi-isolation convention (Unicode LRI U+2066 / RLI U+2067 / PDI U+2069) or a stated rule 'no math in SMS, only topic names.'"
+    evidence: "AXIS_4...md:F6 section"
+    lens_note: "Unicode bidi-isolate marks work in SMS on most carriers; must pick one or forbid math altogether."
+  - severity: P1
+    finding: "Feature 1 'Why This Topic' explainability card must avoid red for 'weak' skill callouts — doc doesn't specify. Red-green color is a WCAG and color-blind accessibility hazard."
+    evidence: "AXIS_4...md:F1 section"
+    lens_note: "Primary #7367F0 + amber (with fix per AXIS 3 review) + shape differentiation."
+  - severity: P1
+    finding: "Feature 8 Bagrut-countdown could read as loss-aversion ('N days left!'). Phrasing must be forward-framed to pass ship-gate banned-terms."
+    evidence: "AXIS_4...md:F8 section"
+    lens_note: "Also a ship-gate concern (cross-lens → persona-ethics), but a11y-adjacent because countdown UI visual patterns (red digits, shrinking numbers) exclude CVD users."
+  - severity: P2
+    finding: "Parent SMS opt-in/opt-out UI must be WCAG keyboard-accessible and have visible focus ring (especially for elderly parents / low-digital-literacy)."
+    evidence: "AXIS_4...md:F6 section"
+    lens_note: "Parent cohort often includes low-digital-literacy; focus order + large targets matter more than for students."
+  - severity: P2
+    finding: "Feature 3 parent-teacher bridge messages — if translated via machine translation, math terms (derivative, integral) may be mistranslated between ar/he/ru. Doc hand-waves 'native-speaker-verified' elsewhere but not here."
+    evidence: "AXIS_4...md:F3 section"
+    lens_note: "Glossary-backed translation, not generic MT."
+already_built:
+  - feature: "Hebrew/Arabic parent-facing i18n infrastructure"
+    evidence: "src/student/full-version/src/plugins/i18n/locales/{he,ar,en}.json"
+    note: "Admin side needs a parent portal; i18n scaffolding can port"
+  - feature: "Hebrew gate (hideable outside IL)"
+    evidence: "src/student/full-version/src/components/onboarding/LanguagePicker.vue:21-60"
+    note: "Parent portal must honor same gate"
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-017, FD-018 Parent dashboard + bilingual (dup of F1+F2)"
+  - "cena_competitive_analysis.md: Feature 6 Auto-Translation Parent Communications (dup of F3)"
+extracted_tasks:
+  - title: "Decision-gate: locale scope for parent portal (he/ar/en vs +ru/am)"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Block all AXIS 4 parent features behind an ADR that pins locale scope. Current repo is he/ar/en. Doc promises Russian + Amharic. Decide: Tier-1 UI locales, Tier-2 parent-SMS-only locales, or do not ship.
+      ## Files
+      - new: docs/adr/0038-parent-portal-locales.md
+      ## Definition of Done
+      - ADR explicitly enumerates supported locales and justification (Arabic-first, Hebrew-hideable, others...)
+      - If ru/am included: font stack (Noto Sans Ethiopic, PT Sans), per-locale dir policy, translation QA process named
+      - If ru/am excluded: parent-engagement doc verdicts updated
+      ## Reporting
+      complete via: decision committed to ADR; PR comment notifies claude-code
+    source_doc_lines: [L1-L10]
+  - title: "Bidi-isolation rule for SMS content (no <bdi> in plain text)"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Define and enforce a plain-text bidi convention for SMS/push bodies so math inside Hebrew/Arabic messages doesn't render backwards on phones. Options: (a) wrap math in U+2066...U+2069, (b) forbid math in SMS, allow topic names only.
+      ## Files
+      - new: src/shared/Cena.Infrastructure/Notifications/BidiPlainText.cs
+      - scanner test: notifications emitted by parent/teacher services pass the bidi rule
+      ## Definition of Done
+      - Utility function wraps math in LRI/PDI when locale is rtl
+      - CI test validates no raw equation leaks into SMS body without isolation
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F6 section]
+  - title: "Parent portal: reuse Hebrew-gate across new parent routes"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      When parent portal routes land in admin/full-version, they must respect VITE_ENABLE_HEBREW gate just like student-web.
+      ## Files
+      - src/admin/full-version/src/composables/useAvailableLocales.ts (mirror student-web)
+      - src/admin/full-version/src/components/EnrollmentSwitcher.vue (locale gate)
+      ## Definition of Done
+      - Hebrew hidden when build flag false across parent-portal UI
+      - Scanner test covers parent routes
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F2 section]
+verdict: revise
+verdict_reason: "Parent features are aligned except for locale scope: the doc over-promises ru/am without infrastructure. Gate with an ADR, then extract smaller tasks per locale tier."
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "Feature 4 privacy-preserving cohort context — minimum cohort size to prevent re-identification"
+  - to: persona-ethics
+    about: "Feature 8 Bagrut countdown framing risk (loss-aversion)"
+  - to: persona-enterprise
+    about: "Multi-language pipeline for SMS and push; glossary storage and tenant scoping"

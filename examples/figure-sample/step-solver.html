@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cena — Step-by-Step Math Solver</title>
+
+  <!-- KaTeX -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true},{left: '$', right: '$', display: false}]});">
+  </script>
+
+  <!-- function-plot -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="https://cdn.jsdelivr.net/npm/function-plot@1/dist/function-plot.js"></script>
+
+  <style>
+    :root {
+      --cena-primary: #7367F0;
+      --cena-primary-light: #9E95F5;
+      --cena-primary-bg: rgba(115, 103, 240, 0.08);
+      --cena-surface: #FFFFFF;
+      --cena-surface-variant: #F7F7F9;
+      --cena-on-surface: #4B465C;
+      --cena-on-surface-secondary: #6F6B7D;
+      --cena-border: #DBDADE;
+      --cena-success: #28C76F;
+      --cena-success-bg: rgba(40, 199, 111, 0.08);
+      --cena-warning: #FF9F43;
+      --cena-warning-bg: rgba(255, 159, 67, 0.08);
+      --cena-error: #EA5455;
+      --cena-error-bg: rgba(234, 84, 85, 0.08);
+      --cena-info: #00CFE8;
+      --cena-info-bg: rgba(0, 207, 232, 0.08);
+      --cena-shadow: 0 2px 12px rgba(75, 70, 92, 0.08);
+      --cena-radius: 10px;
+      --cena-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .dark {
+      --cena-surface: #2F3349;
+      --cena-surface-variant: #25293C;
+      --cena-on-surface: #CFD3EC;
+      --cena-on-surface-secondary: #8692D0;
+      --cena-border: #434968;
+      --cena-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--cena-font);
+      background: var(--cena-surface-variant);
+      color: var(--cena-on-surface);
+      padding: 2rem;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      max-width: 760px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .page-header h1 { font-size: 1.4rem; font-weight: 600; }
+
+    .header-actions { display: flex; gap: 0.5rem; }
+
+    .theme-toggle, .level-toggle {
+      background: var(--cena-primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.4rem 0.8rem;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .level-toggle { background: var(--cena-warning); }
+    .level-toggle.active { outline: 2px solid var(--cena-on-surface); outline-offset: 2px; }
+
+    .samples {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2rem;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    /* ── Card ───────────────────────────────────────────────────── */
+    .question-card {
+      background: var(--cena-surface);
+      border-radius: var(--cena-radius);
+      box-shadow: var(--cena-shadow);
+      padding: 1.5rem;
+      transition: background 0.3s;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .chip {
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      padding: 0.2rem 0.75rem; border-radius: 50px;
+      font-size: 0.75rem; font-weight: 600;
+    }
+
+    .chip--primary { background: rgba(115,103,240,0.16); color: var(--cena-primary); }
+    .chip--bagrut  { background: rgba(40,199,111,0.16);   color: var(--cena-success); }
+    .chip--step    { background: rgba(0,207,232,0.16);     color: var(--cena-info); }
+
+    .progress-text { font-size: 0.8rem; color: var(--cena-on-surface-secondary); }
+
+    .progress-bar {
+      width: 100%; height: 6px;
+      background: var(--cena-surface-variant);
+      border-radius: 3px; margin-bottom: 1.25rem; overflow: hidden;
+    }
+
+    .progress-bar__fill {
+      height: 100%; background: var(--cena-primary);
+      border-radius: 3px; transition: width 0.4s ease;
+    }
+
+    /* ── Figure ─────────────────────────────────────────────────── */
+    .question-figure {
+      margin-bottom: 1.25rem;
+      border: 1px solid var(--cena-border);
+      border-radius: 8px; overflow: hidden;
+    }
+
+    .question-figure__plot { width: 100%; min-height: 260px; }
+    .question-figure__plot svg { width: 100% !important; height: auto !important; }
+
+    .question-figure__caption {
+      padding: 0.4rem 0.75rem; font-size: 0.8rem;
+      color: var(--cena-on-surface-secondary);
+      border-top: 1px solid var(--cena-border);
+      background: var(--cena-surface-variant);
+    }
+
+    .dark .question-figure__plot .x.axis path,
+    .dark .question-figure__plot .y.axis path,
+    .dark .question-figure__plot .x.axis line,
+    .dark .question-figure__plot .y.axis line { stroke: var(--cena-on-surface-secondary) !important; }
+    .dark .question-figure__plot .x.axis text,
+    .dark .question-figure__plot .y.axis text { fill: var(--cena-on-surface-secondary) !important; }
+
+    /* ── Question Stem ─────────────────────────────────────────── */
+    .question-stem {
+      font-size: 1.1rem; font-weight: 500;
+      line-height: 1.6; margin-bottom: 1.25rem;
+    }
+
+    /* ── Step Solver Workspace ──────────────────────────────────── */
+    .step-workspace {
+      border: 1px solid var(--cena-border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 1.25rem;
+    }
+
+    .step-workspace__header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.75rem 1rem;
+      background: var(--cena-surface-variant);
+      border-bottom: 1px solid var(--cena-border);
+      font-size: 0.85rem; font-weight: 600;
+      color: var(--cena-on-surface);
+    }
+
+    .step-workspace__header .step-count {
+      font-weight: 400;
+      color: var(--cena-on-surface-secondary);
+    }
+
+    /* ── Individual Step ───────────────────────────────────────── */
+    .step {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--cena-border);
+      transition: background 0.2s, opacity 0.3s;
+    }
+
+    .step:last-child { border-bottom: none; }
+
+    .step.locked {
+      opacity: 0.35;
+      pointer-events: none;
+    }
+
+    .step.completed {
+      background: var(--cena-success-bg);
+    }
+
+    .step.error {
+      background: var(--cena-error-bg);
+    }
+
+    .step__header {
+      display: flex; align-items: center; gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .step__number {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem; font-weight: 700;
+      background: var(--cena-primary-bg);
+      color: var(--cena-primary);
+      flex-shrink: 0;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .step.completed .step__number {
+      background: var(--cena-success);
+      color: white;
+    }
+
+    .step.error .step__number {
+      background: var(--cena-error);
+      color: white;
+    }
+
+    .step__instruction {
+      font-size: 0.9rem;
+      color: var(--cena-on-surface);
+      font-weight: 500;
+    }
+
+    /* Pre-filled step (faded worked example) */
+    .step__prefilled {
+      background: var(--cena-info-bg);
+      border-left: 3px solid var(--cena-info);
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      margin: 0.5rem 0;
+      font-size: 0.95rem;
+      color: var(--cena-on-surface);
+      line-height: 1.8;
+    }
+
+    .step__prefilled-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--cena-info);
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    /* ── Math Input ────────────────────────────────────────────── */
+    .step__input-row {
+      display: flex; align-items: center; gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .math-input-wrapper {
+      flex: 1;
+      position: relative;
+    }
+
+    .math-input {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border: 2px solid var(--cena-border);
+      border-radius: 8px;
+      font-size: 1rem;
+      font-family: 'KaTeX_Math', 'Times New Roman', serif;
+      background: var(--cena-surface);
+      color: var(--cena-on-surface);
+      transition: border-color 0.15s;
+      outline: none;
+    }
+
+    .math-input:focus {
+      border-color: var(--cena-primary);
+    }
+
+    .math-input.correct {
+      border-color: var(--cena-success);
+      background: var(--cena-success-bg);
+    }
+
+    .math-input.wrong {
+      border-color: var(--cena-error);
+      background: var(--cena-error-bg);
+    }
+
+    .math-input::placeholder {
+      font-family: var(--cena-font);
+      font-style: italic;
+      color: var(--cena-on-surface-secondary);
+      opacity: 0.6;
+    }
+
+    /* Live KaTeX preview beneath input */
+    .math-preview {
+      margin-top: 0.35rem;
+      min-height: 1.5rem;
+      padding: 0.25rem 0.5rem;
+      font-size: 1.1rem;
+      color: var(--cena-on-surface);
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+
+    .math-preview:not(:empty) {
+      background: var(--cena-surface-variant);
+    }
+
+    /* ── Step Buttons ──────────────────────────────────────────── */
+    .btn-sm {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.4rem 0.75rem; border-radius: 6px;
+      font-size: 0.8rem; font-weight: 600;
+      border: none; cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn-sm:hover { opacity: 0.8; }
+
+    .btn-check   { background: var(--cena-primary); color: white; }
+    .btn-hint    { background: var(--cena-warning-bg); color: var(--cena-warning); }
+    .btn-skip    { background: var(--cena-surface-variant); color: var(--cena-on-surface-secondary); }
+
+    /* ── Feedback Messages ─────────────────────────────────────── */
+    .step__feedback {
+      margin-top: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      display: none;
+    }
+
+    .step__feedback.show { display: block; }
+
+    .step__feedback.success {
+      background: var(--cena-success-bg);
+      color: var(--cena-success);
+      border-left: 3px solid var(--cena-success);
+    }
+
+    .step__feedback.error-msg {
+      background: var(--cena-error-bg);
+      color: var(--cena-error);
+      border-left: 3px solid var(--cena-error);
+    }
+
+    .step__feedback.hint-msg {
+      background: var(--cena-warning-bg);
+      color: var(--cena-warning);
+      border-left: 3px solid var(--cena-warning);
+    }
+
+    /* ── Completion Banner ─────────────────────────────────────── */
+    .completion-banner {
+      text-align: center;
+      padding: 1.25rem;
+      background: var(--cena-success-bg);
+      border: 1px solid var(--cena-success);
+      border-radius: 10px;
+      display: none;
+    }
+
+    .completion-banner.show { display: block; }
+
+    .completion-banner__title {
+      font-size: 1.1rem; font-weight: 700;
+      color: var(--cena-success);
+      margin-bottom: 0.25rem;
+    }
+
+    .completion-banner__subtitle {
+      font-size: 0.85rem;
+      color: var(--cena-on-surface-secondary);
+    }
+
+    /* ── Bottom Actions ────────────────────────────────────────── */
+    .actions {
+      display: flex; justify-content: space-between; align-items: center;
+    }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.6rem 1.2rem; border-radius: 8px;
+      font-size: 0.9rem; font-weight: 500;
+      border: none; cursor: pointer;
+    }
+
+    .btn--primary { background: var(--cena-primary); color: white; }
+    .btn--outline {
+      background: transparent;
+      border: 1px solid var(--cena-border);
+      color: var(--cena-on-surface-secondary);
+    }
+
+    .btn:hover { opacity: 0.85; }
+
+    /* ── Scaffolding Level Badge ───────────────────────────────── */
+    .scaffolding-badge {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.15rem 0.6rem; border-radius: 50px;
+      font-size: 0.7rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+
+    .scaffolding-badge.full    { background: var(--cena-info-bg);    color: var(--cena-info); }
+    .scaffolding-badge.partial { background: var(--cena-warning-bg); color: var(--cena-warning); }
+    .scaffolding-badge.minimal { background: var(--cena-primary-bg); color: var(--cena-primary); }
+
+    /* ── Math Keyboard Bar (mockup) ────────────────────────────── */
+    .math-keyboard {
+      display: flex; gap: 0.35rem; flex-wrap: wrap;
+      padding: 0.5rem 0; margin-top: 0.25rem;
+    }
+
+    .math-key {
+      padding: 0.3rem 0.5rem; border-radius: 6px;
+      background: var(--cena-surface-variant);
+      border: 1px solid var(--cena-border);
+      font-size: 0.85rem; cursor: pointer;
+      font-family: 'KaTeX_Math', serif;
+      color: var(--cena-on-surface);
+      min-width: 2rem; text-align: center;
+      transition: background 0.1s;
+    }
+
+    .math-key:hover { background: var(--cena-primary-bg); }
+    .math-key:active { background: var(--cena-primary); color: white; }
+
+    /* ── Section Labels ────────────────────────────────────────── */
+    .section-label {
+      font-size: 0.75rem; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--cena-on-surface-secondary);
+      margin-bottom: 0.5rem; font-weight: 600;
+    }
+
+    .section-divider {
+      border: none;
+      border-top: 2px dashed var(--cena-border);
+      margin: 2.5rem 0 1.5rem;
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 1rem; }
+      .question-card { padding: 1rem; }
+      .step { padding: 0.75rem; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page-header">
+    <h1>Step-by-Step Solver</h1>
+    <div class="header-actions">
+      <button class="theme-toggle" onclick="document.body.classList.toggle('dark')">Dark Mode</button>
+    </div>
+  </div>
+
+  <div class="samples">
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!--  SAMPLE A: Full Scaffolding (novice)                       -->
+    <!--  Every step labeled + instruction + worked example faded    -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="section-label">
+      Scaffolding Level: Full (Novice) — every step guided, faded worked example shown
+    </div>
+
+    <div class="question-card" id="sample-full">
+      <div class="card-header">
+        <div style="display:flex;gap:0.5rem">
+          <span class="chip chip--primary">Math</span>
+          <span class="chip chip--bagrut">5 Units</span>
+          <span class="scaffolding-badge full">Full Scaffolding</span>
+        </div>
+        <span class="progress-text">Question 3 / 12</span>
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-bar__fill" style="width: 25%"></div>
+      </div>
+
+      <!-- Graph -->
+      <figure class="question-figure" role="img"
+        aria-label="Parabola f(x) = x squared minus 4x plus 3 opening upward, vertex at (2, -1), roots at x=1 and x=3.">
+        <div class="question-figure__plot" id="plot-full"></div>
+        <figcaption class="question-figure__caption">
+          $f(x) = x^2 - 4x + 3$
+        </figcaption>
+      </figure>
+
+      <!-- Stem -->
+      <div class="question-stem">
+        Find the vertex of $f(x) = x^2 - 4x + 3$ by completing the square.
+        Then determine the minimum value and range.
+      </div>
+
+      <!-- Step Solver -->
+      <div class="step-workspace">
+        <div class="step-workspace__header">
+          Solution Steps
+          <span class="step-count">0 / 4 completed</span>
+        </div>
+
+        <!-- Step 1: Identify a, b, c -->
+        <div class="step" id="step-a1" data-step="1">
+          <div class="step__header">
+            <div class="step__number">1</div>
+            <div class="step__instruction">
+              Identify the coefficients $a$, $b$, and $c$ in $f(x) = ax^2 + bx + c$.
+            </div>
+          </div>
+          <div class="step__input-row">
+            <div class="math-input-wrapper">
+              <input class="math-input" type="text" placeholder="a = ?, b = ?, c = ?"
+                data-answer="a=1, b=-4, c=3" id="input-a1">
+              <div class="math-preview" id="preview-a1"></div>
+            </div>
+            <button class="btn-sm btn-check" onclick="checkStep('a1', 'a=1, b=-4, c=3')">Check</button>
+            <button class="btn-sm btn-hint" onclick="showHint('a1', 'Compare $x^2 - 4x + 3$ with $ax^2 + bx + c$. The coefficient of $x^2$ is $a$, the coefficient of $x$ is $b$, and the constant is $c$.')">Hint</button>
+          </div>
+          <div class="step__feedback" id="feedback-a1"></div>
+        </div>
+
+        <!-- Step 2: Complete the square -->
+        <div class="step locked" id="step-a2" data-step="2">
+          <div class="step__header">
+            <div class="step__number">2</div>
+            <div class="step__instruction">
+              Rewrite $f(x)$ by completing the square: factor out $a$ from the first two terms, then add and subtract $\left(\frac{b}{2a}\right)^2$.
+            </div>
+          </div>
+
+          <!-- Faded worked example for this step -->
+          <div class="step__prefilled">
+            <div class="step__prefilled-label">Example pattern</div>
+            For $g(x) = x^2 - 6x + 5$: we write $g(x) = (x^2 - 6x + 9) - 9 + 5 = (x-3)^2 - 4$
+          </div>
+
+          <div class="step__input-row">
+            <div class="math-input-wrapper">
+              <input class="math-input" type="text"
+                placeholder="f(x) = (x - ?)^2 + ?"
+                data-answer="(x-2)^2 - 1" id="input-a2">
+              <div class="math-preview" id="preview-a2"></div>
+              <div class="math-keyboard">
+                <button class="math-key" onclick="insertMath('a2', '(')">( )</button>
+                <button class="math-key" onclick="insertMath('a2', 'x')">x</button>
+                <button class="math-key" onclick="insertMath('a2', '^2')">x&sup2;</button>
+                <button class="math-key" onclick="insertMath('a2', '-')">-</button>
+                <button class="math-key" onclick="insertMath('a2', '+')">+</button>
+                <button class="math-key" onclick="insertMath('a2', '1')">1</button>
+                <button class="math-key" onclick="insertMath('a2', '2')">2</button>
+                <button class="math-key" onclick="insertMath('a2', '3')">3</button>
+                <button class="math-key" onclick="insertMath('a2', '4')">4</button>
+              </div>
+            </div>
+            <button class="btn-sm btn-check" onclick="checkStep('a2', '(x-2)^2 - 1')">Check</button>
+            <button class="btn-sm btn-hint" onclick="showHint('a2', '$\\left(\\frac{b}{2a}\\right)^2 = \\left(\\frac{-4}{2}\\right)^2 = 4$. So: $x^2 - 4x + 4 - 4 + 3 = (x-2)^2 - 1$.')">Hint</button>
+          </div>
+          <div class="step__feedback" id="feedback-a2"></div>
+        </div>
+
+        <!-- Step 3: Read the vertex -->
+        <div class="step locked" id="step-a3" data-step="3">
+          <div class="step__header">
+            <div class="step__number">3</div>
+            <div class="step__instruction">
+              From the completed square form $(x-h)^2 + k$, what are the vertex coordinates $(h, k)$?
+            </div>
+          </div>
+          <div class="step__input-row">
+            <div class="math-input-wrapper">
+              <input class="math-input" type="text" placeholder="(h, k) = ?"
+                data-answer="(2, -1)" id="input-a3">
+              <div class="math-preview" id="preview-a3"></div>
+            </div>
+            <button class="btn-sm btn-check" onclick="checkStep('a3', '(2, -1)')">Check</button>
+            <button class="btn-sm btn-hint" onclick="showHint('a3', 'Compare $(x-2)^2 - 1$ with $(x-h)^2 + k$. The vertex is where the squared term equals zero.')">Hint</button>
+          </div>
+          <div class="step__feedback" id="feedback-a3"></div>
+        </div>
+
+        <!-- Step 4: State the range -->
+        <div class="step locked" id="step-a4" data-step="4">
+          <div class="step__header">
+            <div class="step__number">4</div>
+            <div class="step__instruction">
+              Since $a > 0$, the parabola opens upward. What is the range of $f$?
+            </div>
+          </div>
+          <div class="step__input-row">
+            <div class="math-input-wrapper">
+              <input class="math-input" type="text" placeholder="Range: [?, infinity)"
+                data-answer="[-1, infinity)" id="input-a4">
+              <div class="math-preview" id="preview-a4"></div>
+            </div>
+            <button class="btn-sm btn-check" onclick="checkStep('a4', '[-1, infinity)')">Check</button>
+            <button class="btn-sm btn-hint" onclick="showHint('a4', 'The minimum value is $k = -1$. Since the parabola opens upward, $f(x) \\geq -1$ for all $x$.')">Hint</button>
+          </div>
+          <div class="step__feedback" id="feedback-a4"></div>
+        </div>
+      </div>
+
+      <!-- Completion -->
+      <div class="completion-banner" id="complete-a">
+        <div class="completion-banner__title">Solution Complete</div>
+        <div class="completion-banner__subtitle">
+          Vertex: $(2, -1)$ &nbsp;|&nbsp; Minimum: $-1$ &nbsp;|&nbsp; Range: $[-1, \infty)$
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn--outline" onclick="resetSteps('a')">Reset</button>
+        <button class="btn btn--primary" id="next-btn-a" style="opacity:0.5;pointer-events:none;">Next Question</button>
+      </div>
+    </div>
+
+    <hr class="section-divider">
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!--  SAMPLE B: Partial Scaffolding (intermediate)              -->
+    <!--  Some steps pre-filled, student fills the gaps              -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="section-label">
+      Scaffolding Level: Partial (Intermediate) — some steps pre-filled, student fills gaps
+    </div>
+
+    <div class="question-card" id="sample-partial">
+      <div class="card-header">
+        <div style="display:flex;gap:0.5rem">
+          <span class="chip chip--primary">Math</span>
+          <span class="chip chip--bagrut">5 Units</span>
+          <span class="scaffolding-badge partial">Partial Scaffolding</span>
+        </div>
+        <span class="progress-text">Question 6 / 12</span>
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-bar__fill" style="width: 50%"></div>
+      </div>
+
+      <figure class="question-figure" role="img"
+        aria-label="Graph of f(x) = 2x squared minus 8x plus 6, parabola opening upward with vertex at (2, -2).">
+        <div class="question-figure__plot" id="plot-partial"></div>
+        <figcaption class="question-figure__caption">
+          $f(x) = 2x^2 - 8x + 6$
+        </figcaption>
+      </figure>
+
+      <div class="question-stem">
+        Find the vertex of $f(x) = 2x^2 - 8x + 6$ and determine the axis of symmetry.
+      </div>
+
+      <div class="step-workspace">
+        <div class="step-workspace__header">
+          Solution Steps
+          <span class="step-count">0 / 3 completed</span>
+        </div>
+
+        <!-- Step 1: Pre-filled (given to the student) -->
+        <div class="step completed" id="step-b1" data-step="1">
+          <div class="step__header">
+            <div class="step__number">1</div>
+            <div class="step__instruction">Factor out the leading coefficient from the first two terms.</div>
+          </div>
+          <div class="step__prefilled">
+            <div class="step__prefilled-label">Given</div>
+            $f(x) = 2(x^2 - 4x) + 6$
+          </div>
+          <div class="step__feedback success show">
+            This step is provided. Study the pattern: we factored $2$ from $2x^2 - 8x$.
+          </div>
+        </div>
+
+        <!-- Step 2: Student fills -->
+        <div class="step" id="step-b2" data-step="2">
+          <div class="step__header">
+            <div class="step__number">2</div>
+            <div class="step__instruction">
+              Now complete the square inside the parentheses and simplify.
+            </div>
+          </div>
+          <div class="step__input-row">
+            <div class="math-input-wrapper">
+              <input class="math-input" type="text"
+                placeholder="f(x) = 2(x - ?)^2 + ?"
+                data-answer="2(x-2)^2 - 2" id="input-b2">
+              <div class="math-preview" id="preview-b2"></div>
+              <div class="math-keyboard">
+                <button class="math-key" onclick="insertMath('b2', '(')">( )</button>
+                <button class="math-key" onclick="insertMath('b2', 'x')">x</button>
+                <button class="math-key" onclick="insertMath('b2', '^2')">x&sup2;</button>
+                <button class="math-key" onclick="insertMath('b2', '-')">-</button>
+                <button class="math-key" onclick="insertMath('b2', '+')">+</button>
+                <button class="math-key" onclick="insertMath('b2', '2')">2</button>
+              </div>
+            </div>
+            <button class="btn-sm btn-check" onclick="checkStep('b2', '2(x-2)^2 - 2')">Check</button>
+            <button class="btn-sm btn-hint" onclick="showHint('b2', 'Inside: $x^2 - 4x + 4 - 4 = (x-2)^2 - 4$. Distribute the 2: $2(x-2)^2 - 8 + 6$.')">Hint</button>
+          </div>
+          <div class="step__feedback" id="feedback-b2"></div>
+        </div>
+
+        <!-- Step 3: Student fills -->
+        <div class="step locked" id="step-b3" data-step="3">
+          <div class="step__header">
+            <div class="step__number">3</div>
+            <div class="step__instruction">
+              State the vertex coordinates and the axis of symmetry.
+            </div>
+          </div>
+          <div class="step__input-row">
+            <div class="math-input-wrapper">
+              <input class="math-input" type="text"
+                placeholder="Vertex = (?, ?), axis: x = ?"
+                data-answer="(2,-2), x=2" id="input-b3">
+              <div class="math-preview" id="preview-b3"></div>
+            </div>
+            <button class="btn-sm btn-check" onclick="checkStep('b3', '(2,-2), x=2')">Check</button>
+          </div>
+          <div class="step__feedback" id="feedback-b3"></div>
+        </div>
+      </div>
+
+      <div class="completion-banner" id="complete-b">
+        <div class="completion-banner__title">Solution Complete</div>
+        <div class="completion-banner__subtitle">
+          Vertex: $(2, -2)$ &nbsp;|&nbsp; Axis of symmetry: $x = 2$
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn--outline" onclick="resetSteps('b')">Reset</button>
+        <button class="btn btn--primary" id="next-btn-b" style="opacity:0.5;pointer-events:none;">Next Question</button>
+      </div>
+    </div>
+
+    <hr class="section-divider">
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!--  SAMPLE C: Minimal Scaffolding (advanced)                  -->
+    <!--  No instructions per step, just numbered slots              -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="section-label">
+      Scaffolding Level: Minimal (Advanced) — numbered step slots, student decides approach
+    </div>
+
+    <div class="question-card" id="sample-minimal">
+      <div class="card-header">
+        <div style="display:flex;gap:0.5rem">
+          <span class="chip chip--primary">Math</span>
+          <span class="chip chip--bagrut">5 Units</span>
+          <span class="scaffolding-badge minimal">Independent</span>
+        </div>
+        <span class="progress-text">Question 10 / 12</span>
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-bar__fill" style="width: 83%"></div>
+      </div>
+
+      <figure class="question-figure" role="img"
+        aria-label="Graph of f(x) = negative x squared plus 6x minus 5, parabola opening downward with vertex at (3, 4).">
+        <div class="question-figure__plot" id="plot-minimal"></div>
+        <figcaption class="question-figure__caption">
+          $f(x) = -x^2 + 6x - 5$
+        </figcaption>
+      </figure>
+
+      <div class="question-stem">
+        Find the vertex and zeros of $f(x) = -x^2 + 6x - 5$. Show your work.
+      </div>
+
+      <div class="step-workspace">
+        <div class="step-workspace__header">
+          Your Solution
+          <span class="step-count">Write each step below</span>
+        </div>
+
+        <div class="step" id="step-c1" data-step="1">
+          <div class="step__header">
+            <div class="step__number">1</div>
+            <div class="step__instruction" style="color:var(--cena-on-surface-secondary);font-style:italic;">
+              Your approach...
+            </div>
+          </div>
+          <div class="step__input-row">
+            <div class="math-input-wrapper">
+              <input class="math-input" type="text" placeholder="Enter your first step"
+                data-answer="free" id="input-c1">
+              <div class="math-preview" id="preview-c1"></div>
+              <div class="math-keyboard">
+                <button class="math-key" onclick="insertMath('c1', '(')">( )</button>
+                <button class="math-key" onclick="insertMath('c1', 'x')">x</button>
+                <button class="math-key" onclick="insertMath('c1', '^2')">x&sup2;</button>
+                <button class="math-key" onclick="insertMath('c1', '-')">-</button>
+                <button class="math-key" onclick="insertMath('c1', '+')">+</button>
+                <button class="math-key" onclick="insertMath('c1', '=')"> = </button>
+                <button class="math-key" onclick="insertMath('c1', '/')"> / </button>
+                <button class="math-key" onclick="insertMath('c1', 'sqrt')"> &radic; </button>
+              </div>
+            </div>
+            <button class="btn-sm btn-check" onclick="checkFreeStep('c1')">Check</button>
+          </div>
+          <div class="step__feedback" id="feedback-c1"></div>
+        </div>
+
+        <div class="step locked" id="step-c2" data-step="2">
+          <div class="step__header">
+            <div class="step__number">2</div>
+            <div class="step__instruction" style="color:var(--cena-on-surface-secondary);font-style:italic;">
+              Continue...
+            </div>
+          </div>
+          <div class="step__input-row">
+            <div class="math-input-wrapper">
+              <input class="math-input" type="text" placeholder="Enter your next step"
+                data-answer="free" id="input-c2">
+              <div class="math-preview" id="preview-c2"></div>
+            </div>
+            <button class="btn-sm btn-check" onclick="checkFreeStep('c2')">Check</button>
+          </div>
+          <div class="step__feedback" id="feedback-c2"></div>
+        </div>
+
+        <div class="step locked" id="step-c3" data-step="3">
+          <div class="step__header">
+            <div class="step__number">3</div>
+            <div class="step__instruction" style="color:var(--cena-on-surface-secondary);font-style:italic;">
+              Final answer...
+            </div>
+          </div>
+          <div class="step__input-row">
+            <div class="math-input-wrapper">
+              <input class="math-input" type="text"
+                placeholder="Vertex = (?, ?), zeros = ?, ?"
+                data-answer="(3,4), x=1, x=5" id="input-c3">
+              <div class="math-preview" id="preview-c3"></div>
+            </div>
+            <button class="btn-sm btn-check" onclick="checkStep('c3', '(3,4), x=1, x=5')">Check</button>
+          </div>
+          <div class="step__feedback" id="feedback-c3"></div>
+        </div>
+      </div>
+
+      <div class="completion-banner" id="complete-c">
+        <div class="completion-banner__title">Solution Complete</div>
+        <div class="completion-banner__subtitle">
+          Vertex: $(3, 4)$ &nbsp;|&nbsp; Zeros: $x = 1, x = 5$
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn--outline" onclick="resetSteps('c')">Reset</button>
+        <button class="btn btn--primary" id="next-btn-c" style="opacity:0.5;pointer-events:none;">Next Question</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    /* ── Math preview (simulated — in production this is MathLive) ─ */
+    function updatePreview(id) {
+      var input = document.getElementById('input-' + id);
+      var preview = document.getElementById('preview-' + id);
+      if (!input || !preview) return;
+
+      var val = input.value.trim();
+      if (!val) {
+        while (preview.firstChild) preview.removeChild(preview.firstChild);
+        return;
+      }
+
+      try {
+        katex.render(val, preview, { throwOnError: false, displayMode: false });
+      } catch (e) {
+        preview.textContent = val;
+      }
+    }
+
+    // Wire up live preview on all inputs
+    document.addEventListener('input', function (e) {
+      if (e.target.classList.contains('math-input')) {
+        var id = e.target.id.replace('input-', '');
+        updatePreview(id);
+      }
+    });
+
+    /* ── Math keyboard insert ──────────────────────────────────── */
+    function insertMath(id, text) {
+      var input = document.getElementById('input-' + id);
+      if (!input) return;
+      var start = input.selectionStart || input.value.length;
+      var end = input.selectionEnd || input.value.length;
+      input.value = input.value.substring(0, start) + text + input.value.substring(end);
+      input.focus();
+      input.selectionStart = input.selectionEnd = start + text.length;
+      updatePreview(id);
+    }
+
+    /* ── Check a guided step ───────────────────────────────────── */
+    function checkStep(id, expected) {
+      var input = document.getElementById('input-' + id);
+      var feedback = document.getElementById('feedback-' + id);
+      var step = document.getElementById('step-' + id);
+      if (!input || !feedback || !step) return;
+
+      var userVal = input.value.trim().replace(/\s+/g, '').toLowerCase();
+      var expectVal = expected.replace(/\s+/g, '').toLowerCase();
+
+      // Simplified matching (production uses SymPy symbolic equivalence)
+      var isCorrect = userVal === expectVal ||
+        userVal.replace(/\*/g, '') === expectVal.replace(/\*/g, '');
+
+      if (isCorrect) {
+        step.classList.add('completed');
+        step.classList.remove('error');
+        input.classList.add('correct');
+        input.classList.remove('wrong');
+        input.setAttribute('readonly', 'true');
+
+        feedback.className = 'step__feedback success show';
+        feedback.textContent = 'Correct!';
+
+        unlockNext(id);
+        updateStepCount(id);
+      } else {
+        step.classList.add('error');
+        step.classList.remove('completed');
+        input.classList.add('wrong');
+        input.classList.remove('correct');
+
+        feedback.className = 'step__feedback error-msg show';
+        feedback.textContent = 'Not quite. Check your calculation and try again.';
+
+        setTimeout(function () {
+          input.classList.remove('wrong');
+          step.classList.remove('error');
+        }, 1500);
+      }
+    }
+
+    /* ── Check a free-form step (minimal scaffolding) ──────────── */
+    function checkFreeStep(id) {
+      var input = document.getElementById('input-' + id);
+      var feedback = document.getElementById('feedback-' + id);
+      var step = document.getElementById('step-' + id);
+      if (!input || !feedback || !step) return;
+
+      var val = input.value.trim();
+      if (val.length < 3) {
+        feedback.className = 'step__feedback error-msg show';
+        feedback.textContent = 'Please write a meaningful step.';
+        return;
+      }
+
+      // In production: send to SymPy for symbolic validation
+      // For demo: accept any non-trivial input
+      step.classList.add('completed');
+      input.classList.add('correct');
+      input.setAttribute('readonly', 'true');
+
+      feedback.className = 'step__feedback success show';
+      feedback.textContent = 'Step recorded. In production, SymPy validates each algebraic step.';
+
+      unlockNext(id);
+      updateStepCount(id);
+    }
+
+    /* ── Show hint ─────────────────────────────────────────────── */
+    function showHint(id, hintHtml) {
+      var feedback = document.getElementById('feedback-' + id);
+      if (!feedback) return;
+
+      feedback.className = 'step__feedback hint-msg show';
+      // Render math in hint
+      feedback.textContent = '';
+      var span = document.createElement('span');
+      span.textContent = hintHtml;
+      feedback.appendChild(span);
+
+      // Re-render KaTeX in the hint
+      if (typeof renderMathInElement === 'function') {
+        renderMathInElement(feedback, {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false },
+            { left: '\\(', right: '\\)', display: false },
+            { left: '\\[', right: '\\]', display: true }
+          ]
+        });
+      }
+    }
+
+    /* ── Unlock the next step ──────────────────────────────────── */
+    function unlockNext(id) {
+      var prefix = id.charAt(0);
+      var num = parseInt(id.charAt(1));
+      var nextId = prefix + (num + 1);
+      var nextStep = document.getElementById('step-' + nextId);
+      if (nextStep) {
+        nextStep.classList.remove('locked');
+        var nextInput = document.getElementById('input-' + nextId);
+        if (nextInput) setTimeout(function () { nextInput.focus(); }, 300);
+      } else {
+        // All steps done — show completion
+        var banner = document.getElementById('complete-' + prefix);
+        if (banner) banner.classList.add('show');
+        var btn = document.getElementById('next-btn-' + prefix);
+        if (btn) {
+          btn.style.opacity = '1';
+          btn.style.pointerEvents = 'auto';
+        }
+      }
+    }
+
+    /* ── Update step counter ───────────────────────────────────── */
+    function updateStepCount(id) {
+      var prefix = id.charAt(0);
+      var card = document.getElementById(
+        prefix === 'a' ? 'sample-full' :
+        prefix === 'b' ? 'sample-partial' : 'sample-minimal'
+      );
+      if (!card) return;
+      var completed = card.querySelectorAll('.step.completed').length;
+      var total = card.querySelectorAll('.step').length;
+      var counter = card.querySelector('.step-count');
+      if (counter) counter.textContent = completed + ' / ' + total + ' completed';
+    }
+
+    /* ── Reset all steps in a sample ───────────────────────────── */
+    function resetSteps(prefix) {
+      var card = document.getElementById(
+        prefix === 'a' ? 'sample-full' :
+        prefix === 'b' ? 'sample-partial' : 'sample-minimal'
+      );
+      if (!card) return;
+
+      var steps = card.querySelectorAll('.step');
+      for (var i = 0; i < steps.length; i++) {
+        var step = steps[i];
+        var stepNum = i + 1;
+        var sid = prefix + stepNum;
+
+        // Skip pre-completed steps (sample B step 1)
+        if (prefix === 'b' && stepNum === 1) continue;
+
+        step.classList.remove('completed', 'error');
+        if (stepNum > (prefix === 'b' ? 2 : 1)) step.classList.add('locked');
+
+        var input = document.getElementById('input-' + sid);
+        if (input) {
+          input.value = '';
+          input.classList.remove('correct', 'wrong');
+          input.removeAttribute('readonly');
+        }
+
+        var preview = document.getElementById('preview-' + sid);
+        if (preview) while (preview.firstChild) preview.removeChild(preview.firstChild);
+
+        var fb = document.getElementById('feedback-' + sid);
+        if (fb) { fb.className = 'step__feedback'; fb.textContent = ''; }
+      }
+
+      var banner = document.getElementById('complete-' + prefix);
+      if (banner) banner.classList.remove('show');
+
+      var btn = document.getElementById('next-btn-' + prefix);
+      if (btn) { btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none'; }
+
+      var counter = card.querySelector('.step-count');
+      var initCompleted = prefix === 'b' ? 1 : 0;
+      var total = card.querySelectorAll('.step').length;
+      if (counter) counter.textContent = initCompleted + ' / ' + total + ' completed';
+    }
+
+    /* ── Render plots ──────────────────────────────────────────── */
+    function renderPlots() {
+      var curveColor = '#7367F0';
+      var opts = { grid: true };
+
+      try {
+        var el1 = document.getElementById('plot-full');
+        if (el1) el1.replaceChildren();
+        functionPlot(Object.assign({}, opts, {
+          target: '#plot-full', width: 720, height: 280,
+          xAxis: { domain: [-1, 5] }, yAxis: { domain: [-2, 6] },
+          data: [
+            { fn: 'x^2 - 4*x + 3', color: curveColor },
+            { points: [[1,0],[3,0]], fnType: 'points', graphType: 'scatter', color: '#EA5455', attr: { r: 5 } },
+            { points: [[2,-1]], fnType: 'points', graphType: 'scatter', color: '#28C76F', attr: { r: 6 } }
+          ]
+        }));
+      } catch(e) { console.warn(e); }
+
+      try {
+        var el2 = document.getElementById('plot-partial');
+        if (el2) el2.replaceChildren();
+        functionPlot(Object.assign({}, opts, {
+          target: '#plot-partial', width: 720, height: 280,
+          xAxis: { domain: [-1, 5] }, yAxis: { domain: [-3, 8] },
+          data: [
+            { fn: '2*x^2 - 8*x + 6', color: curveColor },
+            { points: [[1,0],[3,0]], fnType: 'points', graphType: 'scatter', color: '#EA5455', attr: { r: 5 } },
+            { points: [[2,-2]], fnType: 'points', graphType: 'scatter', color: '#28C76F', attr: { r: 6 } }
+          ]
+        }));
+      } catch(e) { console.warn(e); }
+
+      try {
+        var el3 = document.getElementById('plot-minimal');
+        if (el3) el3.replaceChildren();
+        functionPlot(Object.assign({}, opts, {
+          target: '#plot-minimal', width: 720, height: 280,
+          xAxis: { domain: [-1, 7] }, yAxis: { domain: [-3, 6] },
+          data: [
+            { fn: '-x^2 + 6*x - 5', color: curveColor },
+            { points: [[1,0],[5,0]], fnType: 'points', graphType: 'scatter', color: '#EA5455', attr: { r: 5 } },
+            { points: [[3,4]], fnType: 'points', graphType: 'scatter', color: '#28C76F', attr: { r: 6 } }
+          ]
+        }));
+      } catch(e) { console.warn(e); }
+    }
+
+    /* ── Init ──────────────────────────────────────────────────── */
+    window.addEventListener('DOMContentLoaded', function () {
+      setTimeout(renderPlots, 200);
+      // Re-render KaTeX for prefilled content
+      setTimeout(function () {
+        if (typeof renderMathInElement === 'function') {
+          renderMathInElement(document.body, {
+            delimiters: [
+              { left: '$$', right: '$$', display: true },
+              { left: '$', right: '$', display: false }
+            ]
+          });
+        }
+      }, 400);
+    });
+  </script>
+</body>
+</html>

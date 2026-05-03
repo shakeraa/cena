@@ -1,0 +1,267 @@
+# =============================================================================
+# Ship-gate rule pack: UX-surface DOM-aware bans (prr-211, EPIC-PRR-E)
+# =============================================================================
+# Source: TASK-PRR-211, EPIC-PRR-E, docs/engineering/shipgate.md.
+# Policy:  New UX surfaces that land with prr-203/205/225 (HintLadder,
+#          StepSolverCard, Sidekick, MathInput, FreeBodyDiagramConstruct) must
+#          not drift into dark-pattern territory post-launch. This rulepack is
+#          enforced by scripts/shipgate/ux-surface-scan.mjs on every PR.
+#
+# Architectural rationale — WHY a separate rulepack vs. extending
+# banned-mechanics.yml:
+#
+#   banned-mechanics.yml expresses context-FREE rules: "this string on any line
+#   anywhere is banned." Its scanner (rulepack-scan.mjs) treats every file as a
+#   flat sequence of lines and matches one regex per line. That works for
+#   locale keys and static copy, but it CANNOT express the UX-surface rules we
+#   need here, which are structure-dependent:
+#
+#     * "no text-danger class APPLIED TO A hint-ladder-rung element" — requires
+#       knowing the element contains the rung selector on the same line/near
+#       proximity. Pure string scan would flag every legitimate error banner.
+#
+#     * "L1 hint copy (visible inside the first rung of a <HintLadder>) must
+#       not contain emoji" — requires knowing which template block is the L1
+#       rung vs. L2/L3. Not expressible as a grep.
+#
+#     * "file-existence expectation" — we want the scanner to KNOW about the
+#       five surfaces by name, report cleanly when one doesn't exist yet
+#       ("will be enforced on creation"), and hard-fail when it does exist but
+#       violates. rulepack-scan.mjs has no concept of per-surface enforcement.
+#
+#   Rather than bolt DOM-aware logic onto the string scanner (which would bend
+#   its single-responsibility promise), we ship a separate scanner binary
+#   (ux-surface-scan.mjs) and a separate YAML surface for the structural rules.
+#   The two scanners run side-by-side in CI; neither reads the other's config.
+#
+# Rule shape (distinct from banned-mechanics.yml):
+#   - id:                stable identifier used in violations + tests
+#     reason:            human-readable rationale
+#     surface:           one of HintLadder | StepSolverCard | Sidekick |
+#                        MathInput | FreeBodyDiagramConstruct | any
+#     kind:              string-ban  | dom-coupled-class | emoji-in-rung
+#     pattern:           regex (for string-ban)
+#     flags:             regex flags (default "i")
+#     dom-anchor:        for dom-coupled-class, the outer element marker
+#                        (regex) that must be present on the same line
+#     banned-classes:    for dom-coupled-class, space-separated class names
+#                        that become violations when attached to the anchored
+#                        element
+#     rung:              optional — 1 | 2 | 3 | any — restricts emoji-in-rung
+#                        to a specific ladder rung
+#     locale:            en | he | ar (copy bans only)
+#     aria-required:     for aria checks, the attribute that must be present
+#     aria-target:       for aria checks, the outer element marker requiring it
+#
+# See scripts/shipgate/ux-surface-scan.mjs for the interpreter.
+# =============================================================================
+
+surfaces:
+  # --------------------------------------------------------------------------
+  # Named UX surfaces scanned by prr-211. Each entry maps a logical name to
+  # its canonical file path AND the locale keys that must exist for it. When
+  # the file is absent, the scanner logs a warning and exits 0 — "will be
+  # enforced on creation". When present, the rules below are enforced hard.
+  # --------------------------------------------------------------------------
+  - name: HintLadder
+    path: "src/student/full-version/src/components/session/HintLadder.vue"
+    locale-prefix: "session.runner.hintLadder"
+
+  - name: StepSolverCard
+    path: "src/student/full-version/src/components/session/StepSolverCard.vue"
+    locale-prefix: "session.runner.stepSolver"
+
+  - name: Sidekick
+    path: "src/student/full-version/src/components/Sidekick.vue"
+    locale-prefix: "sidekick"
+
+  - name: MathInput
+    path: "src/student/full-version/src/components/session/MathInput.vue"
+    locale-prefix: "session.runner.mathInput"
+
+  - name: FreeBodyDiagramConstruct
+    path: "src/student/full-version/src/components/session/FreeBodyDiagramConstruct.vue"
+    locale-prefix: "session.runner.fbd"
+
+rules:
+  # --------------------------------------------------------------------------
+  # HintLadder — no shame/penalty copy, no warning styling on rungs
+  # --------------------------------------------------------------------------
+  - id: hintladder-penalty
+    surface: HintLadder
+    kind: string-ban
+    reason: "HintLadder must never imply a penalty for asking for hints (prr-211 — expertise-reversal safety)."
+    pattern: "\\bpenalt(y|ies|ize)\\b"
+    flags: i
+
+  - id: hintladder-lost-points
+    surface: HintLadder
+    kind: string-ban
+    reason: "HintLadder must not say 'lost points' or equivalents (prr-211 — hints are learning aids)."
+    pattern: "\\blost\\s+points?\\b"
+    flags: i
+
+  - id: hintladder-wrong-exclaim
+    surface: HintLadder
+    kind: string-ban
+    reason: "HintLadder must not use shaming 'Wrong!' copy (prr-211 — tone is neutral/supportive)."
+    pattern: "\\bwrong!"
+    flags: i
+
+  - id: hintladder-hint-n-of-m
+    surface: HintLadder
+    kind: string-ban
+    reason: "HintLadder must not expose numeric counters like 'Hint 1 of 5' (prr-065 shipgate lock)."
+    pattern: "hint\\s*\\d+\\s*(of|/)\\s*\\d+"
+    flags: i
+
+  - id: hintladder-remaining-counter
+    surface: HintLadder
+    kind: string-ban
+    reason: "HintLadder must not expose remaining-hint counters (prr-065 / prr-211 — expertise-reversal safety)."
+    pattern: "\\(\\s*\\d+\\s+(remaining|left)\\s*\\)"
+    flags: i
+
+  - id: hintladder-reveal-xp
+    surface: HintLadder
+    kind: string-ban
+    reason: "HintLadder must not use reward-language like 'reveal XP' (prr-211 — no variable-ratio mechanics)."
+    pattern: "reveal\\s+xp"
+    flags: i
+
+  - id: hintladder-rung-warning-class
+    surface: HintLadder
+    kind: dom-coupled-class
+    reason: "HintLadder rung elements must never use warning-semantic color classes (prr-211 — hints are informational, not penalties)."
+    dom-anchor: "hint-ladder-rung|hint-ladder__rung|hint-rung-\\d+|<HintLadder|class=\"hint-ladder"
+    banned-classes: "text-danger text-warning bg-danger bg-warning text-error bg-error"
+
+  - id: hintladder-rung-warning-color-prop
+    surface: HintLadder
+    kind: dom-coupled-class
+    reason: "HintLadder rung Vuetify components must never use color=\"warning|error\" (prr-211)."
+    dom-anchor: "hint-ladder-rung|hint-ladder__rung|hint-rung"
+    banned-classes: "color=\"warning\" color=\"error\" color=\"danger\" type=\"warning\" type=\"error\""
+
+  - id: hintladder-l1-emoji
+    surface: HintLadder
+    kind: emoji-in-rung
+    reason: "HintLadder L1 (first rung) copy must be calm, no emoji (prr-211 — LD-anxious accommodation safety)."
+    rung: 1
+
+  - id: hintladder-aria-live
+    surface: HintLadder
+    kind: aria-required
+    reason: "HintLadder region must have role=\"region\" with an aria-label OR aria-live announcement for screen readers (prr-211 — persona-a11y)."
+    aria-target: "class=\"hint-ladder|data-testid=\"hint-ladder\""
+    aria-required: "role=\"region\"|role=\"status\"|aria-live=\"polite\"|aria-live=\"assertive\"|aria-label"
+
+  # --------------------------------------------------------------------------
+  # StepSolverCard — no urgency, no percentile comparisons
+  # --------------------------------------------------------------------------
+  - id: stepsolver-countdown
+    surface: StepSolverCard
+    kind: string-ban
+    reason: "StepSolverCard must not display countdown/timer-pressure copy (prr-211 — time-pressure is banned)."
+    pattern: "time\\s+is\\s+running\\s+out|countdown|timer\\s+pressure|hurry"
+    flags: i
+
+  - id: stepsolver-percentile-compare
+    surface: StepSolverCard
+    kind: string-ban
+    reason: "StepSolverCard must not compare the student to a percentile or peer cohort (prr-211 — banned social-comparison)."
+    pattern: "\\d{1,3}(?:st|nd|rd|th)\\s+percentile|compared\\s+to\\s+(peers|cohort|other\\s+students)|ahead\\s+of\\s+\\d+%"
+    flags: i
+
+  - id: stepsolver-wrong-exclaim
+    surface: StepSolverCard
+    kind: string-ban
+    reason: "StepSolverCard must not use shaming 'Wrong!' or 'Incorrect!' copy on step feedback (prr-211)."
+    pattern: "\\b(wrong|incorrect)!"
+    flags: i
+
+  - id: stepsolver-penalty
+    surface: StepSolverCard
+    kind: string-ban
+    reason: "StepSolverCard must never imply a penalty (prr-211)."
+    pattern: "\\bpenalt(y|ies|ize)\\b"
+    flags: i
+
+  - id: stepsolver-time-pressure-class
+    surface: StepSolverCard
+    kind: dom-coupled-class
+    reason: "StepSolverCard step-status elements must never adopt urgency-color classes (prr-211)."
+    dom-anchor: "step-status|step-solver__row|data-testid=\"step-"
+    banned-classes: "text-danger bg-warning animate-pulse pulse-urgent"
+
+  # --------------------------------------------------------------------------
+  # Sidekick — no streak, no quota, no catch-up shame (even if file absent)
+  # --------------------------------------------------------------------------
+  - id: sidekick-streak
+    surface: Sidekick
+    kind: string-ban
+    reason: "Sidekick must not render streak-counter copy (GD-004 hard ban)."
+    pattern: "\\bstreak\\b"
+    flags: i
+
+  - id: sidekick-daily-quota
+    surface: Sidekick
+    kind: string-ban
+    reason: "Sidekick must not render daily-quota pressure (prr-211 — banned dark pattern)."
+    pattern: "daily\\s+quota|quota\\s+remaining|quota\\s+met"
+    flags: i
+
+  - id: sidekick-catch-up
+    surface: Sidekick
+    kind: string-ban
+    reason: "Sidekick must not use catch-up/falling-behind shame framing (prr-211 — loss aversion)."
+    pattern: "\\bcatch\\s+up\\b|falling\\s+behind|you'?re\\s+behind"
+    flags: i
+
+  - id: sidekick-loss-aversion
+    surface: Sidekick
+    kind: string-ban
+    reason: "Sidekick must not use loss-aversion framing (prr-211 — banned dark pattern)."
+    pattern: "don'?t\\s+lose\\s+your|you'?ll\\s+lose|don'?t\\s+miss\\s+out"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # MathInput — no shame on malformed input, no emoji in error copy
+  # --------------------------------------------------------------------------
+  - id: mathinput-wrong-exclaim
+    surface: MathInput
+    kind: string-ban
+    reason: "MathInput must not shame malformed input with 'Wrong!' (prr-211)."
+    pattern: "\\bwrong!|\\bincorrect!"
+    flags: i
+
+  - id: mathinput-invalid-shame
+    surface: MathInput
+    kind: string-ban
+    reason: "MathInput must not use shame-laden rejection copy (prr-211)."
+    pattern: "that'?s\\s+not\\s+right|try\\s+harder|no,\\s+that'?s"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # FreeBodyDiagramConstruct — no chance/probability copy, no variable-ratio rewards
+  # --------------------------------------------------------------------------
+  - id: fbd-chance-to-score
+    surface: FreeBodyDiagramConstruct
+    kind: string-ban
+    reason: "FBD must not frame construction as a 'chance to score' (prr-211 — variable-ratio reward ban)."
+    pattern: "chance\\s+to\\s+(score|win|earn)"
+    flags: i
+
+  - id: fbd-variable-ratio
+    surface: FreeBodyDiagramConstruct
+    kind: string-ban
+    reason: "FBD must not use variable-ratio reward language (prr-211 — slot-machine mechanic)."
+    pattern: "lucky\\s+(bonus|reward|prize)|bonus\\s+round|jackpot|surprise\\s+reward"
+    flags: i
+
+  - id: fbd-penalty
+    surface: FreeBodyDiagramConstruct
+    kind: string-ban
+    reason: "FBD must not imply penalties for incorrect force vectors (prr-211)."
+    pattern: "\\bpenalt(y|ies|ize)\\b"
+    flags: i

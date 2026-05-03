@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="NSubstitute" Version="5.3.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!-- RDY-019b: ship the analysis.json fixture next to the test dll so
+       ReferenceCalibratedGenerationServiceTests can load it from
+       AppContext.BaseDirectory without being tied to a repo-relative path. -->
+  <ItemGroup>
+    <None Include="Content\fixtures\**\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Cena.Admin.Api\Cena.Admin.Api.csproj" />
+    <ProjectReference Include="..\Cena.Admin.Api.Host\Cena.Admin.Api.Host.csproj" />
+    <ProjectReference Include="..\..\shared\Cena.Infrastructure\Cena.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\actors\Cena.Actors\Cena.Actors.csproj" />
+    <ProjectReference Include="..\Cena.Api.Contracts\Cena.Api.Contracts.csproj" />
+    <!-- FIND-ux-006b: cover the Student host's AuthEndpoints.PasswordReset
+         handler from the existing admin test project so CI picks it up
+         without needing a new test csproj wired into backend.yml. -->
+    <ProjectReference Include="..\Cena.Student.Api.Host\Cena.Student.Api.Host.csproj" />
+  </ItemGroup>
+
+</Project>

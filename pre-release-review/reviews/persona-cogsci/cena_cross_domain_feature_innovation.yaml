@@ -1,0 +1,221 @@
+doc_path: pre-release-review/cena_cross_domain_feature_innovation.md
+reviewer: persona-cogsci
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight features imported from non-EdTech domains: Obsidian-style knowledge graph,
+  Calm/Headspace breathing opener, Fabulous-style learning journeys, Tetris-style
+  adaptive flow, Woebot-style supportive bot, Discord-style study circles, Sanvello-
+  style mood tracker, Nike Training Club-style session menu. Pattern-borrowing doc
+  with limited primary cogsci warrants.
+system_purpose_fit: 3
+  rationale:
+    - F1 (knowledge graph) aligns with docs/cognitive-load-progressive-disclosure-research.md
+      "information architecture for learning" and with existing prerequisite DAG.
+    - F4 (adaptive flow) restates Vygotsky ZPD + Csikszentmihalyi flow = axis1 F6
+      with Tetris-study wrapper. Same DDA concerns apply.
+    - F2 (breathing) and F7 (mood) map to affective self-signal and MUST respect
+      ADR-0037 boundaries.
+code_reality_check:
+  claims_verified_in_code:
+    - "Prerequisite DAG already compressed into scheduler -> commit 11fcaed (F7 compression phase 1B — prerequisite DAG wired into scheduler)"
+    - "Onboarding affective self-signal exists and is ADR-0037-scoped -> docs/adr/0037-affective-signal-in-pedagogy.md"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Sweeny 'flow state Tetris' research (cross_domain:83) — real paper but the adaptive-difficulty-in-game-engagement finding is weak evidence for 'maintain 60% success rate' math learning."
+    - "Fitzpatrick 2017 Woebot RCT — real paper, but 2-week college-student anxiety reduction does not transfer to 12-18-year-old math-support context."
+  claims_unsupported_in_literature:
+    - "F5 Cena Companion's 'supportive check-in' framing derives from Woebot therapy-adjacent research. Doc itself flags 'BORDERLINE' at L109. Cogsci view: any feature that explicitly borrows from mental-health conversational-AI risks slipping into therapy territory; framing and scope must be iron-clad."
+adr_alignment:
+  honored:
+    - "Non-negotiable 3: doc explicitly bars streaks, loss-aversion, variable-ratio across all 8 features"
+  violated: []
+  missing_adr_needed:
+    - "F2 breathing + F7 mood tracker both capture 'how are you feeling about math' affective data. Doc's claim of session-local storage is consistent with ADR-0037, but the explicit scope should be ADR-locked: mood emojis may influence UI tone and session opener, never mastery model, never teacher dashboard at per-student level."
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F1 (Math Concept Map / Obsidian-style knowledge graph) has direct cogsci
+      warrants the doc does not cite: concept-mapping research (Novak & Cañas
+      2008), schema-theory / germane-load support (Sweller). The feature is
+      worth shipping — but: (a) the claim that "AI identifies structural gaps"
+      must use the existing prerequisite DAG, not a learned model; (b) "nodes
+      light up as they master concepts" must be a derived view of mastery
+      state, not a new aggregate. If implemented this way, F1 is a cogsci-
+      principled UI over existing infrastructure with no new ADR needed.
+    evidence: cena_cross_domain_feature_innovation.md:18-29
+    lens_note: |
+      Transfer-of-learning: visualising prerequisite chains supports the
+      skill-mapping VERIFY-0001 requires. Low-risk, high cogsci merit if
+      implemented on existing DAG.
+  - severity: P1
+    finding: |
+      F4 (Adaptive Flow Sessions) is axis1 F6 (Desirable Difficulty Targeting)
+      dressed as a Tetris-flow feature. Same critique applies: 60% success rate
+      as a global knob targeting "flow" conflates Csikszentmihalyi flow theory
+      (a per-individual phenomenological state) with a session-level
+      success-rate target. The doc's own mitigation "never show success rate
+      percentages to students" is correct but doesn't address the underlying
+      design issue. Dedupe with axis1 F6; apply the per-concept ZPD bounds
+      critique there.
+    evidence: cena_cross_domain_feature_innovation.md:76-89
+    lens_note: "Same cogsci finding as axis1 F6; consolidate."
+  - severity: P1
+    finding: |
+      F5 (Cena Companion — Woebot-inspired bot) explicitly flags "must be
+      carefully designed to avoid therapy territory" (L109). Cogsci lens:
+      any conversational agent that says "You're on fire today!" or "want to
+      try a different approach" based on affective cues is *already* doing
+      something therapy-adjacent. The line between "study buddy" and
+      "wellbeing intervention" is thin and legally relevant (Israeli
+      regulation of therapeutic apps). Recommend: SHORTLIST is too strong;
+      downgrade to DEFER until explicit legal + persona-ethics sign-off.
+    evidence: cena_cross_domain_feature_innovation.md:98-111
+    lens_note: "Therapy-territory slippage is the #1 risk. Proceed only with explicit scope ADR."
+  - severity: P2
+    finding: |
+      F2 (Focus Ritual / Breathing Opener) is light-touch and session-scoped.
+      The US-DoE citation (L48) is flagged by Dr. Rami as "vague to the point
+      of being unverifiable". Replace with Dunning 2019 or Zoogman 2015 meta-
+      analysis. The mood emoji (😰😐🙂) feeds "session opening difficulty" —
+      ensure this is a *selection tie-breaker* under ADR-0037, not a
+      difficulty-selection driver.
+    evidence: cena_cross_domain_feature_innovation.md:44-49
+    lens_note: "Citation upgrade + ADR-0037 compliance check."
+  - severity: P2
+    finding: |
+      F7 (Learning Energy Tracker) proposes correlating mood with accuracy,
+      time of day, topic. This is a per-student behavioral pattern that, if
+      persisted, becomes exactly the profile attribute ADR-0003 / ADR-0037
+      exclude. Doc claims "session-local" for under-13 and "opt-in for 13+";
+      this is still cross-session profiling for 13+ students. Must be either:
+      (a) strictly session-scoped with no persisted correlations, or (b) an
+      explicit ADR-0037-superseding ADR + privacy review.
+    evidence: cena_cross_domain_feature_innovation.md:142-160
+    lens_note: |
+      Most subtle ADR-0037 violation in the corpus: opt-in correlation of
+      mood and performance over time is "behavioral profile of minor".
+  - severity: P2
+    finding: |
+      F8 (Session Type Menu — Nike Training Club) introduces user choice over
+      session archetype (Power Sprint / Deep Dive / etc.). Cogsci warrant:
+      autonomy support (SDT Deci & Ryan), session-type variety reduces
+      habituation, user-controlled difficulty bands. Ship-ready if
+      implemented as "user-selected session intent" without any system-side
+      profiling of preferences.
+    evidence: cena_cross_domain_feature_innovation.md:163-178
+    lens_note: "Clean feature; ship on SDT warrant, not Nike analogy."
+already_built:
+  - feature: "Prerequisite DAG (substrate for F1 knowledge map)"
+    evidence: commit 11fcaed (F7 compression phase 1B — prerequisite DAG wired into scheduler)
+    note: "F1 UI should sit on top of existing DAG, not re-author curriculum."
+  - feature: "Onboarding affective self-assessment (F2 mood opener, F7 mood tracker inputs)"
+    evidence: docs/adr/0037-affective-signal-in-pedagogy.md:14-16
+    note: "F2/F7 read from existing store; must respect ADR-0037 scope."
+duplicates_of_other_docs:
+  - "axis1_pedagogy_mechanics_cena.md: F6 Desirable Difficulty Targeting = F4 here"
+  - "axis2_motivation_self_regulation_findings.md: F4 Mastery Path Progress = F1 here (knowledge graph is the progress view)"
+  - "axis2_motivation_self_regulation_findings.md: F5 Confidence Check-ins + F8 Study Plan = F7 here"
+  - "feature-discovery-2026-04-20.md: FD-017 Focus Ritual = F2; FD-018 Learning Energy Tracker = F7; FD-048 Session Type Menu = F8"
+extracted_tasks:
+  - title: "Ship F1 Math Concept Map as UI over existing prerequisite DAG"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Interactive graph visualization of Bagrut-math prerequisite DAG with
+      student mastery color-coded on each node. Use existing DAG and mastery
+      snapshot; no new aggregate, no new model.
+
+      ## Files
+      - src/student-web/src/features/concept-map/ConceptMap.vue (new)
+      - src/admin/api GET /curriculum/dag (extend if not present)
+
+      ## Definition of Done
+      - No new mastery model or classifier.
+      - Rendered from existing data only.
+      - Gaps highlighted using static DAG rules (high-centrality node + low mastery) — no LLM inference of "structural gap".
+      - Session-safe: rendering does not retain per-student click data.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-concept-map"
+    source_doc_lines: [L16-L28]
+  - title: "F2 Focus Ritual — ADR pin mood emoji to tie-breaker scope only"
+    priority: P2
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Explicit ADR clarifying that F2 mood emoji influences *session opener copy
+      tone* and *initial item tie-breaker* only, never adaptive difficulty.
+      Replace unverifiable US-DoE citation with Dunning 2019 or Zoogman 2015.
+
+      ## Files
+      - docs/adr/00XX-mood-emoji-scope.md
+      - Edit cross_domain doc F2 citation list.
+
+      ## Definition of Done
+      - ADR written, linked.
+      - Citation replaced.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-f2-mood-adr"
+    source_doc_lines: [L36-L50]
+  - title: "Downgrade F5 Cena Companion Bot to DEFER pending therapy-scope ADR"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Change F5 verdict to DEFER. Before any implementation, write therapy-
+      territory scope ADR with legal + persona-ethics sign-off.
+
+      ## Files
+      - pre-release-review/cena_cross_domain_feature_innovation.md (F5 verdict)
+      - retired.md entry if fully retired
+
+      ## Definition of Done
+      - Status: DEFER pending ADR.
+      - persona-ethics handoff logged.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-f5-defer"
+    source_doc_lines: [L98-L111]
+  - title: "F7 Learning Energy Tracker — session-only or retire"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Rewrite F7 to strict session-scoped mood tracking with no cross-session
+      correlation of mood and performance, or retire. 'Weekly Learning Energy
+      Report' as currently framed violates ADR-0037 (affective correlation
+      creates behavioral profile).
+
+      ## Files
+      - pre-release-review/cena_cross_domain_feature_innovation.md (F7 rewrite)
+
+      ## Definition of Done
+      - Either (a) revised scope: session-only, no retained mood-performance correlation, OR (b) RETIRE entry in retired.md.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-f7-retire-or-revise"
+    source_doc_lines: [L142-L160]
+verdict: revise
+verdict_reason: |
+  Innovation-by-analogy doc. F1 + F8 ship cleanly on existing infrastructure.
+  F2 needs ADR-0037 scope-pinning and citation fix. F4 dedupes to axis1 F6.
+  F5 must DEFER until therapy-scope ADR. F7 must either scope to session-only
+  or retire.
+cross_lens_handoff:
+  - to: persona-ethics
+    about: "F5 Cena Companion therapy-territory slippage is the headline ethics review."
+  - to: persona-privacy
+    about: "F7 mood-performance correlation = behavioral profile of minor."
+  - to: persona-a11y
+    about: "F1 knowledge graph must be keyboard-navigable + screen-reader-accessible."
+  - to: persona-finops
+    about: "F5 conversational bot LLM-call volume — if shipped."
+  - to: persona-educator
+    about: "F8 session-type menu — which archetypes actually work in Bagrut prep?"

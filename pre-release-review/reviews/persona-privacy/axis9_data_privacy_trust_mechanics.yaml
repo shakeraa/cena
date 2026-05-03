@@ -1,0 +1,355 @@
+doc_path: pre-release-review/axis9_data_privacy_trust_mechanics.md
+reviewer: persona-privacy
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 privacy/trust features: explainable-AI "why this problem", student data dashboard,
+  self-service erasure, consent-revocation UX, age-appropriate privacy copy, inference-trail
+  provenance, differential-privacy analytics, and a public transparency report.
+  Positioned as parent-NPS and compliance differentiators against COPPA 2025, GDPR, and
+  Israeli PPL Amendment 13 (effective Jan 2025).
+
+system_purpose_fit: 5
+  rationale:
+    - Non-negotiable #2 (ADR-0003 session-scope) is explicitly honored throughout
+    - Non-negotiable #3 (no dark-patterns) honored — Feature 4 enforces symmetric accept/reject
+    - Non-negotiable #1 (SymPy oracle) not in scope, no risk
+    - Correctly rejects silent under-13 collection, cross-session misconception retention, ML training on student data
+    - Feature 7 (DP analytics) correctly notes k-anonymity threshold, aligning with ADR-0003 Decision 2
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Self-service GDPR portal exists -> src/api/Cena.Student.Api.Host/Endpoints/MeGdprEndpoints.cs:35-91 (consents, export, erasure, DSAR all wired)"
+    - "Right-to-erasure with 30-day cooling period is real, not stub -> src/shared/Cena.Infrastructure/Compliance/RightToErasureService.cs:230 (CoolingPeriod const), :289-489 (ProcessErasureAsync does real cascade across 7 data stores)"
+    - "Misconception events carry [MlExcluded] attribute -> src/actors/Cena.Actors/Events/MisconceptionEvents.cs:22,38,53"
+    - "GDPR export filters out [MlExcluded] events (Feature 2 + 3 compatible) -> src/shared/Cena.Infrastructure/Compliance/StudentDataExporter.cs:154-160, :211"
+    - "30-day / 90-day hard cap on session misconception retention enforced in policy -> src/shared/Cena.Infrastructure/Compliance/DataRetentionPolicy.cs:58,65 + RetentionWorker:492-500 (tenant override clamped)"
+    - "Consent change audit log exists with previous/new/changedBy -> src/shared/Cena.Infrastructure/Compliance/GdprConsentManager.cs:15-25 (ConsentChangeLog), :147-203"
+    - "Age-based default consents correctly deny all non-contract-necessity for <16 -> MeGdprEndpoints.cs:552-569"
+    - "Parental-consent-step UI stub + COPPA documentation -> src/student/full-version/src/components/onboarding/ParentalConsentStep.vue:1-16"
+    - "LLM prompts explicitly exclude PII by design -> src/actors/Cena.Actors/Services/PersonalizedExplanationService.cs:23 'PRIVACY: No student ID, name, or PII is ever included in LLM prompts'"
+  claims_contradicted_by_code:
+    - "Feature 3 claims 'deletion scope is simplified because we delete all session data after each session' but RightToErasureService ANONYMIZES rather than DELETES StudentProfileSnapshot (FullName HMAC-hashed, not removed) -> RightToErasureService.cs:321-347. Doc oversimplifies erasure surface."
+    - "Feature 7 assumes no existing DP/k-anonymity implementation, but aggregate analytics code paths are not verified either way (no DP module exists in src/)."
+    - "RetentionWorker session-misconception purge is soft — it does NOT actually delete events, it logs a SIEM entry and relies on read-path filtering (RetentionWorker.cs:334-357). This is acceptable per ADR-0003 but the doc's 'retention horizon' claim of hard delete is weaker in practice."
+  claims_unverifiable:
+    - "Feature 8 transparency report scope — no existing equivalent in src/; greenfield"
+    - "Feature 6 'inference trail' - ExplanationCacheService exists but no inference_log / evidence_chain table confirmed"
+    - "Feature 5 age-banded privacy copy — privacy.vue page exists but age-band tiering unverified"
+
+adr_alignment:
+  honored:
+    - ADR-0003 (session-scope misconception — features 2/3/6 correctly scope data)
+    - ADR-0001 (tenancy — Feature 7 k-anonymity respects per-institute cohort boundaries)
+  violated: []
+  missing_adr_needed:
+    - "ADR for PII-in-LLM-prompts policy — currently only a source-code comment (PersonalizedExplanationService.cs:23); needs a lint rule + ADR documenting the exclusion principle"
+    - "ADR for transparency-report governance — Feature 8 proposes public report with bias metrics; needs review-board ADR"
+    - "ADR for DP epsilon budget — Feature 7 needs explicit epsilon-ledger policy before implementation"
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 2 ("My Cena Profile" dashboard) risks exposing [MlExcluded] misconception tags
+      to the student UI. Dashboard API must NOT re-expose MisconceptionDetected_V1 data that
+      StudentDataExporter.cs:154 explicitly strips from GDPR export. If the student can see
+      it in the dashboard but not the export, that's a subject-access-right inconsistency
+      under GDPR Art 15 vs Art 20.
+    evidence: "axis9_data_privacy_trust_mechanics.md:67-100 + src/shared/Cena.Infrastructure/Compliance/StudentDataExporter.cs:154-160"
+    lens_note: |
+      Privacy right-exposure surfaces must be consistent — a dashboard-visible item the
+      export omits creates a defensible-disclosure problem for DPO during a DSAR audit.
+
+  - severity: P0
+    finding: |
+      Feature 3 deletion workflow assumes cascade across session stores but the current
+      RightToErasureService does NOT touch LearningSessionState documents, projections
+      (ClassMasteryHeatmapProjection, LearningSessionQueueProjection), or misconception
+      event streams. Verifiable-erasure gap: event streams carry MisconceptionDetected_V1
+      with StudentId + BuggyRuleId + StudentAnswer (free-text PII per MisconceptionEvents.cs:29)
+      and those events are NOT hard-deleted — only filtered on read per RetentionWorker.cs:340-357.
+      GDPR Art 17 requires erasure that an audit can verify, not just read-path hiding.
+    evidence: "src/actors/Cena.Actors/Events/MisconceptionEvents.cs:23-32 + src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs:334-357 + src/shared/Cena.Infrastructure/Compliance/RightToErasureService.cs:318-480"
+    lens_note: |
+      "Read-filter = deletion" is not defensible to a regulator. A 14-year-old's wrong-answer
+      string sitting in an append-only Marten stream 2 years after erasure is a textbook
+      PPL §14 / GDPR Art 17 violation.
+
+  - severity: P1
+    finding: |
+      Feature 4 consent-revocation UX is proposed as a new feature, but MeGdprEndpoints.cs
+      already implements full consent CRUD (get/record/revoke/bulk). Retire the "build new
+      consent backend" part of this proposal — only the UX/floating-link frontend work
+      remains. Doc overstates the surface area.
+    evidence: "axis9_data_privacy_trust_mechanics.md:160-164 + src/api/Cena.Student.Api.Host/Endpoints/MeGdprEndpoints.cs:42-55,313-475"
+    lens_note: |
+      Product prioritization risk: backend team would duplicate a shipped capability.
+
+  - severity: P1
+    finding: |
+      Feature 6 inference trail must not reintroduce cross-session misconception retention
+      under a new label. "Evidence chain" log linking a student to specific inferences
+      over time is exactly the "per-student behavioral profile" banned by ADR-0003 and
+      ICO v. Reddit (£14.47M, Feb 2026). MVP scope must be session-bounded — evidence
+      references "THIS session" only — which the doc acknowledges at L251 but the data
+      model (inference_log table) as drafted suggests persistent storage.
+    evidence: "axis9_data_privacy_trust_mechanics.md:240-252 + docs/adr/0003-misconception-session-scope.md:41-67"
+    lens_note: |
+      Naming the table "inference_log" instead of "misconception_log" does not launder
+      the data category; the regulator reads by data shape, not by column name.
+
+  - severity: P1
+    finding: |
+      Feature 5 age-appropriate privacy copy should be gated on an under-16 test — the
+      current IsMinor helper in MeGdprEndpoints.cs:529-544 uses <16 (GDPR-K / Israel PPL),
+      while COPPA 2025 uses <13. Dual-threshold messaging needed; a single minor flag loses
+      the COPPA-specific "verifiable parental consent" signal for 13-year-olds.
+    evidence: "axis9_data_privacy_trust_mechanics.md:212-214 + src/api/Cena.Student.Api.Host/Endpoints/MeGdprEndpoints.cs:529-544"
+    lens_note: |
+      Under-13 triggers VPC (verifiable parental consent) separate from GDPR-K 16-cutoff
+      parental responsibility. A single ageBand enum is the right fix.
+
+  - severity: P1
+    finding: |
+      Feature 7 DP analytics proposes cohort insights with k-anonymity ≥10. For Israeli
+      schools, an Arab-medium class may have <10 students per grade per track (4-unit /
+      5-unit). This would suppress legitimate teacher insights AND disproportionately affect
+      Arab cohorts. The proposal's fixed k≥10 threshold has a fairness impact it does not acknowledge.
+    evidence: "axis9_data_privacy_trust_mechanics.md:80 + axis9_data_privacy_trust_mechanics.md:262-266"
+    lens_note: |
+      Privacy-preserving techniques with universal thresholds often hide smaller
+      minority cohorts from teacher support — documented harm pattern in DP-for-education
+      literature. ε-budget tuning needed per-tenant, not global.
+
+  - severity: P2
+    finding: |
+      Feature 8 transparency report is listed as L effort; in practice it needs data-governance
+      owner + legal sign-off + translated drafts. No such role exists in the project (no
+      DPO role found in src/). Treat as a hire-then-build, not an engineering task.
+    evidence: "axis9_data_privacy_trust_mechanics.md:315-332"
+    lens_note: |
+      Publishing "fairness metrics by gender/SES" without a named DPO reviewing each report
+      is itself a Section 8A PPL disclosure risk.
+
+  - severity: P2
+    finding: |
+      Doc does not address sub-processor disclosure. LLM calls go to Anthropic (ClaudeTutorLlmService.cs,
+      ClaudeStuckClassifierLlm.cs) — this must be in the Feature 8 report AND in consent
+      copy per PPL Section 11 duty of disclosure.
+    evidence: "axis9_data_privacy_trust_mechanics.md whole doc (no mention of Anthropic/OpenAI sub-processor) + src/actors/Cena.Actors/Tutor/ClaudeTutorLlmService.cs"
+    lens_note: |
+      Israeli PPL Regulations (Data from EEA) require sub-processor transparency;
+      DPA §7 no-training-on-student-data needs to be MATCHED by an Anthropic zero-data-retention
+      enterprise agreement, not just a promise in docs.
+
+already_built:
+  - feature: Feature 3 — Data Erasure Workflow (backend)
+    evidence: src/shared/Cena.Infrastructure/Compliance/RightToErasureService.cs (full 30-day cooling, 7-store cascade, HMAC-SHA256 name hashing, audit manifest, SIEM logging)
+    note: |
+      Backend is production-grade. Proposal should be retitled "Feature 3b: Parent-proxy
+      erasure UX" — add parent-authenticated trigger for under-16, not a new backend.
+  - feature: Feature 4 — Consent-Revocation (backend + change audit)
+    evidence: src/shared/Cena.Infrastructure/Compliance/GdprConsentManager.cs + src/api/Cena.Student.Api.Host/Endpoints/MeGdprEndpoints.cs:313-475
+    note: |
+      RecordConsentChangeAsync logs prev/new/changedBy/source. Proposal should be retired
+      in backend scope; UX work (floating link, symmetric reject) remains.
+  - feature: Feature 2 — Student Data Transparency Dashboard (export side)
+    evidence: src/shared/Cena.Infrastructure/Compliance/StudentDataExporter.cs (full profile+tutor+sessions+events, ML-excluded filter)
+    note: |
+      Export API ships complete data with PII-level annotation. Dashboard becomes a
+      UI-over-existing-API task, not a new data pipeline.
+  - feature: Feature 5 — Age-appropriate consent scaffolding (partial)
+    evidence: src/student/full-version/src/components/onboarding/ParentalConsentStep.vue + AgeGateStep.vue + src/student/full-version/src/composables/useAgeGate.ts + tests/e2e/privacy-gdpr-self-service.spec.ts
+    note: |
+      Age gate + parental-consent UI flow exist with COPPA/GDPR Art 8/ICO Children's Code
+      citations baked in. Doc's Feature 5 should scope to content tiering / audio narration only.
+  - feature: Retention windows (30-day session misconception, 90-day hard cap, tutor 90d, audit 5y)
+    evidence: src/shared/Cena.Infrastructure/Compliance/DataRetentionPolicy.cs:23-65
+    note: Policies are codified; tenant overrides clamped to hard cap.
+
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-014 (Why This Problem?) overlaps Feature 1 — treat as one task"
+  - "AXIS_4_Parent_Engagement_Cena_Research.md: Feature 1 (Why This Topic) overlaps Feature 1 here — parent-facing variant"
+
+extracted_tasks:
+  - title: "Hard-delete misconception events on erasure (not read-filter)"
+    priority: P0
+    estimate: M
+    suggested_assignee: claude-subagent-compliance
+    queue_body: |
+      ## Goal
+      Close GDPR Art 17 / PPL §14 gap: StudentId-linked MisconceptionDetected_V1 /
+      MisconceptionRemediated_V1 events currently remain in Marten event streams after
+      erasure; only read paths filter them. Regulator-verifiable erasure requires
+      actual removal of StudentAnswer free-text PII from the append-only store.
+
+      ## Files
+      - src/actors/Cena.Actors/Events/MisconceptionEvents.cs (event definitions)
+      - src/shared/Cena.Infrastructure/Compliance/RightToErasureService.cs (add step 8 for event-stream scrub)
+      - src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs:334 (replace logging with marten stream archive)
+      - src/actors/Cena.Actors.Tests/Compliance/ErasureEventStreamTests.cs (new)
+
+      ## Definition of Done
+      - ErasureManifest gains new store "MisconceptionEvents" with count + Action.Deleted
+      - After ProcessErasureAsync, no MisconceptionDetected_V1 remains queryable by StudentId
+      - RetentionWorker actually deletes (or replaces with tombstone) events past 30-day cutoff
+      - Test proves event with StudentAnswer="foo" cannot be retrieved after erasure + retention
+      - ADR-0003 Decision 2 language updated from "filtered out of reads" to "deleted from store"
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-compliance --result "<branch>"
+    source_doc_lines: ["L105-139"]
+
+  - title: "Reconcile dashboard visibility with export ([MlExcluded] consistency)"
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Dashboard API for "My Cena Profile" (Feature 2) must apply the same MlExcludedAttribute
+      filter as StudentDataExporter. Otherwise GDPR Art 15 (access) surfaces data Art 20
+      (portability) hides — DSAR auditability breaks.
+
+      ## Files
+      - src/shared/Cena.Infrastructure/Compliance/StudentDataExporter.cs:211 (IsMlExcluded is public — reuse)
+      - New: src/api/Cena.Student.Api.Host/Endpoints/MeProfileDashboardEndpoints.cs
+      - Test: MlExcludedFilterAppliedToDashboardTests
+
+      ## Definition of Done
+      - Any endpoint returning student events runs them through StudentDataExporter.IsMlExcluded
+      - Unit test asserts misconception events never appear in dashboard response
+      - Doc note in ADR-0003 adds Decision 4b: "dashboard reads use same filter as exports"
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L67-100"]
+
+  - title: "Split ageBand enum: under13 / 13-15 / 16-17 / 18+ for consent defaults"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Single IsMinor<16 boolean collapses COPPA (<13, requires VPC) with GDPR-K (<16,
+      parental responsibility). Different legal bases need different consent flows and
+      copy tiers.
+
+      ## Files
+      - src/api/Cena.Student.Api.Host/Endpoints/MeGdprEndpoints.cs:529 (IsMinor)
+      - src/student/full-version/src/composables/useAgeGate.ts (ageBand)
+      - src/shared/Cena.Infrastructure/Compliance/GdprConsentManager.cs (extend HasConsentAsync)
+
+      ## Definition of Done
+      - AgeBand enum { Under13, Teen13to15, Teen16to17, Adult }
+      - Under13 triggers verifiable-parental-consent route; 13-15 triggers parental-responsibility route
+      - Default consents test matrix: under13=VPC-required, 13-15=parent-notified, 16+=self
+      - Age-appropriate copy tier selects by band
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L212-214"]
+
+  - title: "Ban PII in LLM prompts — lint rule + ADR"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      PersonalizedExplanationService.cs:23 comment ("No student ID, name, or PII is ever
+      included in LLM prompts") is policy-by-convention. Make it enforceable.
+
+      ## Files
+      - docs/adr/NNNN-no-pii-in-llm-prompts.md (new ADR)
+      - scripts/lint-llm-prompts.ts (new — scans for PII field names in prompt-builder arguments)
+      - .github/workflows/security-scan.yml (wire scanner)
+      - src/actors/Cena.Actors/Services/L3ExplanationRequest.cs (add [NoPii] markers)
+
+      ## Definition of Done
+      - ADR lists banned tokens (StudentId, FullName, DisplayName, Email, ParentEmail, DateOfBirth)
+      - Lint fails CI if any prompt-builder call site passes a field marked [Pii]
+      - At least 3 services (PersonalizedExplanationService, HintGenerator, ClaudeStuckClassifierLlm) audited
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: []
+
+  - title: "Publish sub-processor registry (Anthropic, OCR vendor, Twilio, etc.)"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      PPL §11 duty of disclosure + GDPR Art 28 require listing sub-processors. Current
+      privacy page does not enumerate Anthropic (LLM), Twilio (WhatsApp), Firebase (auth),
+      Mashov (if adopted).
+
+      ## Files
+      - docs/compliance/sub-processors.md (new)
+      - src/student/full-version/src/pages/privacy.vue (link to list)
+      - Review current Anthropic / Firebase contracts for zero-data-retention opt-ins
+
+      ## Definition of Done
+      - Registry lists vendor, purpose, data categories, retention, region, DPA link
+      - Anthropic enterprise ZDR status confirmed (no 30-day prompt retention)
+      - Privacy page links to list in Hebrew/Arabic/English
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: []
+
+  - title: "Tenant-aware k-anonymity floor for DP analytics (Feature 7)"
+    priority: P2
+    estimate: M
+    suggested_assignee: claude-subagent-analytics
+    queue_body: |
+      ## Goal
+      Feature 7 fixed k≥10 threshold suppresses legitimate insights in Arab-medium classes
+      with <10 students per track. Need per-tenant configurable floor with audit logging.
+
+      ## Files
+      - New: src/shared/Cena.Infrastructure/Analytics/PrivacyBudgetLedger.cs
+      - ADR: docs/adr/NNNN-dp-epsilon-budget.md
+      - Feature flag: only enable after DPO sign-off
+
+      ## Definition of Done
+      - Per-tenant epsilon + k-floor configuration
+      - Queries that fall below floor return "suppressed" with no side-channel leakage
+      - Audit log includes tenant, cohort-size, epsilon-consumed
+      - Arab-cohort small-class scenario documented
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-analytics --result "<branch>"
+    source_doc_lines: ["L259-293"]
+
+verdict: revise
+verdict_reason: |
+  Direction is correct but 2 of 8 features (3, 4) substantially already shipped — proposal
+  over-scopes engineering work. 2 features (2, 6) have compliance-consistency gaps that must
+  be closed before UI ships. Retire duplicated backend work, add the P0 event-stream scrub,
+  and the feature set is shippable.
+
+cross_lens_handoff:
+  - to: persona-enterprise
+    about: |
+      Event-sourcing implication — MisconceptionDetected_V1 is append-only in Marten, and
+      GDPR-compliant erasure of append-only stores is an aggregate-design concern, not just
+      a compliance concern. Needs ADR on "PII-carrying events must be archivable per-stream
+      or tombstone-able" (ADR-0012 aggregate decomposition ref).
+  - to: persona-redteam
+    about: |
+      Feature 1/6 "Why this problem" reveals the recommendation logic. Consider whether
+      exposing the evidence chain to students gives a prompt-injection / reward-hack surface
+      (student crafts answers to force the system into a particular recommendation).
+  - to: persona-a11y
+    about: |
+      Feature 5 age-appropriate copy + Hebrew/Arabic RTL with audio narration intersects
+      WCAG 2.2 + privacy; KaTeX bdi wrapping applies to any math in privacy examples too.
+  - to: persona-sre
+    about: |
+      Feature 8 transparency report needs an incident-log data source — link to SRE runbook
+      for breach notification (GDPR Art 33 72h) and SIEM event catalog.
+  - to: persona-ministry
+    about: |
+      Feature 8 public fairness metrics by demographic may intersect Ministry of Education
+      position on disclosing student cohort data; confirm defensibility before publication.

@@ -1,0 +1,79 @@
+name: CAS Chaos (Nightly)
+
+# RDY-052: Runs the SymPy sidecar SIGKILL chaos scenarios. Two flavours:
+#
+#   1. Unit-integration chaos (always runs): the C# test suite in
+#      Cena.Actors.Tests.Chaos.SymPySidecarChaosTests uses a controllable
+#      fake sidecar to prove the router + gate + persister degrade
+#      gracefully when SymPy dies mid-batch. No Docker required.
+#
+#   2. Full docker chaos (opt-in on workflow_dispatch): follows the runbook
+#      at tests/chaos/sympy-sigkill-test.md. Gated because it needs a
+#      complete docker-compose stack with a labelled sympy-sidecar service.
+#
+# Security: inputs/secrets flow via env: blocks per the GitHub Actions
+# workflow-injection guide; the conditional on the docker job uses the
+# `inputs.*` context in an if-expression (not a run: body).
+
+on:
+  schedule:
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+    inputs:
+      run_docker:
+        description: 'Also run the full docker-compose SIGKILL scenario (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  chaos-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - run: dotnet restore src/actors/Cena.Actors.sln
+      - run: dotnet build src/actors/Cena.Actors.sln --no-restore -c Release
+      - name: Run chaos test suite
+        run: |
+          dotnet test src/actors/Cena.Actors.Tests/Cena.Actors.Tests.csproj \
+            --no-build -c Release \
+            --filter "FullyQualifiedName~SymPySidecarChaosTests" \
+            --logger "console;verbosity=normal" \
+            --logger "trx;LogFileName=chaos.trx"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-chaos-trx
+          path: src/actors/Cena.Actors.Tests/TestResults/chaos.trx
+          if-no-files-found: warn
+
+  chaos-docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: chaos-unit
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_docker == 'true'
+    env:
+      COMPOSE_FILE: docker-compose.yml
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bring up stack
+        run: |
+          docker compose up -d
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsS http://localhost:5080/healthz >/dev/null 2>&1; then
+              echo "Admin API healthy"; break
+            fi
+            sleep 5
+          done
+      - name: Run scripted SIGKILL scenario
+        run: |
+          # Runbook: tests/chaos/sympy-sigkill-test.md.
+          # Scripted version is the remaining RDY-052 deliverable; this
+          # workflow step provides the wired entry point.
+          echo "::warning::Full docker chaos scripting pending — see tests/chaos/sympy-sigkill-test.md"
+      - name: Teardown
+        if: always()
+        run: docker compose down -v

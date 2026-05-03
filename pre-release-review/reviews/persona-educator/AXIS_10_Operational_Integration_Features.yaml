@@ -1,0 +1,188 @@
+doc_path: pre-release-review/AXIS_10_Operational_Integration_Features.md
+reviewer: persona-educator
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 operational/integration features: Google SSO one-click, Mashov gradebook
+  read-only sync, CSV bulk roster import, offline-first practice mode, multi-
+  device session continuity, school IT admin deployment dashboard, Google
+  Classroom assignment + grade passback, Israel-privacy-law-compliant student
+  data portability export.
+
+system_purpose_fit: 2
+  rationale:
+    - Infrastructure doc. Pedagogue lens has limited surface here.
+    - Relevant angles: Mashov (IL classroom reality), Google Classroom
+      grade passback (affects teacher workflow + student grades that
+      feed the classroom report card), offline-first (access for periphery
+      students).
+    - Minus because the doc treats grade-passback as purely operational,
+      but a passback of Cena-generated scores to a school gradebook crosses
+      into pedagogue territory — those scores will affect student transcripts.
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Offline sync ledger exists" -> src/actors/Cena.Actors/Sessions/MartenOfflineSyncLedger.cs
+    - "Session NATS publisher / event bus" -> src/actors/Cena.Actors/Sessions/SessionNatsPublisher.cs
+    - "SignalR / messaging infrastructure" -> src/actors/Cena.Actors/Messaging/
+    - "Tenancy/management layer exists" -> src/actors/Cena.Actors/Management/
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Mashov API client library" — not apparent
+    - "Google Classroom grade passback" — not apparent
+    - "CSV bulk roster import" — not apparent
+
+adr_alignment:
+  honored:
+    - ADR-0001 (multi-institute enrollment, tenant-scoped features aligned)
+    - Non-negotiable #5 (multi-tenant, tenant isolation required for Mashov
+      credentials, roster import)
+    - PPL Amendment 13 referenced for data portability + roster import
+  violated: []
+  missing_adr_needed:
+    - Grade-passback policy ADR: what Cena scores get written to school
+      gradebooks, whether passback is teacher-triggered or automatic,
+      dispute resolution when Cena disagrees with teacher grading.
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 7 (Google Classroom Assignment + Grade Passback) — Cena
+      writing scores into Google Classroom's gradebook affects student
+      report cards. Three pedagogue concerns:
+      (1) Cena formative scores (practice, hint-assisted) are *not*
+      equivalent to summative exam scores — passing practice scores to
+      the gradebook distorts the academic record.
+      (2) Teacher must always have a veto before passback executes.
+      (3) For multi-tenancy (ADR-0001), passback credentials must be
+      per-class-teacher, not per-school.
+    evidence: AXIS_10_Operational_Integration_Features.md Feature 7 section
+    lens_note: |
+      I've seen schools where an EdTech tool auto-wrote practice grades
+      into the LMS, and parents called panicking about "failures" that
+      were just practice attempts. Teacher opt-in + summative-only is the
+      only safe policy.
+  - severity: P2
+    finding: |
+      Feature 4 (Offline-First Practice Mode) — valuable for periphery
+      students (Galilee, Negev, West Bank settlements). Pedagogue concern:
+      offline practice should *not* include timed mock-Bagrut exams,
+      because score-integrity depends on timing honesty. Restrict offline
+      mode to untimed practice + worked-example study; timed assessments
+      require online + proctoring context.
+    evidence: AXIS_10_Operational_Integration_Features.md:L192-L200
+    lens_note: |
+      Offline ≠ exam-grade. Good for practice and review; not for
+      summative assessment.
+  - severity: P2
+    finding: |
+      Feature 2 (Mashov Read-Only Sync) — Mashov is the reality of IL
+      schools. Read-only is the right default. However, the doc claims
+      sync runs daily at 02:30; pedagogue angle: sync should be teacher-
+      triggerable on-demand before a parent-teacher conference so the
+      displayed Mashov grades are fresh. Add a "sync now" teacher button
+      in addition to the scheduled job.
+    evidence: AXIS_10_Operational_Integration_Features.md:L72-L128
+    lens_note: |
+      Teachers prepare for parent conferences the hour before. "24-hour-
+      old grades" is a quick credibility hit.
+
+already_built:
+  - feature: "Offline sync ledger (F4 foundation)"
+    evidence: src/actors/Cena.Actors/Sessions/MartenOfflineSyncLedger.cs
+    note: |
+      Infrastructure for offline→online sync exists. F4 is primarily a
+      client-side (PWA service worker, IndexedDB) build on top of this
+      ledger. Not from-scratch.
+
+duplicates_of_other_docs:
+  - feature-discovery-2026-04-20.md: FD-042 Google SSO (same as F1), FD-044 CSV Bulk Roster Import (same as F3), FD-019 Mashov Sync (same as F2)
+  - cena_competitive_analysis.md: Feature 4 At-Risk Student Alerts (reads from same Mashov/Classroom integrations)
+
+extracted_tasks:
+  - title: "Grade-passback policy ADR + teacher-opt-in veto flow"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Write ADR for Google Classroom grade-passback policy: only summative
+      assessment scores (mock Bagrut, proctored tests) eligible for
+      passback; teacher must opt in per assignment; teacher has explicit
+      "do not write to gradebook" toggle; passback happens only on
+      teacher-review confirmation.
+      ## Files
+      - docs/adr/ (new ADR: "classroom-grade-passback-policy")
+      - src/actors/Cena.Actors/Assessment/ (new PassbackPolicyService.cs)
+      ## Definition of Done
+      - ADR locks summative-only + teacher-approval rule.
+      - PassbackPolicyService enforces in code.
+      - Tests: practice session grade is NOT eligible for passback; mock
+        Bagrut grade is, only after teacher confirmation.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>: grade-passback-policy-ADR"
+    source_doc_lines: [AXIS_10_Operational_Integration_Features.md Feature 7]
+  - title: "Offline mode restricts to untimed practice (no summative)"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F4 offline mode must refuse timed summative assessments (mock Bagrut).
+      Only untimed practice + worked-example study can be queued for offline.
+      ## Files
+      - src/actors/Cena.Actors/Sessions/MartenOfflineSyncLedger.cs
+      - src/student/student-web/ (offline queue)
+      ## Definition of Done
+      - Session metadata includes assessment-type flag.
+      - Queue-for-offline rejects summative sessions.
+      - Test: mock Bagrut session cannot be queued offline.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: offline-no-summative"
+    source_doc_lines: [L192-L200]
+  - title: "Teacher 'sync Mashov now' button + rate-limited endpoint"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F2 Mashov sync — add a teacher-triggered on-demand sync button
+      (rate-limited 1/hour) in addition to the scheduled daily job.
+      Helps teachers freshly prep for parent conferences.
+      ## Files
+      - src/api/Cena.Admin.Api/ (new MashovSyncEndpoint.cs)
+      - src/admin/full-version/src/views/apps/teacher/mashov-sync.vue
+      ## Definition of Done
+      - Endpoint rate-limited per teacher to 1/hour.
+      - UI button with "synced X minutes ago" indicator.
+      - Test: teacher triggers sync; second call within hour returns 429.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: mashov-sync-on-demand"
+    source_doc_lines: [L72-L128]
+
+verdict: adopt
+verdict_reason: |
+  Sensible operational doc. Pedagogue-relevant revisions: grade-passback
+  policy (summative-only, teacher-approval), offline-mode scope (no
+  summative), Mashov on-demand sync for teacher workflow. Most other
+  features are straight infrastructure.
+
+cross_lens_handoff:
+  - to: persona-sre
+    about: |
+      F2 Mashov API is unofficial — SRE ownership of circuit-breakers,
+      graceful-degradation, credential encryption, health checks.
+      Primary lens on operational features.
+  - to: persona-redteam
+    about: |
+      F1 OAuth token storage, F2 Mashov credential encryption,
+      F7 Classroom grade-passback authorization — redteam owns.
+  - to: persona-privacy
+    about: |
+      F8 data-portability export (PPL compliance), F3 CSV bulk roster
+      (under-13 silent creation risk if not teacher-certified).
+  - to: persona-enterprise
+    about: |
+      Multi-tenant scoping of all integrations (per ADR-0001) — Mashov
+      credentials per school, Classroom tokens per teacher-class.

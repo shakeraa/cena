@@ -1,0 +1,154 @@
+doc_path: pre-release-review/axis1_pedagogy_mechanics_cena.md
+reviewer: persona-enterprise
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight pedagogy-mechanics features (interleaving, spaced mastery, retrieval micro-checks,
+  elaborative prompts, hint governor, desirable difficulty, near-to-far sequencing,
+  worked-example fading) aimed at lifting mastery-per-hour and 30-day retention. Each
+  feature is cited to peer-reviewed effect sizes and competitor behavior.
+system_purpose_fit: 4
+  rationale:
+    - All eight features slot cleanly into the existing Pedagogy bounded context (scheduler + session lifecycle) without requiring new aggregates.
+    - Several features shift state that is currently in-session into persisted "mastery state" (e.g. skill_mastery_state) — needs to be keyed by (enrollmentId, conceptId) per ADR-0001 Phase 2 / ADR-0003 rules.
+    - No feature proposes GraphQL, new mobile stack, or streak/dark-pattern mechanics; all are SignalR/REST-friendly.
+code_reality_check:
+  claims_verified_in_code:
+    - "Session lifecycle events exist (SessionStarted_V1) -> src/actors/Cena.Actors/Events/StudentProfileSnapshot.cs:180"
+    - "Per-concept mastery state already tracked with PKnown -> src/actors/Cena.Actors/Events/StudentProfileSnapshot.cs:141-148"
+    - "Mastery decay already event-sourced (MasteryDecayed_V1) -> src/actors/Cena.Actors/Events/StudentProfileSnapshot.cs:141"
+    - "Enrollment aggregate landed (EnrollmentCreated_V1) -> src/actors/Cena.Actors/Events/EnrollmentEvents.cs:72"
+  claims_contradicted_by_code:
+    - "Doc assumes scheduler is a free-standing service; today scheduling logic is fused into StudentActor -> src/actors/Cena.Actors/Students/StudentActor.Commands.cs:1 (1036 LOC, violates <500 rule)"
+    - "FD-007 / 'session-local discrimination scores' must not persist, but current StudentProfileSnapshot is the default sink and stores per-concept state indefinitely -> src/actors/Cena.Actors/Events/StudentProfileSnapshot.cs:11"
+  claims_unverifiable:
+    - "'Mastery challenge covering relationships hand-curated initially' — no CurriculumGraph covering-edge schema exists to confirm where this data would live"
+adr_alignment:
+  honored:
+    - ADR-0002 (explicit: all features defer answer-correctness to SymPy CAS; none bypass)
+    - ADR-0003 (session-local discrimination scores; no misconception persistence)
+    - ADR-0012 (features align with the LearningSession aggregate split — scheduler belongs in LearningSession context)
+  violated: []
+  missing_adr_needed:
+    - "Scheduler-as-service vs scheduler-in-actor boundary — these eight features push enough scheduling logic to warrant a dedicated aggregate or service (candidate for a 'LearningScheduler' aggregate inside LearningSession context per ADR-0012)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Features 1, 2, 6, 7 all introduce new per-student persisted state (skill_discrimination_matrix, skill_mastery_state,
+      desirable_difficulty_target, transfer_sequence_position). None are keyed by EnrollmentId. ADR-0001 Phase 2 / TENANCY-P2a
+      re-keyed mastery to enrollmentId:conceptId; these new stores will regress that isolation unless authored with the same key.
+    evidence: axis1_pedagogy_mechanics_cena.md:L112-115 (skill_mastery_state schema omits enrollmentId)
+    lens_note: Enterprise — any new per-student state must be enrollment-scoped or Phase 2 tenant isolation is compromised.
+  - severity: P0
+    finding: |
+      Doc treats "scheduler" as a new service, but StudentActor is already 764 + 1036 + 353 + 363 + 453 = 2969 LOC of partial classes (god-aggregate
+      pattern). ADR-0012 accepts this for pilot but mandates split before production. Adding eight new scheduler code paths without
+      landing the aggregate split will make the post-pilot decomposition exponentially more expensive.
+    evidence: "src/actors/Cena.Actors/Students/StudentActor.Commands.cs:1 (1036 LOC); docs/adr/0012-aggregate-decomposition.md:18"
+    lens_note: Enterprise — DDD aggregate hygiene; do not pile more logic into the god aggregate.
+  - severity: P1
+    finding: |
+      Feature 5 (hint governor) and Feature 8 (worked-example fading) both emit new events (HintGovernorDecided_V1-ish,
+      FadingLevelChanged_V1-ish) but doc doesn't specify upcaster strategy. The existing HintRequested_V1 in PedagogyEvents.cs
+      is already in-stream — any schema change is a breaking event-store evolution without a versioned upcaster.
+    evidence: axis1_pedagogy_mechanics_cena.md:L~200 (Feature 5 implementation sketch); docs/architecture-audit.md:17 (C2 gap)
+    lens_note: Enterprise — event schema versioning is non-optional; every new event must ship with V1 + upcaster rule.
+  - severity: P1
+    finding: |
+      Features 3 & 4 (retrieval micro-checks, elaborative prompts) both assume LearningSessionActor can spawn mid-session
+      sub-flows. Today context.Parent null-forgiving usage in LearningSessionActor is unsafe (H2 in actor-system-review) and
+      DelegateEvent from session actors is silently dropped (M7). New mid-session flows will hit both bugs.
+    evidence: "docs/actor-system-review.md:77-83 (H2); docs/actor-system-review.md:182-185 (M7)"
+    lens_note: Enterprise — don't build new features atop known actor-boundary defects.
+  - severity: P2
+    finding: |
+      Features make no mention of offline conflict resolution. Most are session-bound so this is mild, but spaced mastery
+      intervals written offline will collide with server-side MasteryDecayed_V1 emissions (C4 gap).
+    evidence: "axis1_pedagogy_mechanics_cena.md:L99-105 (Feature 2 scheduler); docs/architecture-audit.md:26-28 (C4)"
+    lens_note: Enterprise — any new per-student state needs an offline/replay design.
+already_built:
+  - feature: "Per-concept mastery state with PKnown and MasteryDecayed event"
+    evidence: src/actors/Cena.Actors/Events/StudentProfileSnapshot.cs:141-148
+    note: "Feature 2 'mastery_state per skill' partially exists — should extend, not reinvent"
+  - feature: "Enrollment scoping for mastery (TENANCY-P2a)"
+    evidence: src/actors/Cena.Actors/Events/EnrollmentEvents.cs:72
+    note: "Doc appears unaware mastery was re-keyed to enrollmentId:conceptId; update schema proposals"
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-001 (Interleaved Adaptive Scheduler) = Feature 1"
+  - "feature-discovery-2026-04-20.md: FD-002 (CAS-gated variation) partially overlaps Feature 8"
+extracted_tasks:
+  - title: "Make skill_discrimination + mastery_state schemas enrollment-scoped"
+    priority: P0
+    estimate: M
+    suggested_assignee: claude-subagent-tenancy
+    queue_body: |
+      ## Goal
+      Before any of axis1 features 1/2/6/7 land, formalize that every new per-student persisted state key uses
+      (enrollmentId, conceptId) rather than (studentId, conceptId). Produce a schema linting rule or reviewer checklist.
+
+      ## Files
+      - src/shared/Cena.Infrastructure/Tenancy/TenantScope.cs
+      - docs/engineering/shipgate.md (add rule)
+      - docs/adr/0001-multi-institute-enrollment.md (link rule)
+
+      ## Definition of Done
+      - Written checklist in shipgate.md: "new per-student document/event carries EnrollmentId".
+      - Reference implementation: one existing mastery store + one new scheduler store both using MasteryKeys.Key.
+      - Ship-gate CI scanner rule added to flag `studentId` + `conceptId` pair without enrollmentId context.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-tenancy --result "<branch>"
+    source_doc_lines: [L55-L115]
+  - title: "Publish upcaster convention doc for pedagogy events"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Close gap C2 from architecture-audit for the pedagogy event family before axis1 features 5 & 8 add
+      new event types. Must cover: naming (EventName_V{n}), default-value upcaster rules, and where
+      upcasters live.
+
+      ## Files
+      - docs/event-schemas.md
+      - docs/adr/ (new: 0013-event-versioning-policy.md)
+
+      ## Definition of Done
+      - ADR-0013 drafted with Marten upcaster example for one real pedagogy event.
+      - Reviewer checklist references it; any PR adding a `record EventName_V\d+` without upcaster is blocked.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L180-L240]
+  - title: "Block new pedagogy features until ADR-0012 split plan is scheduled"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Make a go/no-go call: either (a) start ADR-0012 StudentActor decomposition ahead of axis1 feature rollout,
+      or (b) accept a documented tech-debt ticket per feature that reopens when decomposition starts.
+
+      ## Files
+      - docs/adr/0012-aggregate-decomposition.md
+      - docs/roadmap/ (update schedule)
+
+      ## Definition of Done
+      - Decision recorded in ADR-0012 status block.
+      - If (a): Sprint 1 of 6-sprint plan opened in queue.
+      - If (b): every axis1 feature ticket links a "ACT-DEBT-axis1-<n>" follow-up.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L20-L50]
+verdict: adopt
+verdict_reason: |
+  Pedagogy mechanics are core to Cena's stated purpose and all align with non-negotiables. Adoption is gated on
+  enrollment-scoped keys + event-versioning discipline + a decision on the god-actor split. None of these are showstoppers.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: Validity of effect sizes and transfer-of-learning citations (Rohrer, Brunmair).
+  - to: persona-sre
+    about: New per-student state implies projection rebuild risk; need SLO for rebuild time.
+  - to: persona-educator
+    about: Pedagogical appropriateness of "hint governor" vs. current F9 hint design.

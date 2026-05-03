@@ -1,0 +1,75 @@
+-- =============================================================================
+-- Cena Platform — Migration V0003
+-- Partial covering index on cena.mt_events for active per-stream reads
+--
+-- Origin: 2026-04-26 emulator-stress profiling at 50 students × 20× speed.
+-- pg_stat_statements (after pg_stat_statements_reset) showed a single Marten
+-- event-stream read query consuming 65.6 % of total exec time (1729 ms over
+-- 50 calls, mean 34.6 ms / call):
+--
+--   SELECT data, type, mt_dotnet_type, seq_id, id, stream_id, version,
+--          timestamp, tenant_id, correlation_id, causation_id, headers,
+--          is_archived
+--   FROM cena.mt_events AS d
+--   WHERE d.is_archived = $2 AND d.stream_id = $1
+--   ORDER BY d.seq_id;
+--
+-- EXPLAIN (ANALYZE, BUFFERS) on a representative stream:
+--   Sort  (cost=5506.23..5510.19 rows=1583 ...) (Sort Method: quicksort, 2000kB)
+--     ->  Bitmap Heap Scan on cena.mt_events d
+--           Recheck Cond: stream_id = $1
+--           Filter: NOT is_archived
+--           ->  Bitmap Index Scan on pk_mt_events_stream_and_version
+--                 Index Cond: stream_id = $1
+--
+-- Two costs visible in the plan:
+--   1. Sort step on seq_id — the existing primary key index orders rows by
+--      (stream_id, version), but Marten reads them ordered by seq_id (the
+--      global event sequence). PG must materialize and sort.
+--   2. Recheck of `NOT is_archived` on every heap row — wasted work on the
+--      hot path because >99 % of events in the active stream are not
+--      archived (tombstoning is the rare case).
+--
+-- This partial covering index removes both:
+--   - Leading column stream_id  → equality seek
+--   - Trailing column seq_id    → ordered output, sort step disappears
+--   - WHERE is_archived = false → smaller index, archive recheck disappears
+--
+-- Read footprint of the dominant query becomes a plain Index Scan with no
+-- sort and no filter recheck. Write cost is bounded: every insert into
+-- mt_events sets is_archived = false (the default) so the index sees the
+-- same write rate as pk_mt_events_stream_and_version. The archived-row
+-- subset (tombstoned events) is excluded, keeping the index compact.
+--
+-- Why this lives here and not in Marten's StoreOptions:
+--   - Marten owns mt_events table shape and the two existing indexes
+--     (pk_mt_events_stream_and_version, pkey_mt_events_seq_id). Adding a
+--     supplementary read-side index outside Marten's tracked set is the
+--     supported pattern for performance tuning event-store reads —
+--     Marten's CreateOrUpdate schema diff only adds/modifies indexes it
+--     manages and will not drop unknown ones.
+--   - Authoring this in raw SQL keeps the rationale, EXPLAIN evidence,
+--     and stress-test envelope auditable in one place (this header).
+--
+-- Validation: after applying this migration and re-running the same
+-- emulator envelope, the dominant query should drop out of the top of
+-- pg_stat_statements (or shrink by an order of magnitude). Re-baseline by:
+--
+--   SELECT pg_stat_statements_reset();
+--   -- run emulator at 50 × 20× for ~90s --
+--   SELECT round(total_exec_time::numeric, 1) AS total_ms, calls,
+--          round(mean_exec_time::numeric, 2) AS mean_ms,
+--          substr(query, 1, 80)
+--     FROM pg_stat_statements
+--    ORDER BY total_exec_time DESC LIMIT 5;
+-- =============================================================================
+
+CREATE INDEX IF NOT EXISTS ix_mt_events_active_stream_seq
+    ON cena.mt_events (stream_id, seq_id)
+    WHERE is_archived = false;
+
+-- Refresh planner stats so the new index is costed correctly on the next
+-- query plan. mt_events accumulates write traffic faster than autovacuum
+-- typically catches up during stress runs, and a stale n_distinct on
+-- stream_id can push the planner back to the bitmap-scan + sort plan.
+ANALYZE cena.mt_events;

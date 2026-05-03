@@ -1,0 +1,69 @@
+name: Ship-gate scanners
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Dark-pattern ship-gate per docs/engineering/shipgate.md.
+# Three scanners run in series:
+#   1. scripts/shipgate/scan.mjs         — baked-in locale + i18n rules
+#   2. scripts/shipgate/rulepack-scan.mjs — YAML rule packs (citations + mechanics)
+#   3. scripts/shipgate/ux-surface-scan.mjs — prr-211 DOM-aware UX-surface rulepack
+# The rule-pack scanner starts in --advisory mode so CI reports hits without
+# blocking; flip to strict by removing --advisory once the historical-scan
+# follow-ups in pre-release-review/reviews/banned-*-historical-scan.md clear.
+# The UX-surface scanner is strict from day one (it targets NEW surfaces
+# that land clean — no historical backlog to absorb).
+
+jobs:
+  shipgate:
+    name: shipgate / scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Lexicon-lock gate (Arabic lexicon terms)
+        run: node scripts/shipgate/lexicon-lock-gate.mjs
+
+      - name: Rule-pack scanner (banned-citations + banned-mechanics, advisory)
+        run: node scripts/shipgate/rulepack-scan.mjs --advisory
+
+      - name: LLM-routing scanner (ADR-0026, advisory)
+        # Starts in --advisory mode; flip to --strict once Epic B sub-tasks
+        # (prr-012, prr-145, prr-105) retire the TODO(prr-012) allowlist
+        # entries. See docs/adr/0026-llm-three-tier-routing.md §Follow-up.
+        run: node scripts/shipgate/llm-routing-scanner.mjs --advisory
+
+      - name: UX-surface scanner v2 (prr-211 — strict)
+        run: node scripts/shipgate/ux-surface-scan.mjs
+
+      - name: Rule-pack fixture self-test (strict — every rule must fire)
+        run: |
+          node --test tests/shipgate/banned-citations.spec.mjs \
+                      tests/shipgate/banned-mechanics.spec.mjs \
+                      tests/shipgate/llm-routing-scanner.spec.mjs \
+                      tests/shipgate/ux-surfaces.spec.mjs
+
+      - name: Coverage SLO ship-gate (prr-210)
+        run: node scripts/shipgate/coverage-slo.mjs
+
+      - name: Upload coverage rung status report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-rung-status
+          path: ops/reports/coverage-rung-status.md
+          if-no-files-found: warn
+
+      - name: Coverage SLO script self-test
+        run: node --test tests/shipgate/coverage-slo.spec.mjs

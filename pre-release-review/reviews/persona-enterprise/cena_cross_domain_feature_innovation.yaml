@@ -1,0 +1,81 @@
+doc_path: pre-release-review/cena_cross_domain_feature_innovation.md
+reviewer: persona-enterprise
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight cross-domain feature ideas imported from non-EdTech domains (gaming, health,
+  finance, flight-training). Presented as inspiration, not committed proposals.
+system_purpose_fit: 2
+  rationale:
+    - Cross-domain ideas often import architectural assumptions that don't fit Cena (e.g. streaks from habit apps).
+    - Most proposals are speculative; several violate non-negotiables if adopted literally.
+code_reality_check:
+  claims_verified_in_code:
+    - "Focus degradation service exists (health-monitor analog) -> src/actors/Cena.Actors/Focus... (per FocusEvents.cs referenced in ADR-0012:71)"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Most cross-domain mappings; speculative by design."
+adr_alignment:
+  honored: []
+  violated:
+    - "GD-004 (potentially — several habit-app-inspired features imply streaks/variable-ratio)"
+  missing_adr_needed:
+    - "Guardrail for cross-domain feature borrowing (require ADR-0003 + GD-004 compatibility check before authoring)"
+non_negotiable_violations:
+  - "3 (streaks/loss-aversion) if 'habit loop' features from finance/health apps are adopted as-is"
+persona_findings:
+  - severity: P1
+    finding: |
+      Any feature imported from habit-tracker apps (Duolingo, Fabulous, Headspace) must be scrubbed for streak /
+      variable-ratio / loss-aversion mechanics before entering backlog. Cross-domain innovation doc is the riskiest
+      vector for sneaking banned mechanics into the product.
+    evidence: "cena_cross_domain_feature_innovation.md (full doc); docs/engineering/shipgate.md (GD-004)"
+    lens_note: Enterprise — cross-domain imports must pass ship-gate banned-term scan at authoring time.
+  - severity: P2
+    finding: |
+      "Flight simulator scenario generation" idea implies scripted multi-step scenarios. That maps to ExamSimulation
+      context — use existing ExamSimulation + QuestionRecreation infrastructure rather than a new scenario engine.
+    evidence: "cena_cross_domain_feature_innovation.md:L~100; src/actors/Cena.Actors/Simulation/"
+    lens_note: Enterprise — reuse existing contexts.
+  - severity: P2
+    finding: |
+      "Financial portfolio diversification" → "curriculum diversification" analogy proposed. Maps to existing
+      enrollment-track + interleaving; no new architecture needed.
+    evidence: "cena_cross_domain_feature_innovation.md:L~150; ADR-0001"
+    lens_note: Enterprise — existing aggregates cover this.
+already_built:
+  - feature: "Focus/attention context analogous to 'pilot workload'"
+    evidence: "src/actors/Cena.Actors/ (FocusEvents.cs cited in ADR-0012)"
+    note: "Already covered."
+duplicates_of_other_docs:
+  - "axis2_motivation_self_regulation_findings.md: habit-loop overlap"
+  - "axis1_pedagogy_mechanics_cena.md: interleaving = 'portfolio diversification'"
+extracted_tasks:
+  - title: "Pre-backlog ship-gate scan for cross-domain features"
+    priority: P1
+    estimate: S
+    suggested_assignee: claude-subagent-shipgate
+    queue_body: |
+      ## Goal
+      Extend ship-gate CI scanner to block any new feature ticket that lifts language from cross-domain research docs
+      without explicit mapping to existing Cena ADRs/contexts.
+
+      ## Files
+      - docs/engineering/shipgate.md
+      - CI config for shipgate scanner
+
+      ## Definition of Done
+      - Scanner flags ticket titles/bodies containing banned-term set.
+      - README documents the rule.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-shipgate --result "<branch>"
+    source_doc_lines: [L1-L240]
+verdict: retire
+verdict_reason: |
+  Inspiration doc; no direct tickets. Several specific proposals are ship-blocker risks under non-negotiable 3.
+  Treat as a heat-check, not a backlog source.
+cross_lens_handoff:
+  - to: persona-ethics
+    about: "Every cross-domain idea needs GD-004 review."
+  - to: persona-cogsci
+    about: "Cross-domain analogies rarely carry empirical transfer; evidence required before adoption."

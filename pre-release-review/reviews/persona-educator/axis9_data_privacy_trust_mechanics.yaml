@@ -1,0 +1,166 @@
+doc_path: pre-release-review/axis9_data_privacy_trust_mechanics.md
+reviewer: persona-educator
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 privacy + trust features: explainable-AI "why this problem," student data
+  transparency dashboard, delete-my-journey data erasure, consent-revocation
+  UX, age-appropriate privacy language, inference-trail / provenance, cohort-
+  insights with differential privacy, periodic transparency report.
+
+system_purpose_fit: 2
+  rationale:
+    - Almost entirely outside the pedagogue lens. Privacy + trust features
+      are necessary for compliance but do not directly move mastery-per-hour
+      or Bagrut-outcome delta.
+    - I flag pedagogue issues only where privacy-UX choices (e.g., age-
+      appropriate explanations) could affect learning.
+    - ADR-0003 compliance is the relevant through-line.
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Audit system exists" -> src/actors/Cena.Actors/Audit/
+    - "Compliance / retention worker" -> src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs + DataRetentionPolicy.cs + ComplianceContracts.cs
+    - "ML exclusion enforcement tests (ADR-0003 compliance)" -> src/actors/Cena.Actors.Tests/Compliance/MlExclusionEnforcementTests.cs
+    - "Stuck diagnosis anonymization" -> src/actors/Cena.Actors/Diagnosis/StuckAnonymizer.cs
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Differential-privacy pipeline for F7 cohort insights" — no DP
+      library or epsilon budget tracker apparent.
+
+adr_alignment:
+  honored:
+    - ADR-0003 (doc repeatedly invokes session-scope as strength, not
+      limitation)
+    - Non-negotiable #8 (no ML training on student data)
+  violated: []
+  missing_adr_needed: []
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 1 ("Why This Problem" Explainable AI) — Dr Rami and Dr Nadia
+      both flagged the thin research base. From a pedagogue lens: 16-year-
+      old Bagrut students *don't care* why a problem was recommended. They
+      want to solve the problem and move on. A verbose "why this problem"
+      panel adds cognitive load. Ship only as a one-sentence header
+      ("you're practicing this because your last session showed gaps in
+      trig identities") at ≤15 words. Do not build a standalone panel.
+    evidence: axis9_data_privacy_trust_mechanics.md:L26-L61, cena_dr_nadia_pedagogical_review_20_findings.md FD-014 WARNING, finding_assessment_dr_rami.md FD-014 PASS
+    lens_note: |
+      Explanations are for parents and regulators, not for 16-year-olds.
+      Put the transparency in the parent dashboard; keep the student flow
+      friction-free.
+  - severity: P2
+    finding: |
+      Feature 5 (Age-Appropriate Privacy Communication) — the "12-year-
+      old readable plain language" goal is right for Cena's youngest
+      users. However, the doc proposes "layered disclosure (summary first,
+      details on demand)" which, for Hebrew-speaking 12-year-olds, may
+      require a reading-level of at least grade 6, not grade 3. Validate
+      reading level in each language against age-appropriate corpus.
+    evidence: axis9_data_privacy_trust_mechanics.md:L184-L206
+    lens_note: |
+      A 12-year-old reads differently in Hebrew than in English. Lorem
+      ipsum privacy notices translated from English to Hebrew score
+      grade 10+. Validate with actual students.
+  - severity: P2
+    finding: |
+      Feature 6 (Data Provenance Inference Trail) — "I recommended this
+      because of session X, problem Y, time Z" sounds transparent but
+      risks exposing raw misconception data across sessions (the very
+      thing ADR-0003 forbids). Carefully: the provenance trail can only
+      cite *mastery signals* (BKT, Elo) and *session-level* events, never
+      misconception tags. The doc does say "session-scoped" but the
+      inference-trail architecture needs a test enforcing it.
+    evidence: axis9_data_privacy_trust_mechanics.md F6 section
+    lens_note: |
+      Transparency that re-exposes session misconception tags breaks the
+      ADR-0003 wall. Architectural test required.
+
+already_built:
+  - feature: "Retention worker + data-retention policy framework (F3 foundation)"
+    evidence: src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs, DataRetentionPolicy.cs
+    note: |
+      Retention infrastructure exists. F3 erasure flow needs the UI + API
+      wiring to trigger cascading deletion through the existing worker.
+  - feature: "ML exclusion enforcement (F8 transparency report foundation)"
+    evidence: src/actors/Cena.Actors.Tests/Compliance/MlExclusionEnforcementTests.cs
+    note: |
+      The tests for "misconception data is never in training corpus"
+      already exist — F8 transparency report can publish the test-pass
+      status.
+
+duplicates_of_other_docs:
+  - AXIS_4_Parent_Engagement_Cena_Research.md: F1 "Why This Topic" (same as F1 here, but parent-facing)
+  - feature-discovery-2026-04-20.md: FD-014 Explainable recommendations
+
+extracted_tasks:
+  - title: "Scope 'Why this problem' to ≤15-word single-sentence header"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Reject F1 standalone panel. Instead, embed a ≤15-word one-sentence
+      explanation at the top of each problem card: "You're practicing this
+      because your last session showed gaps in [topic]." Generated from
+      the existing ExplanationGenerator with a strict length clamp.
+      ## Files
+      - src/student/student-web/ (problem-card component)
+      - src/actors/Cena.Actors/Services/ExplanationGenerator.cs (one-line mode)
+      ## Definition of Done
+      - Single sentence, ≤15 words.
+      - Session-scoped data source only (no cross-session misconception
+        leakage — unit test required).
+      - Shipped on student problem-card header; no separate panel.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: why-this-problem-one-line"
+    source_doc_lines: [L26-L61]
+  - title: "Architectural test: provenance trail never leaks misconception tags"
+    priority: P1
+    estimate: S
+    suggested_assignee: claude-subagent-privacy
+    queue_body: |
+      ## Goal
+      Add a test that any user-facing or audit-facing "why this was
+      recommended" trail contains only mastery signals (BKT, Elo) and
+      session-event IDs, never misconception_tag fields. Protects ADR-
+      0003 across the transparency feature set.
+      ## Files
+      - src/actors/Cena.Actors.Tests/Compliance/ProvenanceTrailLeakageTests.cs (new)
+      - src/actors/Cena.Actors/Audit/
+      ## Definition of Done
+      - Test iterates all provenance payloads, asserts no MisconceptionTag
+        fields present.
+      - CI-blocking on fail.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-privacy --result "<branch>: provenance-no-misconception-leak"
+    source_doc_lines: [axis9 F6 section]
+
+verdict: adopt
+verdict_reason: |
+  Doc is outside my lens for most features. Pedagogue-relevant notes:
+  scope "why this problem" to a one-liner, not a panel; validate reading
+  level of privacy notices with target-age students in each language;
+  architectural test for provenance trail.
+
+cross_lens_handoff:
+  - to: persona-privacy
+    about: |
+      This entire doc is primarily your lens. F1-F8 need full privacy-lens
+      review.
+  - to: persona-a11y
+    about: |
+      F5 age-appropriate privacy language + visual layering → a11y for
+      contrast, reading level, audio-narration compliance.
+  - to: persona-redteam
+    about: |
+      F3 delete-my-journey flow — redteam should probe for deletion
+      bypass, parent-impersonation, under-age bypass.
+  - to: persona-enterprise
+    about: |
+      F7 cohort-insights differential-privacy pipeline — enterprise should
+      ensure it integrates with the existing event-sourced architecture
+      cleanly (nightly DP aggregate as projection).

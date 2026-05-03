@@ -1,0 +1,255 @@
+doc_path: pre-release-review/AXIS_10_Operational_Integration_Features.md
+reviewer: persona-privacy
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 operational features: Google SSO, Mashov gradebook sync (read-only), CSV bulk
+  roster import, offline-first practice, multi-device session continuity, school IT admin
+  deployment dashboard, Google Classroom assignment/grade passback, Israeli-law-compliant
+  student data portability export. Heavy on integrations with external systems.
+
+system_purpose_fit: 3
+  rationale:
+    - Feature 8 (portability) is already built — see axis9 review
+    - Feature 1 Google SSO — data-sharing with Google for minors = disclosure boundary
+    - Feature 2 Mashov uses teacher username/password (credentials storage)
+    - Feature 7 Google Classroom grade passback = per-student grade shared with Google
+    - Every integration = new sub-processor requiring disclosure
+    - Non-negotiable #7 (REST+SignalR only) respected
+
+code_reality_check:
+  claims_verified_in_code:
+    - "GDPR portability export shipped -> src/shared/Cena.Infrastructure/Compliance/StudentDataExporter.cs + src/api/Cena.Student.Api.Host/Endpoints/MeGdprEndpoints.cs:57-63"
+    - "Firebase auth integration exists (different from Google SSO) -> src/shared/Cena.Infrastructure/Firebase/FirebaseAdminService.cs"
+    - "ICON privacy manifest files for iOS integrations -> src/mobile/ios/Pods/.../PrivacyInfo.xcprivacy"
+  claims_contradicted_by_code:
+    - "Feature 8 is proposed but already implemented in MeGdprEndpoints.cs — retire proposal"
+  claims_unverifiable:
+    - "Mashov, Google Classroom, CSV bulk import not in src/ — proposed"
+    - "Offline-first + multi-device sync not built"
+
+adr_alignment:
+  honored:
+    - Non-negotiable #7 (REST + SignalR)
+    - ADR-0001 (multi-institute — Feature 6 IT admin dashboard tenant-scoped)
+  violated: []
+  missing_adr_needed:
+    - "ADR for sub-processor inventory + sharing policy (every integration = disclosure)"
+    - "ADR for credential storage (Feature 2 encrypted Mashov password at rest)"
+    - "ADR for offline data retention on device (Feature 4) — how long does student data live in browser/localStorage?"
+    - "ADR for grade passback to Google Classroom — cross-border data transfer"
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 7 (Google Classroom grade passback) transfers per-student grades to
+      Google Workspace. This is cross-border data transfer (Google US) of minor's
+      educational records. Requires: (a) Standard Contractual Clauses or
+      Israel-EU-US adequacy bridge; (b) explicit student/parent consent with specific
+      destination disclosure; (c) data-minimization (aggregate grade only, not raw
+      Cena analytics); (d) Israel PPL Regulations (Data from EEA) compliance.
+    evidence: "AXIS_10_Operational_Integration_Features.md:13-15 (feature list)"
+    lens_note: |
+      "Integrates with LMS" is a compliance loaded statement. Data flows outside Israel
+      need explicit transfer-mechanism documentation.
+
+  - severity: P0
+    finding: |
+      Feature 2 (Mashov sync) stores teacher credentials (username + encrypted password)
+      in Cena. This is a high-risk credential surface. Requires: (a) at-minimum HashiCorp
+      Vault / AWS Secrets Manager (not Marten encrypted column); (b) periodic credential
+      rotation reminder; (c) SIEM alerting on credential access; (d) teacher notification
+      if credentials used; (e) Mashov API is unofficial (doc acknowledges) — breaking
+      change risk.
+    evidence: "AXIS_10_Operational_Integration_Features.md:117"
+    lens_note: |
+      "Encrypted at rest" is not a bar that's automatically met by putting it in Postgres.
+      This needs a proper secret-manager.
+
+  - severity: P1
+    finding: |
+      Feature 1 Google SSO — doc correctly flags BORDERLINE: scope limitation to
+      openid/email/profile. But does not address: (a) OAuth consent screen language
+      (must be Hebrew/Arabic for Israeli minors); (b) account-linking consent when
+      student already has Cena account with different email; (c) disabling SSO-only
+      accounts when student leaves school; (d) Google disclosure per PPL §11.
+    evidence: "AXIS_10_Operational_Integration_Features.md:62-66"
+    lens_note: |
+      Google is a sub-processor requiring disclosure; SSO-only login creates
+      account-lifecycle dependency on a third party.
+
+  - severity: P1
+    finding: |
+      Feature 4 (offline-first practice) stores student progress locally. Key issues:
+      (a) localStorage on shared school laptop = cross-user data leak;
+      (b) offline data retention if device lost / student leaves;
+      (c) sync conflict resolution must not overwrite remote erasure (GDPR Art 17 —
+      if student requested erasure while offline device has data, sync must not
+      restore it).
+    evidence: "AXIS_10_Operational_Integration_Features.md:11"
+    lens_note: |
+      Offline data is a classic right-to-erasure loophole.
+
+  - severity: P1
+    finding: |
+      Feature 3 (CSV Bulk Roster Import) — PII-heavy import surface (student names,
+      emails, birth dates). Needs: (a) PII in CSV held only in-flight, not in
+      temp files; (b) school admin must have delegated authority; (c) import audit log;
+      (d) duplicate-with-existing-student detection to prevent PII overwrite.
+    evidence: "AXIS_10_Operational_Integration_Features.md:12"
+    lens_note: |
+      Roster imports are a top-5 incident cause in EdTech (wrong file → wrong tenant).
+
+  - severity: P2
+    finding: |
+      Feature 5 (multi-device session continuity) syncs ephemeral session state. Must
+      not sync [MlExcluded] misconception events across devices in a way that creates
+      a durable cross-device log. Session-scope boundary means same session id, same
+      Marten stream — OK if properly scoped.
+    evidence: "AXIS_10_Operational_Integration_Features.md:13"
+    lens_note: |
+      Multi-device architecture often tempts teams to break session-scope.
+
+  - severity: P2
+    finding: |
+      Feature 8 (portability export) is already shipped in MeGdprEndpoints.cs / Student
+      DataExporter.cs. Doc mis-positions as "new feature". Retire the proposal; only
+      Hebrew translation of the export format docs remains.
+    evidence: "AXIS_10_Operational_Integration_Features.md:15 + src/api/Cena.Student.Api.Host/Endpoints/MeGdprEndpoints.cs:179-197"
+    lens_note: |
+      Don't pay twice for the same feature.
+
+already_built:
+  - feature: GDPR portability export (Feature 8)
+    evidence: src/shared/Cena.Infrastructure/Compliance/StudentDataExporter.cs + MeGdprEndpoints.cs:57-63
+    note: Complete export with PII annotations, [MlExcluded] filter, rate limit. Retire proposal.
+  - feature: Firebase auth (adjacent to Feature 1 Google SSO)
+    evidence: src/shared/Cena.Infrastructure/Firebase/FirebaseAdminService.cs
+    note: Existing auth backend; SSO integration extends rather than replaces.
+
+duplicates_of_other_docs:
+  - "axis9_data_privacy_trust_mechanics.md: Feature 3 (data erasure) partially related to Feature 8 (portability)"
+  - "feature-discovery-2026-04-20.md: FD-042 Google SSO, FD-043 Mashov, FD-044 CSV — all mapped"
+  - "cena_axis5_teacher_workflow_features.md: Mashov grade integration surfaces teacher use"
+
+extracted_tasks:
+  - title: "Sub-processor registry + DPAs for all integrations (SSO, Mashov, Google Classroom)"
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Every integration in AXIS 10 (Google SSO, Mashov, Google Classroom) is a
+      new sub-processor. Before ship: (a) published registry; (b) DPA executed;
+      (c) privacy notice updated in he/ar/en; (d) consent purposes mapped;
+      (e) cross-border transfer mechanism documented (SCCs / adequacy).
+
+      ## Files
+      - docs/compliance/sub-processors.md (shared with Axis 9 task)
+      - docs/compliance/cross-border-transfers.md
+      - Legal: Google Workspace DPA, Priority/Mashov DPA
+      - Privacy page updates
+
+      ## Definition of Done
+      - Registry lists Google, Mashov, Firebase, Anthropic, Twilio, OCR vendors with categories + region + DPA link
+      - Transfer mechanisms documented per destination
+      - Privacy notice updated 3 languages
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: ["L13-15", "L62-66", "L72-97"]
+
+  - title: "Credential storage: Mashov password via secret manager, not DB"
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Feature 2 teacher Mashov credentials must live in HashiCorp Vault / AWS Secrets /
+      Azure Key Vault — NOT a Marten encrypted column. Access must be audit-logged and
+      alert on anomaly.
+
+      ## Files
+      - src/shared/Cena.Infrastructure/Secrets/ISecretStore.cs
+      - Feature 2 implementation
+      - Alerting: new category "credential_access" in SIEM
+
+      ## Definition of Done
+      - ISecretStore abstraction with Vault/KV adapter
+      - Mashov credentials via abstraction
+      - Access alerts firing in SIEM
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L117"]
+
+  - title: "Offline-first erasure-honoring sync (Feature 4)"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Offline device caches must be invalidated on: (a) successful erasure request;
+      (b) user sign-out; (c) device-loss report. Sync must NOT recreate deleted data
+      from offline writes made before erasure.
+
+      ## Files
+      - PWA service worker design
+      - Sync conflict resolver — erasure-wins
+
+      ## Definition of Done
+      - Service worker subscribes to erasure events (via SignalR or poll)
+      - Local IndexedDB / cache cleared on erasure
+      - Test: offline writes after erasure do NOT resurrect data
+      - TTL on local cache (default 7 days for minors)
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L11"]
+
+  - title: "CSV roster import audit + duplicate-detection + in-flight-only PII"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Feature 3 bulk import handles PII in bulk. Need: (a) no temp file written to disk
+      (stream-only); (b) per-import audit entry with count/hash/tenant; (c) duplicate
+      detection before write; (d) school-admin role check; (e) rollback capability.
+
+      ## Files
+      - Feature 3 implementation
+      - Audit middleware extension for bulk imports
+
+      ## Definition of Done
+      - Streaming CSV parser only
+      - Audit entry per import
+      - Duplicate detection by email
+      - Test for tenant-boundary
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L12"]
+
+verdict: revise
+verdict_reason: |
+  Operational integrations are high compliance-cost: every sub-processor, every credential,
+  every cross-border transfer needs documentation + consent + DPA. Feature 8 already ships
+  — retire. Features 1/2/7 need the sub-processor+DPA work. Feature 4 offline has a real
+  erasure-loophole risk.
+
+cross_lens_handoff:
+  - to: persona-redteam
+    about: |
+      SSO account takeover, Mashov credential theft, offline data extraction. This axis is
+      the largest new attack surface in the corpus.
+  - to: persona-sre
+    about: |
+      Multi-device sync reliability, Mashov API unofficial (community-documented) — SLO/runbook.
+  - to: persona-enterprise
+    about: |
+      Tenancy rollout (per memory: TENANCY-P1 in-flight) intersects Feature 6 IT admin dashboard.
+  - to: persona-finops
+    about: |
+      Every integration = new per-student API cost; tier-routing per ADR-026 applies.

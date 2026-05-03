@@ -1,0 +1,81 @@
+doc_path: pre-release-review/cena_cross_domain_feature_innovation.md
+reviewer: persona-sre
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight cross-domain features mined from non-EdTech (Obsidian math concept map, Calm/Headspace focus ritual, Fabulous learning
+  journeys, dynamic-difficulty flow sessions, plus four more). Guardrail-filtered in the doc itself.
+system_purpose_fit: 3
+  rationale:
+    - Guardrail filter in the doc is mostly correct (no streaks, no variable-ratio).
+    - SRE angle: these cross-domain borrowings often come with hidden infrastructure (graph DBs, animation engines).
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Curriculum concept graph (100-150 nodes) — no graph store referenced"
+    - "Breathing bubble animation timing -> no animation spec"
+    - "Journey visualization engine — no path-viz component"
+adr_alignment:
+  honored: [GD-004 (no dark patterns, per doc guardrail column)]
+  violated: []
+  missing_adr_needed:
+    - "Learning-graph storage choice (materialized view vs graph DB)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 1 (Math Concept Map / knowledge graph) at 100-150 nodes + per-student mastery coloring implies a graph query on
+      every dashboard load. Needs a materialized projection + cache layer; do not query event store on every click.
+    evidence: cena_cross_domain_feature_innovation.md Feature 1
+    lens_note: Graph visualizations are a common source of p99 spikes.
+  - severity: P1
+    finding: |
+      Feature 2 (Breathing Ritual) mood check-in logs per session. "Stored locally" for under-13 per doc, but the server-side
+      correlation claim implies eventual sync. Route through affective-signal policy (ADR-0037).
+    evidence: cena_cross_domain_feature_innovation.md Feature 2
+    lens_note: Affective data path must be explicit.
+  - severity: P1
+    finding: |
+      Feature 3 (Learning Journeys) introduces per-student content sequencing — effectively a state machine that must survive
+      pause/resume/device switch. Specify durable storage + replay semantics before SHIP.
+    evidence: cena_cross_domain_feature_innovation.md Feature 3
+    lens_note: Long-lived user-state needs migration + backup story.
+  - severity: P2
+    finding: |
+      "Dynamic Difficulty" framing from games (Feature 4) is close to "desirable difficulty" (axis1). De-duplicate; don't create
+      parallel scheduler implementations.
+    evidence: cena_cross_domain_feature_innovation.md Feature 4
+    lens_note: Reduces ops surface area.
+already_built:
+  - feature: FeatureFlagActor infrastructure
+    evidence: src/actors/Cena.Actors/Infrastructure/FeatureFlagActor.cs
+    note: Use for journey pause/resume + ritual toggles; avoid new primitives.
+duplicates_of_other_docs:
+  - "axis1 (desirable difficulty)"
+  - "axis2 (focus ritual / if-then / mood check-in)"
+  - "feature-discovery-2026-04-20.md (multiple FDs)"
+extracted_tasks:
+  - title: Specify learning-graph storage + caching ADR before knowledge-map feature
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Pick storage for curriculum graph (Postgres materialized view vs dedicated graph DB) and cache-layer strategy. ADR must
+      include query-latency budget.
+      ## Files
+      docs/adr/ (new)
+      ## Definition of Done
+      - ADR merged
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch:sre/concept-graph-adr"
+    source_doc_lines: []
+verdict: merge-with:feature-discovery-2026-04-20.md
+verdict_reason: |
+  Most features duplicate axis/index items. Extract one operational ADR (graph storage); rest should flow through the canonical
+  dedup.
+cross_lens_handoff:
+  - to: persona-educator
+    about: Whether knowledge graph pedagogy is a real differentiator or cosmetic.
+  - to: persona-finops
+    about: Graph rendering cost per dashboard load.

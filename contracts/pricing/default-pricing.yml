@@ -1,0 +1,59 @@
+# =============================================================================
+# Cena Platform — Default pricing contract (prr-244, ADR-0050 Q5)
+#
+# Single source of truth for SaaS-global default pricing. Values locked
+# 2026-04-21 per Multi-Target Exam Plan review §14.6. Every pricing code
+# path MUST route through IInstitutePricingResolver — the resolver reads
+# these defaults when no per-institute override exists.
+#
+# WHY YAML (not JSON): operator-facing file, intentionally human-edited
+# on pricing reviews; YAML lets us keep the inline rationale comments
+# adjacent to each value so the "why $19" context is preserved in git.
+#
+# CHANGING THESE VALUES:
+#   1. Update the numeric value + the rationale comment on the same line.
+#   2. File a pricing-review note in docs/engineering/pricing-changelog.md
+#      with justification + approver.
+#   3. Values are read at service start; hosts must be redeployed (or
+#      cache-flushed — Redis TTL is 5min) to observe the change.
+#
+# The resolver is authorised to read *only* this file + the event stream;
+# any other reader is a violation caught by NoHardcodedPricingTest.
+# =============================================================================
+
+version: 1
+effective_from_utc: "2026-04-21T00:00:00Z"
+source: "cena-saas-global-default"
+
+# Student tier — monthly subscription for self-pay individual students.
+# Floor analysis: ~$3.30/student/month LLM cost (ADR-0026 3-tier routing)
+# + infra ceiling. Margin at $19 = ~82% gross, covers SRE + support +
+# content-engineering refresh (~$500-1,500/quarter per ADR-0050 Q4).
+student_monthly_price_usd: 19.00
+
+# Institutional per-seat price — schools / cram-schools / NGOs who bulk-
+# buy seats. ≥20-seat threshold is the breakpoint where institute billing
+# kicks in; below that, institutes pay the student-monthly rate.
+# Discount = 26% vs self-pay (14 / 19 ≈ 0.737), positioned to beat typical
+# school budget ceilings without cannibalising the individual tier.
+institutional_per_seat_price_usd: 14.00
+min_seats_for_institutional: 20
+
+# Free tier — generous enough that a single student can do a full
+# diagnostic + 1-2 practice sessions per month without paying, narrow
+# enough that serious prep (5+ sessions/week) requires upgrading. Uses
+# only tier-2 LLM (Haiku) per ADR-0026 to keep the LLM bill bounded.
+free_tier_session_cap: 10
+
+# Validation bounds — enforced by IInstitutePricingResolver on both reads
+# and writes. Overrides outside these ranges require a SUPER_ADMIN
+# secondary-confirm dialog carrying the decision rationale.
+bounds:
+  student_monthly_price_usd_min: 3.30   # LLM cost + infra floor
+  student_monthly_price_usd_max: 99.00  # pricing-review guardrail
+  institutional_per_seat_price_usd_min: 2.31  # 0.70 × student floor (30% margin)
+  institutional_per_seat_price_usd_max: 99.00
+  min_seats_for_institutional_min: 1
+  min_seats_for_institutional_max: 1000
+  free_tier_session_cap_min: 0
+  free_tier_session_cap_max: 500

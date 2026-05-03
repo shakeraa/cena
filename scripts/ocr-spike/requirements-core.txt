@@ -1,0 +1,35 @@
+# Core spike deps — needed for fixtures, triage, benchmark harness, and metrics.
+# Heavy model deps (Surya, Marker, olmOCR, etc.) live in requirements.txt.
+#
+# Target: Python 3.10+ on arm64 macOS.
+
+# PDF handling
+pypdf>=4.0
+pdfplumber>=0.11
+pdf2image>=1.17      # needs poppler via: brew install poppler
+PyMuPDF>=1.24        # fitz — used for mixed PDF inspection
+reportlab>=4.0       # synthesizes mixed-PDF fixtures
+
+# Image manipulation
+Pillow>=10.0
+opencv-python>=4.9   # deskew / denoise / binarize in Layer 0
+
+# HTTP / scraping
+httpx>=0.27
+beautifulsoup4>=4.12
+
+# Metrics
+jiwer>=3.0           # WER
+Levenshtein>=0.25    # CER
+sympy>=1.12          # math equivalence + LaTeX parsing
+unicodedata2>=15.1   # Hebrew NFC normalization
+python-bidi>=0.4.2   # RTL round-trip checks
+
+# Synthesis (student-photo fixtures)
+matplotlib>=3.8
+numpy>=1.26
+
+# Reporting
+rich>=13.7           # pretty CLI output
+pandas>=2.2          # results table aggregation
+tabulate>=0.9        # markdown tables

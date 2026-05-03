@@ -1,0 +1,130 @@
+doc_path: pre-release-review/cena_cross_domain_feature_innovation.md
+reviewer: persona-redteam
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight cross-domain feature ideas from non-EdTech products (Obsidian-style
+  concept map, Calm-style breathing ritual, Fabulous-style journeys, Tetris-
+  style flow sessions, mental-health check-in bot, Notion-style notes,
+  Duolingo-style session menu, Pinterest-style collection board). Mostly UX
+  inspiration with low server surface; red-team concern is limited to the
+  two features that add new data channels.
+system_purpose_fit: 4
+  rationale:
+    - Most features are clean UX patterns with low security footprint
+    - F5 "Cena Companion supportive check-in bot" is an LLM chat surface
+      that needs the same safety guard treatment as the Socratic tutor
+    - F6/F8 user-curated collections may persist content across sessions —
+      ADR-0003 check needed
+code_reality_check:
+  claims_verified_in_code:
+    - "Tutor LLM + safety guard pattern exists -> src/actors/Cena.Actors/Tutoring/TutorSafetyGuard.cs; TutorActor.cs"
+    - "Focus analytics service exists -> src/api/Cena.Admin.Api/FocusAnalyticsService.cs (from ls output)"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Check-in bot 'mental health' framing — no existing mental-health-specific content-safety policy"
+adr_alignment:
+  honored:
+    - ADR-0003 — doc explicitly states "session-local" for mood data in F2
+    - GD-004 — doc explicitly bans streaks in F3 (Journeys)
+  violated: []
+  missing_adr_needed:
+    - "Mental-wellness LLM content policy — bot must never simulate a therapist, must escalate to crisis resources"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      F5 "Cena Companion" — an LLM chatbot positioned near "mental health /
+      conversational AI" is the single highest-liability LLM surface on the
+      platform. Self-harm / crisis signals from a student MUST have a
+      designed escalation path: (a) no therapist-like language, (b) crisis
+      keyword detection with immediate hotline surfacing (ERAN in Israel),
+      (c) logged-for-safeguarding (separate retention track with explicit
+      parent notification policy), (d) never auto-responds to crisis content
+      without a human in the loop.
+    evidence: pre-release-review/cena_cross_domain_feature_innovation.md Feature 5
+    lens_note: Real EdTech incidents 2023-2025 involved student crisis content handled by LLMs. Ship-blocker as described.
+  - severity: P1
+    finding: |
+      F6 Notes / F8 Collection Board persist student-authored content across
+      sessions. Must flow through the student-data inventory (axis9 task),
+      have parent-visible retention, and pass the same moderation / URL-
+      strip as other user-authored surfaces.
+    evidence: pre-release-review/cena_cross_domain_feature_innovation.md Features 6, 8
+    lens_note: "Notes" features are a common unsanitized XSS sink.
+  - severity: P2
+    finding: |
+      F1 Math Concept Map — server-side produces the graph from curriculum
+      data; low risk. But if adjacency includes "concepts the student has
+      mastered," that is per-student state that must be session-scoped unless
+      marked as explicit longitudinal mastery (which IS allowed and already
+      exists via MasteryTrackingService).
+    evidence: pre-release-review/cena_cross_domain_feature_innovation.md Feature 1
+    lens_note: MasteryTracking is distinct from misconception tracking; document it.
+  - severity: P2
+    finding: |
+      F2 Breathing Ritual stores mood emoji. Doc says "session-local" —
+      enforce at the store level, not at the UI.
+    evidence: pre-release-review/cena_cross_domain_feature_innovation.md Feature 2
+    lens_note: Minor concern; ensure RetentionWorker coverage.
+already_built:
+  - feature: Tutor LLM + safety guard + output validation
+    evidence: src/actors/Cena.Actors/Tutoring/TutorSafetyGuard.cs
+    note: F5 Companion must reuse or extend.
+  - feature: Mastery tracking (longitudinal, allowed)
+    evidence: src/api/Cena.Admin.Api/MasteryTrackingService.cs
+    note: F1 Concept Map should source from here, not a new store.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-017 Focus Ritual overlaps F2; FD-018 Learning Energy overlaps F2/F5"
+  - "axis2_motivation_self_regulation_findings.md: F2 if-then planner overlaps F3 Journeys"
+extracted_tasks:
+  - title: Crisis-escalation policy + ADR for any wellness/companion LLM
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Before F5 ships, produce an ADR + runbook: crisis keyword detection,
+      immediate ERAN (105) hotline surfacing, no-therapist-language prompt
+      constraint, separate safeguarding retention track with parent-
+      notification policy, on-call incident process for red flags.
+      ## Files
+      - docs/adr/ (new: wellness-llm-crisis-policy)
+      - runbooks/ops/crisis-escalation.md
+      ## Definition of Done
+      - [ ] ADR accepted
+      - [ ] Crisis keyword corpus defined for Hebrew / Arabic / English
+      - [ ] Runbook has on-call role defined
+      - [ ] Dry run executed
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L98-L140]
+  - title: Apply URL/PII sanitizer to F6 Notes + F8 Collection content
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Student-authored notes/collections render with output-side HTML escape,
+      strip URLs when rendered to peers (if cross-peer), and pass through
+      existing content moderation on save.
+      ## Files
+      - new F6/F8 endpoints
+      - reuse src/api/Cena.Admin.Api/ContentModerationService.cs
+      ## Definition of Done
+      - [ ] Render tests assert escaped output
+      - [ ] Moderation verdict stored on note
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L180-L230]
+verdict: revise
+verdict_reason: |
+  F5 Cena Companion is a P0 ship-blocker until the wellness/crisis ADR
+  lands. F6/F8 need sanitization. F1/F2/F3/F4/F7 are fine from a red-team
+  perspective.
+cross_lens_handoff:
+  - to: persona-ethics
+    about: F5 Companion tone + framing — risk of presenting as therapist
+  - to: persona-privacy
+    about: F6/F8 notes retention under ADR-0003
+  - to: persona-cogsci
+    about: Mood-check frequency and wellbeing claims

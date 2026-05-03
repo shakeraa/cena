@@ -1,0 +1,153 @@
+doc_path: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md
+reviewer: persona-finops
+reviewed_at: 2026-04-20
+doc_summary: |
+  Seven collaboration features: anonymous peer explanation circles, teacher-
+  mediated micro groups, team cooperative competitions, async Q&A w/
+  endorsement, "I'm confused too" signal, peer tutor matcher, collab
+  whiteboard. Storage (audio, whiteboard streams) is the dominant cost axis.
+system_purpose_fit: 3
+  rationale:
+    - Social features carry storage + bandwidth costs (voice clips, real-time streams).
+    - Content moderation LLM (pre-screening peer explanations) is a cost line.
+    - 24h ephemeral retention (F1) is a storage cost WIN — small blast radius.
+code_reality_check:
+  claims_verified_in_code:
+    - "SignalR real-time infra exists -> contracts/frontend/signalr-messages.ts"
+    - "Content filter task routing (Kimi k2_turbo @ $0.40/Min input) -> contracts/llm/routing-config.yaml:149"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Voice clip storage tier (hot/warm/cold) not specified in doc"
+    - "Real-time whiteboard infra — not present; greenfield"
+adr_alignment:
+  honored:
+    - "Two-sided consent mentioned (ADR-0001 tenant/consent)"
+    - "24h ephemeral peer content respects ADR-0003 spirit"
+  violated: []
+  missing_adr_needed:
+    - "ADR for peer-content storage tier and retention economics"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      F1 Anonymous Peer Explanation Circles — 30-second voice clips. At 100k
+      students x 10% opt-in x 2 clips/week = 20k clips/week = ~1.2TB/year of
+      audio at 128kbps. Hot storage (Redis/S3 standard) = $27/mo; fine. But
+      content moderation: EVERY clip MUST run through LLM content filter
+      (safety, PII, profanity) before publishing. At kimi_k2_turbo (routing-
+      config.yaml:149, $0.40/Min input + $2/Min output, ~100 token transcript
+      + 20 token classification), cost is ~$0.0001/clip x 20k/week = $2/week.
+      NEGLIGIBLE. But also need Whisper/Vosk transcription (~$0.006/min) =
+      ~$60/week. Still fine. Key economics check: pass.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md (F1); contracts/llm/routing-config.yaml:149
+    lens_note: Transcription is the hidden cost. Use local Whisper tiny model for ~$0 runtime, accept lower accuracy.
+  - severity: P0
+    finding: |
+      F7 Collaborative Math Whiteboard with Teacher Oversight — real-time
+      WebSocket streams. At 10k concurrent students x 1KB/sec stroke data =
+      10MB/sec = 26TB/month bandwidth. At AWS $0.09/GB egress = $2.3k/month
+      just for this feature. Plus session recording storage. This is the
+      single most expensive feature in the proposal set.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md (F7)
+    lens_note: Rate-limit collaborative sessions (teacher-mediated only, max 30 concurrent sessions). Compress stroke streams.
+  - severity: P1
+    finding: |
+      F3 Team vs Challenge Cooperative Competitions — real-time leaderboard
+      updates via SignalR. Low bandwidth (~100 bytes/update x 5/min) but
+      fan-out at 10k students = 5MB/sec. Fine. No LLM cost.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md (F3)
+    lens_note: SignalR group messaging is cheap; ship.
+  - severity: P1
+    finding: |
+      F4 Async Q&A with Peer Endorsement — DB-heavy (threaded posts, votes).
+      Every post must content-filter. Volume: ~2k posts/day at 10k active =
+      acceptable. LLM filter cost: $0.0001 x 2k = $0.20/day. Trivial.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md (F4)
+    lens_note: Ship with content_filter routing.
+  - severity: P2
+    finding: |
+      F5 "I'm Confused Too" Signal — increment a counter, group by question.
+      Pure DB. Zero LLM cost. Ship cheap.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md (F5)
+    lens_note: Smallest-possible feature. Zero cost concern.
+  - severity: P2
+    finding: |
+      F6 Reciprocal Peer Tutoring Matcher — matching algorithm is batch
+      SQL. No runtime LLM. Moderate storage for match history. Cheap.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md (F6)
+    lens_note: Nightly batch, ship.
+already_built:
+  - feature: "Content filter task routing"
+    evidence: contracts/llm/routing-config.yaml:149
+    note: kimi_k2_turbo tier ready for peer content moderation; reuse.
+  - feature: "SignalR messaging contracts"
+    evidence: contracts/frontend/signalr-messages.ts
+    note: F3/F4/F5 can reuse SignalR infra, no new protocol.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-030 ('I'm confused too') = F5"
+  - "feature-discovery-2026-04-20.md: FD-016 (Team cooperative) = F3"
+extracted_tasks:
+  - title: "Rate-limit collaborative whiteboard to 30 concurrent sessions, compress strokes"
+    priority: P0
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Cap F7 whiteboard bandwidth cost by (a) admitting max 30 concurrent
+      teacher-mediated sessions platform-wide, (b) compressing stroke data
+      (delta encoding + deflate) to reduce bandwidth 80%+, (c) storing only
+      summary snapshots, not full stroke replay.
+
+      ## Files
+      - src/actors/Cena.Actors/Whiteboard/WhiteboardAdmissionControl.cs (new)
+      - src/actors/Cena.Actors/Whiteboard/StrokeCompressor.cs (new)
+      - src/actors/Cena.Actors.Tests/Whiteboard/WhiteboardLoadTests.cs
+
+      ## Definition of Done
+      - Admission control gate: reject new sessions beyond 30 concurrent with backpressure
+      - Stroke delta encoding cuts bandwidth 80%+ (load-test verified)
+      - Session artifacts: final snapshot PNG + last-10-min JSON, not full stream
+      - Bandwidth metric: cena.whiteboard.bandwidth_gb_per_day (alert > 50GB/day)
+      - Cost projection: < $500/month at 30 concurrent
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L480-L560]
+  - title: "Use local Whisper tiny for peer-clip transcription (zero runtime API cost)"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Eliminate per-clip transcription API cost for F1 by running Whisper
+      tiny/base model in a sidecar (similar pattern to existing SymPySidecar).
+      Accuracy trade-off acceptable for moderation-only use.
+
+      ## Files
+      - contracts/infra/whisper-sidecar.md (new)
+      - src/actors/Cena.Actors/Moderation/WhisperSidecarClient.cs (new)
+      - docker/whisper-sidecar/Dockerfile (new)
+
+      ## Definition of Done
+      - Sidecar image with whisper-tiny or base (English + Hebrew + Arabic)
+      - gRPC interface mirroring SymPySidecarClient pattern
+      - Transcription cost per clip: $0 runtime (only container compute)
+      - Accuracy spot-check: >= 85% WER on Hebrew/Arabic math terms
+      - Circuit breaker + fallback to cloud API (hard-capped at $20/day)
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L60-L150]
+verdict: revise
+verdict_reason: |
+  F1/F3/F4/F5/F6 economics are favorable. F7 whiteboard at proposed scope is
+  the most expensive feature in the entire 15-doc set ($2k+/month bandwidth);
+  must be admission-controlled or scoped to teacher-mediated sessions only.
+  Transcription for F1 should use local Whisper, not cloud.
+cross_lens_handoff:
+  - to: persona-redteam
+    about: "F1 voice-clip adversarial content — what's the post-filter audit path?"
+  - to: persona-sre
+    about: "F7 whiteboard SignalR connection budgets at exam-day spike."
+  - to: persona-privacy
+    about: "F1 voice clip 24h retention + transcription PII exposure to local Whisper."

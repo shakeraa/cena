@@ -1,0 +1,123 @@
+doc_path: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md
+reviewer: persona-a11y
+reviewed_at: 2026-04-20
+doc_summary: |
+  7 privacy-preserving collaboration features: anonymized peer explanation circles,
+  teacher-mediated micro groups, team vs challenge cooperative competitions,
+  async anonymous Q&A, "I'm confused too" anonymous signal, reciprocal tutoring
+  matcher, collaborative math whiteboard. Consent-gated; avoids leaderboards
+  and shame.
+system_purpose_fit: 3
+  rationale:
+    - No streaks/shame — aligned with non-negotiable 3
+    - Voice/audio features open new a11y territory (deaf students, captions)
+    - Peer content in mixed Hebrew/Arabic classrooms needs language routing
+    - Math whiteboard needs RTL + math-LTR rules
+code_reality_check:
+  claims_verified_in_code:
+    - "Consent framework scaffolding exists in tests: src/student/full-version/tests/e2e/privacy-gdpr-self-service.spec.ts"
+    - "i18n plumbed for mixed Hebrew/Arabic peer content"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Voice explanation captioning — no ASR/caption path in repo"
+    - "Collaborative whiteboard — no real-time drawing component"
+adr_alignment:
+  honored: []
+  violated: []
+  missing_adr_needed:
+    - "ADR for voice/audio content a11y (captions, transcripts) — currently unaddressed"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: "F1 anonymous voice explanations have NO captioning/transcript spec. Deaf and hard-of-hearing students are entirely excluded from this feature. WCAG 1.2.2 (captions for prerecorded audio) and 1.2.4 (captions for live) are both implicated."
+    evidence: "AXIS_7...md:L36-L45"
+    lens_note: "A feature whose core UX is 'listen to a 30s voice clip' must have a text transcript by default, not as an afterthought. Auto-ASR in Arabic/Hebrew is error-prone; manual text alternative is required, or text-only explanations only."
+  - severity: P0
+    finding: "F7 collaborative math whiteboard — freehand math drawing is inherently inaccessible to blind students and hard for motor-impaired users. Must provide structured input fallback (KaTeX entry box + MathML output) not just canvas."
+    evidence: "AXIS_7...md:F7 section"
+    lens_note: "Most classroom whiteboards ship canvas-only; Cena can differentiate by offering dual-modality."
+  - severity: P1
+    finding: "F5 'I'm confused too' anonymous signal — if visualized as a color-changing indicator only (e.g., pulsing red dot), fails CVD. Needs text label + shape."
+    evidence: "AXIS_7...md:F5 section"
+    lens_note: "Anonymous signals are often reduced to color for 'subtlety'; that subtlety is exclusion."
+  - severity: P1
+    finding: "F3 cooperative competitions — if team display uses percentile/ranking via color, borders on comparative shame. A11y concern is color-alone status; ethics concern is cross-lens."
+    evidence: "AXIS_7...md:F3 section"
+    lens_note: "Cooperative framing is the fix; status must still be text/icon, not hue."
+  - severity: P1
+    finding: "Peer explanations may be in Hebrew OR Arabic. If recipient is Arabic-only and explainer is Hebrew-only, matching policy must not silently cross languages. Memory: Arabic-first, Hebrew-hideable."
+    evidence: "AXIS_7...md:F1 matching section"
+    lens_note: "Must match on shared locale OR provide opt-in translation with 'Machine-translated from Hebrew' disclosure."
+  - severity: P2
+    finding: "Avatars ('Math Owl #7') must have aria-label that isn't '7' (which screen readers may say as the digit); use semantically meaningful labels."
+    evidence: "AXIS_7...md:L38"
+    lens_note: "Small but meaningful for blind users navigating peer lists."
+  - severity: P2
+    finding: "F6 reciprocal tutoring matcher — if chat/messaging UI uses timestamps, must handle Hebrew calendar + Arabic locale date formats (Intl.DateTimeFormat with locale)."
+    evidence: "AXIS_7...md:F6 section"
+    lens_note: "Math students often in non-Gregorian cultural contexts; offloading to Intl is easy."
+already_built:
+  - feature: "GDPR self-service flow"
+    evidence: "src/student/full-version/tests/e2e/privacy-gdpr-self-service.spec.ts"
+    note: "Reuse for two-sided consent UI rather than greenfield"
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: peer-learning FD entries"
+extracted_tasks:
+  - title: "F1 peer voice explanations: text-transcript required by default"
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Block F1 voice-explanation feature until a transcript/captioning strategy is decided. Two acceptable paths: (a) require text-only explanations (ship without voice), or (b) require student to submit both a 30s voice clip AND a text transcript before the explanation is published.
+      ## Files
+      - new: docs/adr/0039-peer-voice-accessibility.md
+      ## Definition of Done
+      - ADR picks path (a) or (b) with rationale
+      - If (b): UX spec for transcript-entry gate is written and cited
+      - WCAG 1.2.2 / 1.2.4 compliance confirmed
+      ## Reporting
+      decision committed to ADR; PR comment notifies claude-code
+    source_doc_lines: [L36-L45]
+  - title: "F7 whiteboard dual-modality: structured math input alongside canvas"
+    priority: P0
+    estimate: L
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      If collaborative whiteboard (F7) is built, it must offer structured math input (KaTeX editor with MathML output) as a first-class modality alongside freehand drawing. Blind and motor-impaired students cannot use canvas-only tools.
+      ## Files
+      - new components under src/student/full-version/src/components/whiteboard/
+      - must extend existing MathInput.vue and StepInput.vue patterns
+      ## Definition of Done
+      - Whiteboard supports: structured math entry + output to both visible canvas and MathML aria-label
+      - Keyboard-only users can add structured math to the shared board
+      - E2E test: blind-simulation Playwright run (keyboard + screen-reader) adds a step and reads back
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F7 section]
+  - title: "Locale-matching rule for peer explanations (F1) and Q&A (F4)"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Match peer explainers and recipients on shared locale first. Cross-locale pairing requires opt-in with a 'Machine-translated' disclosure. Hebrew-gate honored.
+      ## Files
+      - F1 / F4 matcher services when built
+      - explicit unit test: he-only student never paired with ar-only student without opt-in
+      ## Definition of Done
+      - Locale-match rule in matcher
+      - Disclosure UI text in all three locales
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F1, F4 sections]
+verdict: revise
+verdict_reason: "Collaboration features are ethically well-framed but two (F1 voice, F7 whiteboard) have P0 a11y gaps that must be fixed before any build. Gate with ADR-0039."
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "Two-sided consent DPIA and 24h auto-delete enforcement"
+  - to: persona-ethics
+    about: "F3 cooperative competitions — cooperative framing vs comparative shame drift"
+  - to: persona-redteam
+    about: "Anonymity guarantees in F1/F4 — de-anonymization via voice recognition"

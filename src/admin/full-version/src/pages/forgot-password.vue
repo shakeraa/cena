@@ -1,0 +1,199 @@
+<script setup lang="ts">
+import { useFirebaseAuth } from '@/composables/useFirebaseAuth'
+import { useGenerateImageVariant } from '@core/composable/useGenerateImageVariant'
+import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
+import { themeConfig } from '@themeConfig'
+
+import authV2ForgotPasswordIllustrationDark from '@images/pages/auth-v2-forgot-password-illustration-dark.png'
+import authV2ForgotPasswordIllustrationLight from '@images/pages/auth-v2-forgot-password-illustration-light.png'
+import authV2MaskDark from '@images/pages/misc-mask-dark.png'
+import authV2MaskLight from '@images/pages/misc-mask-light.png'
+
+const email = ref('')
+const isSubmitting = ref(false)
+const emailSent = ref(false)
+
+const { resetPassword, authError } = useFirebaseAuth()
+
+const authThemeImg = useGenerateImageVariant(authV2ForgotPasswordIllustrationLight, authV2ForgotPasswordIllustrationDark)
+
+const authThemeMask = useGenerateImageVariant(authV2MaskLight, authV2MaskDark)
+
+definePage({
+  meta: {
+    layout: 'blank',
+    unauthenticatedOnly: true,
+  },
+})
+
+const handleResetPassword = async () => {
+  if (!email.value)
+    return
+
+  isSubmitting.value = true
+  try {
+    await resetPassword(email.value)
+    emailSent.value = true
+  }
+  catch {
+    // Error handled by authError in useFirebaseAuth
+  }
+  finally {
+    isSubmitting.value = false
+  }
+}
+</script>
+
+<template>
+  <RouterLink to="/">
+    <div class="auth-logo d-flex align-center gap-x-3">
+      <VNodeRenderer :nodes="themeConfig.app.logo" />
+      <!-- FIND-ux-026: Brand mark demoted from h1 to span; not a content heading -->
+      <span class="auth-title">
+        {{ themeConfig.app.brandTitle ?? themeConfig.app.title }}
+      </span>
+    </div>
+  </RouterLink>
+
+  <VRow
+    class="auth-wrapper bg-surface"
+    no-gutters
+  >
+    <VCol
+      md="8"
+      class="d-none d-md-flex"
+    >
+      <div class="position-relative bg-background w-100 me-0">
+        <div
+          class="d-flex align-center justify-center w-100 h-100"
+          style="padding-inline: 150px;"
+        >
+          <VImg
+            max-width="468"
+            :src="authThemeImg"
+            class="auth-illustration mt-16 mb-2"
+          />
+        </div>
+
+        <img
+          class="auth-footer-mask"
+          :src="authThemeMask"
+          alt="auth-footer-mask"
+          height="280"
+          width="100"
+        >
+      </div>
+    </VCol>
+
+    <VCol
+      cols="12"
+      md="4"
+      class="d-flex align-center justify-center"
+    >
+      <VCard
+        flat
+        :max-width="500"
+        class="mt-12 mt-sm-0 pa-4"
+      >
+        <VCardText>
+          <h1 class="text-h4 mb-1">
+            {{ $t('auth.forgotPasswordTitle') }}
+          </h1>
+          <p class="mb-0">
+            {{ $t('auth.forgotPasswordSubtitle') }}
+          </p>
+        </VCardText>
+
+        <VCardText v-if="authError">
+          <VAlert
+            color="error"
+            variant="tonal"
+            closable
+            @click:close="authError = null"
+          >
+            {{ authError }}
+          </VAlert>
+        </VCardText>
+
+        <VCardText v-if="emailSent">
+          <VAlert
+            color="success"
+            variant="tonal"
+          >
+            {{ $t('auth.resetEmailSent') }}
+          </VAlert>
+        </VCardText>
+
+        <VCardText>
+          <VForm @submit.prevent="handleResetPassword">
+            <VRow>
+              <!-- email -->
+              <VCol cols="12">
+                <AppTextField
+                  v-model="email"
+                  autofocus
+                  :label="$t('auth.email')"
+                  type="email"
+                  placeholder="admin@cena.edu"
+                  :rules="[requiredValidator, emailValidator]"
+                  :disabled="isSubmitting || emailSent"
+                />
+              </VCol>
+
+              <!-- Reset link -->
+              <VCol cols="12">
+                <VBtn
+                  block
+                  type="submit"
+                  :loading="isSubmitting"
+                  :disabled="isSubmitting || emailSent"
+                >
+                  {{ $t('auth.sendResetLink') }}
+                </VBtn>
+              </VCol>
+
+              <!-- back to login -->
+              <VCol cols="12">
+                <RouterLink
+                  class="d-flex align-center justify-center"
+                  :to="{ name: 'login' }"
+                >
+                  <VIcon
+                    icon="tabler-chevron-left"
+                    size="20"
+                    class="me-1 flip-in-rtl"
+                  />
+                  <span>{{ $t('auth.backToLogin') }}</span>
+                </RouterLink>
+              </VCol>
+
+              <!-- FIND-privacy-002: Legal links on admin forgot-password page -->
+              <VCol
+                cols="12"
+                class="text-center text-caption text-medium-emphasis"
+              >
+                <RouterLink
+                  to="/privacy"
+                  class="text-medium-emphasis text-decoration-underline"
+                >
+                  {{ $t('auth.privacyPolicy') }}
+                </RouterLink>
+                <span class="mx-1">&middot;</span>
+                <RouterLink
+                  to="/terms"
+                  class="text-medium-emphasis text-decoration-underline"
+                >
+                  {{ $t('auth.termsOfService') }}
+                </RouterLink>
+              </VCol>
+            </VRow>
+          </VForm>
+        </VCardText>
+      </VCard>
+    </VCol>
+  </VRow>
+</template>
+
+<style lang="scss">
+@use "@core/scss/template/pages/page-auth.scss";
+</style>

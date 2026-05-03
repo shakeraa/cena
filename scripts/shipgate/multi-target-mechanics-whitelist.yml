@@ -1,0 +1,163 @@
+# =============================================================================
+# Ship-gate whitelist: multi-target-mechanics rule pack (PRR-224)
+# =============================================================================
+# Files that legitimately need to reference the multi-target mechanics:
+# policy docs, task bodies that ban the patterns, retirement logs,
+# the positive-test fixture, and legacy non-production paths that pre-existed
+# this scanner (mobile Flutter, fake-api handlers, gamification components
+# slated for removal — see feedback_shipgate_banned_terms and
+# feedback_no_stubs_production_grade for the broader cleanup).
+# =============================================================================
+
+whitelist:
+  # Policy + design docs
+  - path: "docs/engineering/**"
+    reason: "Engineering policy docs enumerate banned mechanics in rules/rationale context (ci-prohibited-metrics-rules, offline-sync-design, shipgate, etc.)"
+
+  - path: "docs/adr/**"
+    reason: "ADRs may describe banned mechanics in rationale / what-we-rejected sections"
+
+  - path: "docs/design/**"
+    reason: "Design docs may pair banned copy with target copy (policy)"
+
+  - path: "docs/research/**"
+    reason: "Research notes analyse mechanics (pre-production)"
+
+  - path: "docs/feature-specs/**"
+    reason: "Feature specs may cite banned copy for rejection rationale"
+
+  - path: "docs/handoff/**"
+    reason: "Handoff notes may mention shipgate scanner expansions"
+
+  # Task + epic bodies
+  - path: "tasks/pre-release-review/**"
+    reason: "Task bodies define or reference the bans (PRR-217/224/225 especially)"
+
+  - path: "pre-release-review/**"
+    reason: "Pre-release-review docs quote mechanics in critique context"
+
+  # Scanner internals
+  - path: "scripts/shipgate/**"
+    reason: "Scanner rule packs + whitelist + scanner source all reference the banned identifiers in patterns and comments"
+
+  - path: "shipgate/fixtures/**"
+    reason: "Positive-test fixtures deliberately contain every banned pattern"
+
+  - path: "tests/shipgate/**"
+    reason: "Test fixtures / spec files reference banned patterns in assertions"
+
+  # Project root cross-agent docs
+  - path: "CLAUDE.md"
+    reason: "Project rules enumerate banned mechanics in non-negotiable #3"
+
+  - path: "AGENTS.md"
+    reason: "Cross-agent rules mirror CLAUDE.md ban list"
+
+  - path: ".agentdb/**"
+    reason: "Task queue protocol docs may reference ship-gate mechanics"
+
+  # Legacy non-production surfaces slated for cleanup. These surfaces
+  # pre-existed the ADR-0050 bans and are NOT part of the ship-gate scope
+  # because they don't render to the current student-web production build.
+  # Flutter mobile is replaced by PWA (feedback_flutter_mobile); fake-api
+  # handlers are Phase-1-stub vestiges (feedback_no_stubs_production_grade,
+  # scheduled for retirement); gamification widgets are being removed per
+  # GD-004 (feedback_shipgate_banned_terms).
+  - path: "src/mobile/**"
+    reason: "Flutter mobile is deprecated (PWA replaces — feedback_flutter_mobile 2026-04-13); not in ship-gate scope"
+
+  - path: "src/student/full-version/src/plugins/fake-api/**"
+    reason: "Fake-api mock handlers are Phase-1-stub vestiges slated for removal (feedback_no_stubs_production_grade); not rendered to production students"
+
+  - path: "src/student/full-version/src/components/home/StreakWidget.vue"
+    reason: "Legacy streak widget — scheduled for removal per GD-004 cleanup (post-PRR-225 sweep)"
+
+  - path: "src/student/full-version/src/components/notifications/NotificationListItem.vue"
+    reason: "Legacy notification kind enum includes 'streak' — scheduled for removal with StreakWidget"
+
+  - path: "src/student/full-version/src/components/social/FriendRow.vue"
+    reason: "Social feed streak display — scheduled for removal with StreakWidget"
+
+  - path: "src/student/full-version/src/api/types/common.ts"
+    reason: "DTO types include deprecated StreakStatusDto / streakDays fields — scheduled for removal with StreakWidget"
+
+  - path: "src/student/full-version/src/composables/useCelebration.ts"
+    reason: "Comment explicitly REJECTS streaks ('no streaks, loss-aversion, variable-ratio') — negation context"
+
+  - path: "src/student/full-version/src/components/Sidekick.vue"
+    reason: "Component comment explicitly REJECTS streak/badge counters — negation context"
+
+  - path: "src/student/full-version/src/components/InstallPrompt.vue"
+    reason: "Component comment explicitly REJECTS countdown/urgency copy for the PWA install prompt — negation context (mirrors banned-mechanics-whitelist)"
+
+  - path: "src/student/full-version/src/components/session/QuestionCard.vue"
+    reason: "Component comment explicitly REJECTS hint-counter / countdown / percentage-credit penalty — negation context (mirrors banned-mechanics-whitelist)"
+
+  # Backend test assertions may reference banned identifiers in
+  # DoesNotContain / should-be-empty checks
+  - path: "src/actors/Cena.Actors.Tests/**"
+    reason: "Architecture + unit tests assert banned identifiers do NOT appear in production code — legitimate references"
+
+  - path: "src/shared/**/*Tests*/**"
+    reason: "Test projects may assert banned identifiers are absent from production builds"
+
+  - path: "src/shared/Cena.Infrastructure.Tests/**"
+    reason: "Infrastructure tests may reference CurrentStreak etc. in right-to-erasure assertions (legacy user profile fields)"
+
+  - path: "src/api/**/*Tests*/**"
+    reason: "API test projects may assert banned identifiers are absent"
+
+  - path: "src/api/**/*.Tests/**"
+    reason: "API test projects (dotted variant)"
+
+  # Actor-code comments that explain why a countdown/streak is banned
+  - path: "src/actors/Cena.Actors/ParentalControls/TimeBudget.cs"
+    reason: "Source comment explains the banned countdown pattern in rationale"
+
+  - path: "src/actors/Cena.Actors/Accommodations/AccommodationProfile.cs"
+    reason: "Source comment explains UI hides countdown (legit rationale)"
+
+  - path: "src/actors/Cena.Actors/Teacher/ScheduleOverride/TeacherOverrideState.cs"
+    reason: "Internal session-counter term-of-art (RemainingSessions); not student-facing"
+
+  - path: "src/actors/Cena.Actors/Teacher/ScheduleOverride/Events/PinTopicRequested_V1.cs"
+    reason: "Event-comment describes pin replacement semantics internally; not student-facing"
+
+  - path: "src/actors/Cena.Actors/Notifications/OutboundSms/SmsShipgatePolicy.cs"
+    reason: "SMS ship-gate policy — regex list quotes banned terms by construction"
+
+  # --------------------------------------------------------------------------
+  # Legacy backend surfaces carrying streak/cooldown identifiers.
+  # These are backend-only fields that the student-web UI is migrating away
+  # from; the C# identifiers predate GD-004 and will be cleaned up in a
+  # follow-up epic (not in PRR-224 scope). The MULTI-TARGET rule pack is
+  # scoped to NEW multi-target dark-pattern COPY + student-facing surfaces;
+  # the C# backend's internal field names are tracked by GD-004 cleanup.
+  # --------------------------------------------------------------------------
+  - path: "src/actors/Cena.Actors/**"
+    reason: "Backend actor fields (StreakDays/ConsecutiveSessions/TimeRemaining) are internal; GD-004 cleanup is a separate epic. Scanner continues to enforce on student-web surfaces."
+
+  - path: "src/api/Cena.Api.Contracts/**"
+    reason: "API contract DTOs carry legacy StreakDays fields; student-web consumption is tracked for removal separately"
+
+  - path: "src/api/Cena.Student.Api.Host/**"
+    reason: "Student API host surfaces StreakDays/StreakCount from backend; frontend consumption is the enforcement point"
+
+  - path: "src/api/Cena.Admin.Api/**"
+    reason: "Admin API surfaces social projections with legacy StreakDays fields"
+
+  - path: "src/shared/Cena.Infrastructure/**"
+    reason: "Infrastructure gamification badge catalog carries legacy StreakDays criteria; badge catalog cleanup tracked separately"
+
+  - path: "src/student/full-version/src/pages/home.vue"
+    reason: "Legacy home-page streak readout — scheduled for removal with StreakWidget (pre-existing GD-004 leak, not multi-target scope)"
+
+  - path: "src/student/full-version/src/pages/profile/index.vue"
+    reason: "Legacy profile streak label — scheduled for removal with StreakWidget"
+
+  - path: "src/student/full-version/src/components/challenges/DailyChallengeCard.vue"
+    reason: "Legacy daily-challenge countdown — scheduled for removal with challenges/DailyChallenge epic retirement"
+
+  - path: "src/student/full-version/src/components/gamification/**"
+    reason: "Legacy gamification widgets (streak, badge, level) — scheduled for removal post-ADR-0048 sweep"
+

@@ -1,0 +1,92 @@
+# Ship-gate positive-test fixture: banned mechanics
+
+**Purpose**: This file deliberately contains every pattern in
+`scripts/shipgate/banned-mechanics.yml`. The CI test suite
+(`tests/shipgate/banned-mechanics.spec.mjs`) runs the scanner against this
+fixture and asserts that EVERY rule fires at least once.
+
+**Do not clean this file.** Do not rephrase. Each line below is a trap.
+This file is whitelisted in
+`scripts/shipgate/banned-mechanics-whitelist.yml`.
+
+---
+
+## prr-006 — Crisis Mode naming (REJECTED)
+
+- Crisis Mode is a banned label.
+- Variant: crisis-mode flag set to true.
+- Variant: Crisis framing near the Bagrut exam is banned.
+- Variant: Crisis tier red badge near the exam.
+
+## prr-006 — Countdown framing (REJECTED)
+
+- The Bagrut countdown widget is banned.
+- Variant: exam-countdown card.
+- Variant: study countdown timer.
+- Variant: test countdown banner.
+- Bare: countdown framing in any copy.
+- Variant: 42 days remaining before the exam.
+- Variant: 7 days until the test.
+- Variant: 3 days left to prep.
+- Urgency variant: you might run out of time.
+- Urgency variant: time is running out for this unit.
+- Urgency variant: we're almost out of time.
+- Urgency variant: last chance to master this topic.
+- Urgency variant: hurry up before the deadline passes.
+- Urgency variant: hurry now to finish this unit.
+- Scarcity variant: only 3 days left before Bagrut.
+- Scarcity variant: only 5 hours remaining to solve this.
+
+## GD-004 — Streak copy (HARD BAN)
+
+- Practice streaks are banned.
+- Variant: practice streak counter.
+- Loss-aversion: keep your streak alive.
+- Loss-aversion: don't break your streak.
+- Loss-aversion: don't break the chain.
+
+## prr-019 — Outcome-prediction copy (REJECTED)
+
+- Predicted Bagrut score: banned label.
+- Variant: predicted Bagrut based on mastery.
+- Variant: predicted exam score widget.
+- Variant: exam readiness score (banned outcome-prediction framing).
+- Variant: 72% chance of passing the Bagrut.
+- Variant: your 85% chance of succeeding this year.
+- Variant: likelihood of passing based on current mastery.
+- Variant: probability of scoring above 80 on the exam.
+- Variant: odds of Bagrut success given your trajectory.
+- Variant: forecast your Bagrut score by unit.
+- Variant: projected grade based on mastery curve.
+- Variant: estimated Bagrut grade for your cohort.
+
+## Hebrew variants (verify with native-speaker team before enforcement)
+
+- מצב משבר — Crisis Mode.
+- ספירה לאחור — countdown.
+- 5 ימים שנותרו — days remaining.
+- 42 ימים עד הבגרות — days until Bagrut.
+- הזדמנות אחרונה — last chance.
+- הזמן אוזל — time is running out.
+- מהרו לסיים את היחידה — hurry (imperative plural, urgency).
+- מהרי לסיים — hurry (imperative feminine singular).
+- נותרו רק 3 ימים — only 3 days left (scarcity).
+- ציון הבגרות החזוי — predicted Bagrut score.
+- 75% סיכוי לעבור את הבגרות — X% chance of passing (Hebrew).
+- ההסתברות להצלחה בבגרות — probability of Bagrut (Hebrew).
+- הציון המשוער שלך — your estimated/projected score (Hebrew).
+
+## Arabic variants (verify with native-speaker team before enforcement)
+
+- وضع الأزمة — Crisis Mode.
+- العد التنازلي — countdown.
+- الأيام المتبقية — days remaining.
+- الفرصة الأخيرة — last chance.
+- الوقت ينفد — time is running out.
+- أسرع قبل أن ينتهي الوقت — hurry (imperative + urgency marker قبل).
+- اسرع الآن لإنهاء الوحدة — hurry (urgency: الآن).
+- فقط 2 يوم متبقي — only 2 days left (scarcity).
+- علامة البجروت المتوقعة — predicted Bagrut score.
+- 80% فرصة النجاح في البجروت — X% chance of passing (Arabic).
+- احتمالية النجاح في البجروت — probability of Bagrut success (Arabic).
+- العلامة المتوقعة — estimated/projected score (Arabic).

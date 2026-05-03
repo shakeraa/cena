@@ -1,0 +1,686 @@
+// =============================================================================
+// Cena Platform — MockExamRunService (Phase 1B+1E ship)
+//
+// Coordination layer for the Bagrut שאלון playbook. Phase 1A landed
+// the state-machine + endpoints; this revision activates per-paper
+// structure awareness so the runner actually delivers questions
+// matching the שאלון's section composition + Ministry-style scoring.
+//
+// Key Phase 1B changes:
+//   * StartAsync resolves a BagrutPaperStructure (via the catalog) for
+//     the (examCode, paperCode?) pair, then for EVERY slot pulls a
+//     QuestionReadModel matching the slot's TopicId + bloom range.
+//     Fallbacks: slot's exact TopicId → section's FallbackTopicId →
+//     subject. Each step de-dups against already-drawn ids.
+//   * The persisted ExamSimulationState.Format keeps the structure's
+//     time limit + counts so existing client-facing surfaces (timer,
+//     Part-B picker) work unchanged.
+//   * GradeAsync applies Ministry-style section weighting using the
+//     PaperSlot.Points; per-section + total breakdown surfaces on the
+//     mark sheet via MockExamResultResponse.PerSection.
+//
+// Phase 1H change:
+//   * GradeAsync retries CAS once on transient errors (Timeout /
+//     CircuitBreakerOpen) before recording "ungradable-cas-error".
+//
+// What this still does NOT do (intentionally — flagged as Phase 1D):
+//   * Multi-part question support (Bagrut Q's are typically a/b/c).
+//     The single-text-field model holds; UI surfaces a "show work"
+//     box separately.
+//   * MathLive / equation editor — the input is plain text. Honest
+//     for first ship; MathLive integration is GD-006 spike work.
+// =============================================================================
+
+using System.Diagnostics.Metrics;
+using Cena.Actors.Cas;
+using Cena.Actors.Content;
+using Cena.Actors.Events;
+using Cena.Actors.Questions;
+using Cena.Actors.ExamTargets;
+using Cena.Actors.Mastery;
+using Cena.Infrastructure.Documents;
+using Marten;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace Cena.Actors.Assessment;
+
+public sealed class MockExamRunService : IMockExamRunService
+{
+    private readonly IDocumentStore _store;
+    private readonly ICasRouterService _cas;
+    private readonly IBagrutPaperStructureCatalog _structureCatalog;
+    private readonly IItemDeliveryGate _deliveryGate;
+    private readonly ILogger<MockExamRunService> _logger;
+    private readonly TimeProvider _clock;
+    /// <summary>
+    /// PRR-289 — optional dependency that propagates per-question correctness
+    /// from a submitted mock exam into the skill-keyed mastery store via the
+    /// canonical BKT update path. Null means the host hasn't wired BKT (e.g.
+    /// historical test fixtures); the runner stays callable without it but
+    /// throws away the strongest adaptive signal we have.
+    /// </summary>
+    private readonly IBktStateTracker? _bktTracker;
+    private readonly MockExamGrader _grader;
+    private readonly MockExamPaperDraw _paperDraw;
+    private readonly MockExamBktPropagator _bktPropagator;
+    private readonly MockExamItemPreview _itemPreview;
+
+    private static readonly Meter Meter = new("Cena.MockExam", "1.0.0");
+    private static readonly Counter<long> RunsStarted =
+        Meter.CreateCounter<long>("cena_mock_exam_runs_started_total");
+    private static readonly Counter<long> RunsSubmitted =
+        Meter.CreateCounter<long>("cena_mock_exam_runs_submitted_total");
+    private static readonly Counter<long> AnswersSubmitted =
+        Meter.CreateCounter<long>("cena_mock_exam_answers_submitted_total");
+
+    // PRR-322 — per-run cost counter, scraped by the per-tenant Grafana
+    // panels in deploy/observability. Tagged examCode + studentTenant so
+    // ops can split by either axis. USD because that's the operator-
+    // facing finops unit; the equivalent token / call-count metrics live
+    // on the existing ILlmCostMetric + cas histograms separately.
+    private static readonly Counter<double> RunCostUsd =
+        Meter.CreateCounter<double>("cena_mock_exam_run_cost_usd_total");
+
+    private readonly MockExamCostRateConfig _costRates;
+
+    public MockExamRunService(
+        IDocumentStore store,
+        ICasRouterService cas,
+        IBagrutPaperStructureCatalog structureCatalog,
+        IItemDeliveryGate deliveryGate,
+        ILogger<MockExamRunService> logger,
+        TimeProvider? clock = null,
+        IBktStateTracker? bktTracker = null,
+        IOptions<MockExamCostRateConfig>? costRates = null)
+    {
+        _store = store;
+        _cas = cas;
+        _structureCatalog = structureCatalog;
+        _deliveryGate = deliveryGate;
+        _logger = logger;
+        _clock = clock ?? TimeProvider.System;
+        _bktTracker = bktTracker;
+        _costRates = costRates?.Value ?? new MockExamCostRateConfig();
+        _grader = new MockExamGrader(structureCatalog, cas, _clock);
+        _paperDraw = new MockExamPaperDraw(logger, _clock);
+        _bktPropagator = new MockExamBktPropagator(bktTracker, store, logger);
+        _itemPreview = new MockExamItemPreview(store, deliveryGate, _clock);
+    }
+
+    private static string SubjectForExamCode(string examCode) => examCode switch
+    {
+        "806" or "807" => "math",
+        "036"          => "physics",
+        "016"          => "english",
+        _              => "math",
+    };
+
+    public async Task<MockExamRunStartedResponse> StartAsync(
+        string studentId,
+        StartMockExamRunRequest request,
+        CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(studentId);
+        ArgumentNullException.ThrowIfNull(request);
+
+        // Validate exam code via the legacy ExamFormat (kept for the
+        // wire-shape contract on PartA/PartB counts the SPA reads from).
+        var legacyFormat = ExamFormat.FromCode(request.ExamCode)
+            ?? throw new ArgumentException(
+                $"Unsupported examCode '{request.ExamCode}'. Supported: 806, 807, 036.",
+                nameof(request));
+
+        var structure = await _structureCatalog.GetAsync(request.ExamCode, request.PaperCode, ct);
+
+        await using var session = _store.LightweightSession();
+
+        // Idempotency: existing in-flight run for this (student, examCode)
+        // returns instead of double-provisioning.
+        var existing = await session.Query<ExamSimulationState>()
+            .Where(s => s.StudentId == studentId
+                     && s.ExamCode == request.ExamCode
+                     && s.SubmittedAt == null)
+            .FirstOrDefaultAsync(ct);
+
+        if (existing is not null && !existing.IsExpired(_clock.GetUtcNow()))
+        {
+            _logger.LogInformation(
+                "[MOCK-EXAM] Idempotent re-start: studentId={StudentId} examCode={ExamCode} runId={RunId}",
+                studentId, request.ExamCode, existing.SimulationId);
+
+            return MockExamWireResponses.BuildStarted(existing, request.PaperCode);
+        }
+
+        // ── Slot-aware question draw delegated to MockExamPaperDraw ──
+        var subject = SubjectForExamCode(request.ExamCode);
+        var draw = await _paperDraw.DrawAsync(
+            session, structure, request.PaperCode, subject, studentId, request.ExamCode, ct);
+        var partAIds = new List<string>(draw.PartAIds);
+        var partBIds = new List<string>(draw.PartBIds);
+
+        var simulationId = Guid.NewGuid().ToString("N")[..16];
+        var startedAt = _clock.GetUtcNow();
+        var variantSeed = draw.VariantSeed;
+
+        // Phase 2B: clamp accommodation to [0, 100]% silently. Storing
+        // the resolved minute count (not the percent) keeps the state
+        // auditable: a future policy change to the accommodation cap
+        // doesn't retroactively alter past runs.
+        var clampedPercent = Math.Clamp(request.ExtraTimePercent, 0, 100);
+        var extraTimeMinutes = (int)Math.Round(legacyFormat.TimeLimitMinutes * (clampedPercent / 100.0));
+
+        var state = new ExamSimulationState
+        {
+            SimulationId = simulationId,
+            StudentId = studentId,
+            ExamCode = request.ExamCode,
+            Format = legacyFormat,
+            PartAQuestionIds = partAIds,
+            PartBQuestionIds = partBIds,
+            PartBSelectedIds = new List<string>(),
+            Answers = new Dictionary<string, string>(),
+            StartedAt = startedAt,
+            VariantSeed = variantSeed,
+            ExtraTimeMinutes = extraTimeMinutes,
+            CalculatorPolicy = structure.CalculatorPolicy.ToString(),
+            FormulaSheetMode = structure.FormulaSheetMode.ToString(),
+        };
+
+        session.Store(state);
+        session.Events.Append(studentId, new ExamSimulationStarted_V1(
+            StudentId: studentId,
+            SimulationId: simulationId,
+            ExamCode: request.ExamCode,
+            TimeLimitMinutes: legacyFormat.TimeLimitMinutes,
+            PartACount: legacyFormat.PartAQuestionCount,
+            PartBCount: legacyFormat.PartBQuestionCount,
+            VariantSeed: variantSeed,
+            StartedAt: startedAt));
+
+        await session.SaveChangesAsync(ct);
+
+        RunsStarted.Add(1, new KeyValuePair<string, object?>("examCode", request.ExamCode));
+        _logger.LogInformation(
+            "[MOCK-EXAM] Started runId={RunId} studentId={StudentId} examCode={ExamCode} paperCode={PaperCode} partA={A} partB={B}",
+            simulationId, studentId, request.ExamCode, request.PaperCode ?? "(default)", partAIds.Count, partBIds.Count);
+
+        return new MockExamRunStartedResponse(
+            RunId: simulationId,
+            ExamCode: request.ExamCode,
+            PaperCode: request.PaperCode,
+            TimeLimitMinutes: legacyFormat.TimeLimitMinutes,
+            ExtraTimeMinutes: extraTimeMinutes,
+            PartAQuestionCount: legacyFormat.PartAQuestionCount,
+            PartBQuestionCount: legacyFormat.PartBQuestionCount,
+            PartBRequiredCount: legacyFormat.PartBRequiredCount,
+            PartAQuestionIds: partAIds,
+            PartBQuestionIds: partBIds,
+            StartedAt: startedAt,
+            Deadline: state.Deadline,
+            CalculatorPolicy: structure.CalculatorPolicy.ToString(),
+            FormulaSheetMode: structure.FormulaSheetMode.ToString());
+    }
+
+    public async Task<MockExamRunStateResponse?> GetStateAsync(
+        string studentId, string runId, CancellationToken ct)
+    {
+        await using var session = _store.QuerySession();
+        var state = await session.LoadAsync<ExamSimulationState>(runId, ct);
+        if (state is null || state.StudentId != studentId) return null;
+        return MockExamWireResponses.BuildState(state);
+    }
+
+    public async Task<MockExamRunStateResponse> SelectPartBAsync(
+        string studentId, string runId, SelectPartBRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        await using var session = _store.LightweightSession();
+        var state = await session.LoadAsync<ExamSimulationState>(runId, ct)
+            ?? throw new KeyNotFoundException($"Run {runId} not found.");
+
+        if (state.StudentId != studentId)
+            throw new UnauthorizedAccessException("Run does not belong to this student.");
+        if (state.IsSubmitted)
+            throw new InvalidOperationException("Run already submitted.");
+        if (state.IsExpired(_clock.GetUtcNow()))
+            throw new InvalidOperationException("Run deadline elapsed.");
+
+        var distinct = request.SelectedQuestionIds.Distinct().ToList();
+        if (distinct.Count != state.Format.PartBRequiredCount)
+            throw new ArgumentException(
+                $"Must select exactly {state.Format.PartBRequiredCount} Part B questions; got {distinct.Count}.");
+
+        var invalid = distinct.Where(id => !state.PartBQuestionIds.Contains(id)).ToList();
+        if (invalid.Count > 0)
+            throw new ArgumentException(
+                $"Selection contains questions not in this run's Part B pool: {string.Join(",", invalid)}");
+
+        state.PartBSelectedIds = distinct;
+        session.Store(state);
+        await session.SaveChangesAsync(ct);
+
+        return MockExamWireResponses.BuildState(state);
+    }
+
+    public async Task<MockExamRunStateResponse> SubmitAnswerAsync(
+        string studentId, string runId, SubmitAnswerRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        await using var session = _store.LightweightSession();
+        var state = await session.LoadAsync<ExamSimulationState>(runId, ct)
+            ?? throw new KeyNotFoundException($"Run {runId} not found.");
+
+        if (state.StudentId != studentId)
+            throw new UnauthorizedAccessException("Run does not belong to this student.");
+        if (state.IsSubmitted)
+            throw new InvalidOperationException("Run already submitted.");
+        if (state.IsExpired(_clock.GetUtcNow()))
+            throw new InvalidOperationException("Run deadline elapsed.");
+
+        var validIds = state.PartAQuestionIds
+            .Concat(state.PartBSelectedIds.Count > 0
+                ? state.PartBSelectedIds
+                : state.PartBQuestionIds)
+            .ToHashSet();
+
+        if (!validIds.Contains(request.QuestionId))
+            throw new ArgumentException(
+                $"questionId {request.QuestionId} is not part of this run.");
+
+        // Phase 2A: multi-part questions store per-subpart answers under
+        // a composite key "{qid}:{subpartId}" inside the same Answers
+        // dictionary. Single-cell questions keep the bare qid key — the
+        // existing wire shape and on-disk format are preserved for
+        // legacy single-cell rows.
+        var answerKey = string.IsNullOrWhiteSpace(request.SubpartId)
+            ? request.QuestionId
+            : $"{request.QuestionId}:{request.SubpartId}";
+
+        var answerValue = request.Answer ?? "";
+        state.Answers[answerKey] = answerValue;
+        // PRR-299: stamp pacing timestamps. TryAdd preserves first-engaged;
+        // direct assignment keeps last-engaged fresh on every edit.
+        var nowAns = _clock.GetUtcNow();
+        state.AnswerTimestamps.TryAdd(answerKey, nowAns);
+        state.AnswerLastTimestamps[answerKey] = nowAns;
+
+        session.Store(state);
+
+        // PRR-283 — per-answer audit event.
+        session.Events.Append(studentId, new ExamSimulationAnswerSubmitted_V1(
+            StudentId: studentId,
+            SimulationId: state.SimulationId,
+            ItemId: request.QuestionId,
+            SubpartId: string.IsNullOrWhiteSpace(request.SubpartId) ? null : request.SubpartId,
+            HadContent: !string.IsNullOrWhiteSpace(answerValue),
+            SubmittedAt: _clock.GetUtcNow()));
+
+        await session.SaveChangesAsync(ct);
+
+        AnswersSubmitted.Add(1);
+        return MockExamWireResponses.BuildState(state);
+    }
+
+    public async Task<MockExamRunStateResponse> SubmitAnswersBulkAsync(
+        string studentId, string runId, SubmitAnswersBulkRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.Answers is null || request.Answers.Count == 0)
+            throw new ArgumentException("answers list must be non-empty.", nameof(request));
+
+        await using var session = _store.LightweightSession();
+        var state = await session.LoadAsync<ExamSimulationState>(runId, ct)
+            ?? throw new KeyNotFoundException($"Run {runId} not found.");
+
+        if (state.StudentId != studentId)
+            throw new UnauthorizedAccessException("Run does not belong to this student.");
+        if (state.IsSubmitted)
+            throw new InvalidOperationException("Run already submitted.");
+        if (state.IsExpired(_clock.GetUtcNow()))
+            throw new InvalidOperationException("Run deadline elapsed.");
+
+        var validIds = state.PartAQuestionIds
+            .Concat(state.PartBSelectedIds.Count > 0
+                ? state.PartBSelectedIds
+                : state.PartBQuestionIds)
+            .ToHashSet();
+
+        // Validate the whole batch FIRST so we never partially apply.
+        foreach (var a in request.Answers)
+        {
+            if (!validIds.Contains(a.QuestionId))
+                throw new ArgumentException(
+                    $"questionId {a.QuestionId} is not part of this run.");
+        }
+
+        // PRR-283 + PRR-299: shared timestamp for the whole bulk batch.
+        // PRR-283 audit event timestamp + PRR-299 pacing-engaged stamp
+        // both attribute every entry to the same `now` — the student
+        // engaged the entire submission window from the server's
+        // perspective.
+        var ts = _clock.GetUtcNow();
+        foreach (var a in request.Answers)
+        {
+            var key = string.IsNullOrWhiteSpace(a.SubpartId)
+                ? a.QuestionId
+                : $"{a.QuestionId}:{a.SubpartId}";
+            var value = a.Answer ?? "";
+            state.Answers[key] = value;
+            // PRR-299 — pacing timestamps for every entry in the batch.
+            state.AnswerTimestamps.TryAdd(key, ts);
+            state.AnswerLastTimestamps[key] = ts;
+
+            // PRR-283 — emit one per-answer event per submission, so the
+            // stream resolution matches the single-answer path. Bulk
+            // doesn't dedup; the audit semantics are "every answer write
+            // produces one event".
+            session.Events.Append(studentId, new ExamSimulationAnswerSubmitted_V1(
+                StudentId: studentId,
+                SimulationId: state.SimulationId,
+                ItemId: a.QuestionId,
+                SubpartId: string.IsNullOrWhiteSpace(a.SubpartId) ? null : a.SubpartId,
+                HadContent: !string.IsNullOrWhiteSpace(value),
+                SubmittedAt: ts));
+        }
+
+        session.Store(state);
+        await session.SaveChangesAsync(ct);
+
+        AnswersSubmitted.Add(request.Answers.Count,
+            new KeyValuePair<string, object?>("path", "bulk"));
+        return MockExamWireResponses.BuildState(state);
+    }
+
+    public async Task<MockExamResultResponse> SubmitAsync(
+        string studentId, string runId, CancellationToken ct)
+    {
+        await using var session = _store.LightweightSession();
+        var state = await session.LoadAsync<ExamSimulationState>(runId, ct)
+            ?? throw new KeyNotFoundException($"Run {runId} not found.");
+
+        if (state.StudentId != studentId)
+            throw new UnauthorizedAccessException("Run does not belong to this student.");
+
+        if (state.IsSubmitted)
+        {
+            // Idempotent re-submit: just re-render the mark sheet. NO cost
+            // doc rewrite — the canonical cost was captured on the first
+            // submit; re-grades are read-only views (they DO consume CAS,
+            // but that cost is bounded by the SymPy SLO, not this run).
+            return await GradeAsync(session, state, ct);
+        }
+
+        var now = _clock.GetUtcNow();
+        state.SubmittedAt = now;
+        // PRR-322 — measured grade so we can attribute CAS cost to the
+        // run. Bare GradeAsync stays for non-cost paths (StartAsync auto-
+        // grade, GetResultAsync re-render).
+        var (result, casAttempts) = await _grader.GradeAndMeasureAsync(session, state, ct);
+
+        session.Store(state);
+        session.Events.Append(studentId, new ExamSimulationSubmitted_V2(
+            StudentId: studentId,
+            SimulationId: state.SimulationId,
+            QuestionsAttempted: result.QuestionsAttempted,
+            QuestionsCorrect: result.QuestionsCorrect,
+            ScorePercent: result.ScorePercent,
+            TimeTaken: result.TimeTaken,
+            VisibilityWarnings: result.VisibilityWarnings,
+            SubmittedAt: now));
+
+        // PRR-322 — per-run cost attribution. Build the cost doc from
+        // measured counts × rates. LLM tokens / OCR calls are zero today
+        // (no LLM or OCR call sites on the mock-exam path; verified
+        // 2026-04-30 via grep — see MockExamRunCost.cs comment for the
+        // PRR-322f-* follow-ups that wire those when consumers exist).
+        // Computed BEFORE SaveChanges so it lands in the same Marten
+        // transaction as the state + event append (atomic w/ submit).
+        var costDoc = ComputeRunCost(state, casAttempts, llmTokensIn: 0, llmTokensOut: 0, ocrCalls: 0, now);
+        session.Store(costDoc);
+
+        await session.SaveChangesAsync(ct);
+
+        RunsSubmitted.Add(1, new KeyValuePair<string, object?>("examCode", state.ExamCode));
+        // OTel run-cost counter — tagged for per-tenant + per-exam splits
+        // in Grafana. studentTenant is "unknown" until ADR-0001 Phase 1
+        // threads tenant-id onto ExamSimulationState.
+        RunCostUsd.Add((double)costDoc.TotalUsd,
+            new KeyValuePair<string, object?>("examCode",      state.ExamCode),
+            new KeyValuePair<string, object?>("studentTenant", costDoc.StudentTenant ?? "unknown"));
+
+        _logger.LogInformation(
+            "[MOCK-EXAM] Submitted runId={RunId} studentId={StudentId} score={Score:F1}% pointsAwarded={Awarded}/{TotalPts} cost=${Cost:F4} (cas={Cas})",
+            state.SimulationId, studentId, result.ScorePercent, result.PointsAwarded, result.TotalPoints,
+            costDoc.TotalUsd, casAttempts);
+
+        // PRR-289 — feed per-question correctness into the BKT mastery store
+        // AFTER the run has been durably submitted. Best-effort: a BKT failure
+        // here must NOT roll back the submit — the student deserves their mark
+        // sheet even if the adaptive-signal pipeline is briefly down.
+        await _bktPropagator.RecordAsync(state, result, now, ct).ConfigureAwait(false);
+
+        return result;
+    }
+
+    /// <summary>
+    /// PRR-322 — pure cost computation, factored out so unit tests can pin
+    /// the count × rate formula without spinning up Marten / the runner.
+    /// All inputs are integer counts; all outputs are decimal USD rounded
+    /// to 6 places (sub-cent precision so per-run costs in the $0.0001
+    /// range don't all round to zero).
+    /// </summary>
+    internal MockExamRunCost ComputeRunCost(
+        ExamSimulationState state,
+        int casAttempts,
+        int llmTokensIn,
+        int llmTokensOut,
+        int ocrCalls,
+        DateTimeOffset now)
+    {
+        var casCost = Math.Round(casAttempts * _costRates.CasUsdPerCall, 6, MidpointRounding.AwayFromZero);
+        var llmCost = Math.Round(
+            (llmTokensIn  / 1000m) * _costRates.LlmInputUsdPer1kTokens +
+            (llmTokensOut / 1000m) * _costRates.LlmOutputUsdPer1kTokens,
+            6, MidpointRounding.AwayFromZero);
+        var ocrCost = Math.Round(ocrCalls * _costRates.OcrUsdPerCall, 6, MidpointRounding.AwayFromZero);
+        var total   = casCost + llmCost + ocrCost;
+
+        return new MockExamRunCost
+        {
+            Id              = state.SimulationId,
+            StudentId       = state.StudentId,
+            ExamCode        = state.ExamCode,
+            // ADR-0001 Phase 1 hasn't landed; ExamSimulationState carries
+            // no tenant id yet. Null here is HONEST — when the field
+            // arrives, populate it inline; until then "unknown" surfaces
+            // in the OTel counter label so dashboards don't drop the row.
+            StudentTenant   = null,
+            CasCallsCount   = casAttempts,
+            LlmTokensInput  = llmTokensIn,
+            LlmTokensOutput = llmTokensOut,
+            OcrCallsCount   = ocrCalls,
+            CasCostUsd      = casCost,
+            LlmCostUsd      = llmCost,
+            OcrCostUsd      = ocrCost,
+            TotalUsd        = total,
+            ComputedAt      = now,
+        };
+    }
+
+
+    public async Task<MockExamResultResponse?> GetResultAsync(
+        string studentId, string runId, CancellationToken ct)
+    {
+        await using var session = _store.QuerySession();
+        var state = await session.LoadAsync<ExamSimulationState>(runId, ct);
+        if (state is null || state.StudentId != studentId) return null;
+        if (!state.IsSubmitted) return null;
+        return await GradeAsync(session, state, ct);
+    }
+
+    public async Task<MockExamRunStateResponse> PauseAsync(
+        string studentId, string runId, CancellationToken ct)
+    {
+        await using var session = _store.LightweightSession();
+        var state = await session.LoadAsync<ExamSimulationState>(runId, ct)
+            ?? throw new KeyNotFoundException($"Run {runId} not found.");
+        if (state.StudentId != studentId)
+            throw new UnauthorizedAccessException("Run does not belong to this student.");
+        if (state.IsSubmitted)
+            throw new InvalidOperationException("Run already submitted; nothing to pause.");
+        if (state.IsPaused) return MockExamWireResponses.BuildState(state); // idempotent
+
+        state.PausedAt = _clock.GetUtcNow();
+        session.Store(state);
+        await session.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "[MOCK-EXAM] Paused runId={RunId} studentId={StudentId} totalPausedMs={Total}",
+            runId, studentId, state.TotalPausedMs);
+        return MockExamWireResponses.BuildState(state);
+    }
+
+    public async Task<MockExamRunStateResponse> ResumeAsync(
+        string studentId, string runId, CancellationToken ct)
+    {
+        await using var session = _store.LightweightSession();
+        var state = await session.LoadAsync<ExamSimulationState>(runId, ct)
+            ?? throw new KeyNotFoundException($"Run {runId} not found.");
+        if (state.StudentId != studentId)
+            throw new UnauthorizedAccessException("Run does not belong to this student.");
+        if (state.IsSubmitted)
+            throw new InvalidOperationException("Run already submitted; nothing to resume.");
+        if (!state.IsPaused) return MockExamWireResponses.BuildState(state); // idempotent
+
+        var pausedDuration = _clock.GetUtcNow() - state.PausedAt!.Value;
+        state.TotalPausedMs += (long)Math.Max(0, pausedDuration.TotalMilliseconds);
+        state.PausedAt = null;
+        session.Store(state);
+        await session.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "[MOCK-EXAM] Resumed runId={RunId} studentId={StudentId} pausedThisRoundMs={Round} totalPausedMs={Total}",
+            runId, studentId, (long)pausedDuration.TotalMilliseconds, state.TotalPausedMs);
+        return MockExamWireResponses.BuildState(state);
+    }
+
+    public async Task<IReadOnlyList<MockExamRunSummary>> GetRecentRunsAsync(
+        string studentId, string? examCode, string? paperCode, int limit, CancellationToken ct)
+    {
+        // Cap limit defensively — bounded response shape.
+        var capped = Math.Clamp(limit, 1, 10);
+
+        await using var session = _store.QuerySession();
+        var query = session.Query<ExamSimulationState>()
+            .Where(s => s.StudentId == studentId && s.SubmittedAt != null);
+        if (!string.IsNullOrWhiteSpace(examCode))
+            query = query.Where(s => s.ExamCode == examCode);
+        // PaperCode is NOT stored on ExamSimulationState today (it's
+        // request-time display only). Filter is best-effort: returns
+        // all runs for the examCode and the SPA can filter further.
+        // PRR-294 follow-up: persist PaperCode on state for stricter
+        // filtering. For now examCode is the granularity.
+
+        var states = await query
+            .OrderByDescending(s => s.SubmittedAt!.Value)
+            .Take(capped)
+            .ToListAsync(ct);
+
+        // We don't store the graded score on state — re-derive from
+        // submitted answers. For the trend card this is acceptable;
+        // grading is deterministic so re-derive yields the same value
+        // shown on the original result page (assuming canonicals
+        // unchanged; PRR-298 re-grade case will reflect the latest).
+        var summaries = new List<MockExamRunSummary>(states.Count);
+        foreach (var state in states)
+        {
+            // Lightweight re-grade: count answers + canonical hits
+            // without invoking CAS for every Q (perf-bounded). We use
+            // the persisted Answers dict and count which keys had
+            // non-empty values; for points we use the structure +
+            // section weighting as the upper bound.
+            var attempted = state.Answers.Count(a => !string.IsNullOrWhiteSpace(a.Value));
+            var totalPts = await ComputeTotalPointsAsync(session, state.ExamCode, ct);
+            // For trend purposes we re-grade fully (small N; bounded by
+            // cap=10 calls × ~9 questions = 90 CAS calls worst case).
+            var graded = await GradeAsync(session, state, ct);
+            summaries.Add(new MockExamRunSummary(
+                RunId: state.SimulationId,
+                ExamCode: state.ExamCode,
+                PaperCode: paperCode,
+                StartedAt: state.StartedAt,
+                SubmittedAt: state.SubmittedAt!.Value,
+                PointsAwarded: graded.PointsAwarded,
+                TotalPoints: graded.TotalPoints,
+                ScorePercent: graded.ScorePercent));
+            _ = attempted; _ = totalPts; // suppress unused warnings while keeping local for debugging
+        }
+        return summaries;
+    }
+
+    private async Task<int> ComputeTotalPointsAsync(IQuerySession session, string examCode, CancellationToken ct)
+    {
+        var structure = await _structureCatalog.GetAsync(examCode, paperCode: null, ct);
+        return structure.Sections.Sum(s => s.Slots.Take(s.RequiredAnswers).Sum(slot => slot.Points));
+    }
+
+    public async Task<MockExamResultResponse> RegradeAsync(
+        string studentId, string runId, CancellationToken ct)
+    {
+        await using var session = _store.QuerySession();
+        var state = await session.LoadAsync<ExamSimulationState>(runId, ct)
+            ?? throw new KeyNotFoundException($"Run {runId} not found.");
+        if (state.StudentId != studentId)
+            throw new UnauthorizedAccessException("Run does not belong to this student.");
+        if (!state.IsSubmitted)
+            throw new InvalidOperationException("Run not yet submitted; cannot re-grade.");
+
+        // Re-run the grader. GradeAsync reads the CURRENT canonical
+        // answers from Marten — so a corrected QuestionDocument /
+        // BagrutMultipartQuestion gets picked up automatically.
+        // Original Submitted_V2 event stays untouched on the stream.
+        return await GradeAsync(session, state, ct);
+    }
+
+    public async Task<MockExamRunStateResponse> ReportVisibilityEventAsync(
+        string studentId, string runId, VisibilityEventReport report, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        await using var session = _store.LightweightSession();
+        var state = await session.LoadAsync<ExamSimulationState>(runId, ct)
+            ?? throw new KeyNotFoundException($"Run {runId} not found.");
+        if (state.StudentId != studentId)
+            throw new UnauthorizedAccessException("Run does not belong to this student.");
+        // Continue accepting reports even if the run is submitted/expired —
+        // a delayed visibility report after submit is still useful audit.
+
+        var ts = _clock.GetUtcNow();
+        var dur = TimeSpan.FromMilliseconds(Math.Max(0, report.DurationAwayMs));
+        state.VisibilityEvents.Add(new VisibilityEvent(ts, report.State, dur));
+
+        session.Store(state);
+        session.Events.Append(studentId, new ExamVisibilityWarning_V1(
+            StudentId: studentId,
+            SimulationId: runId,
+            VisibilityState: report.State,
+            DurationAway: dur,
+            DetectedAt: ts));
+
+        await session.SaveChangesAsync(ct);
+        return MockExamWireResponses.BuildState(state);
+    }
+
+    // Item preview + delivery-gate delegated to MockExamItemPreview (LOC-ratchet extract).
+    public Task<MockExamQuestionPreview?> GetQuestionPreviewAsync(
+        string studentId, string runId, string questionId, CancellationToken ct) =>
+        _itemPreview.GetAsync(studentId, runId, questionId, ct);
+
+    // Grading delegated to MockExamGrader (single-responsibility extract).
+    private async Task<MockExamResultResponse> GradeAsync(
+        IQuerySession session, ExamSimulationState state, CancellationToken ct) =>
+        await _grader.GradeAsync(session, state, ct);
+}

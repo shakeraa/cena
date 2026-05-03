@@ -1,0 +1,66 @@
+# Bagrut Tanakh (תנ"ך) — 2 Units, Hebrew-stream.
+# PRR-241: humanities catalog extension.
+# Standard Ministry syllabus: Torah narratives, prophetic literature,
+# Writings, historical-critical reading, exegesis.
+
+exam_code: BAGRUT_TANAKH_2U
+family: BAGRUT
+track: "2U"
+units: 2
+region: IL-Bagrut-Hebrew
+regulator: ministry_of_education
+ministry_subject_code: "001"
+ministry_question_paper_codes:
+  - "001281"
+  - "001282"
+availability: queued
+item_bank_status: reference-only
+passback_eligible: true
+default_lead_days: 180
+sittings:
+  - code: TASHPA_SUMMER_A
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: A
+    canonical_date: "2026-06-11"
+  - code: TASHPA_SUMMER_B
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: B
+    canonical_date: "2026-07-16"
+display:
+  en:
+    name: "Bagrut Tanakh (2 units)"
+    short_description: "Israeli Bagrut Hebrew Bible, two-unit track."
+  he:
+    name: "בגרות בתנ\"ך (2 יחידות)"
+    short_description: "בגרות בתנ\"ך במסלול 2 יחידות."
+  ar:
+    name: "بجروت التناخ (وحدتان)"
+    short_description: "بجروت التناخ، مسار وحدتين."
+topics:
+  - topic_id: tanakh.torah_narratives
+    display:
+      en: "Torah narratives"
+      he: "סיפורי התורה"
+      ar: "قصص التوراة"
+  - topic_id: tanakh.prophets_earlier
+    display:
+      en: "Earlier Prophets"
+      he: "נביאים ראשונים"
+      ar: "الأنبياء الأوائل"
+  - topic_id: tanakh.prophets_later
+    display:
+      en: "Later Prophets (Isaiah, Jeremiah, Amos)"
+      he: "נביאים אחרונים (ישעיהו, ירמיהו, עמוס)"
+      ar: "الأنبياء المتأخرون (إشعياء، إرميا، عاموس)"
+  - topic_id: tanakh.writings
+    display:
+      en: "Writings (Psalms, Job, Ecclesiastes)"
+      he: "כתובים (תהלים, איוב, קהלת)"
+      ar: "الكتب (المزامير، أيوب، الجامعة)"
+  - topic_id: tanakh.exegesis
+    display:
+      en: "Classical exegesis"
+      he: "פרשנות קלאסית"
+      ar: "التفسير الكلاسيكي"

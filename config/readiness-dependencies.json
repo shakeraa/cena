@@ -1,0 +1,155 @@
+{
+  "$comment": "RDY-031: Machine-readable dependency graph for all readiness tasks. Generated 2026-04-14.",
+  "$schema_notes": "depends_on = hard block (task cannot start). enhances = soft dependency (task shipped without it, enhancement identified retroactively). blocks = inverse of depends_on.",
+  "version": 2,
+  "tasks": [
+    {
+      "id": "RDY-001", "title": "CSAM Detection + Content Moderation Fail-Closed",
+      "status": "done", "tier": 0, "depends_on": [], "blocks": []
+    },
+    {
+      "id": "RDY-002", "title": "Enable RTL + Visual Regression",
+      "status": "done", "tier": 0, "depends_on": [], "blocks": ["RDY-015"]
+    },
+    {
+      "id": "RDY-003", "title": "Populate Prerequisite Graph",
+      "status": "done", "tier": 0, "depends_on": [], "blocks": ["RDY-007", "RDY-018"]
+    },
+    {
+      "id": "RDY-004", "title": "Arabic Translations (Top 200 Questions)",
+      "status": "pending", "tier": 0, "depends_on": ["RDY-027"], "blocks": []
+    },
+    {
+      "id": "RDY-005", "title": "Legal Compliance Documents",
+      "status": "pending", "tier": 1, "depends_on": [], "blocks": []
+    },
+    {
+      "id": "RDY-006", "title": "ML Training Exclusion Tag (ADR-0003)",
+      "status": "done", "tier": 1, "depends_on": [], "blocks": ["RDY-014"]
+    },
+    {
+      "id": "RDY-007", "title": "DIF Analysis Pipeline",
+      "status": "done", "tier": 2, "depends_on": ["RDY-003"], "blocks": []
+    },
+    {
+      "id": "RDY-008", "title": "Aggregate Decomposition ADR",
+      "status": "done", "tier": 2, "depends_on": [], "blocks": []
+    },
+    {
+      "id": "RDY-009", "title": "OpenAPI/Swagger on Both API Hosts",
+      "status": "in_progress", "tier": 2, "depends_on": [], "blocks": ["RDY-010"]
+    },
+    {
+      "id": "RDY-010", "title": "REST API Versioning",
+      "status": "pending", "tier": 2, "depends_on": ["RDY-009"], "blocks": []
+    },
+    {
+      "id": "RDY-011", "title": "Health Probes Check Real Dependencies",
+      "status": "done", "tier": 1, "depends_on": [], "blocks": []
+    },
+    {
+      "id": "RDY-012", "title": "HTTP Client Circuit Breakers",
+      "status": "done", "tier": 1, "depends_on": [], "blocks": []
+    },
+    {
+      "id": "RDY-013", "title": "Worked Examples UI Rendering",
+      "status": "done", "tier": 2, "depends_on": [], "blocks": ["RDY-014"]
+    },
+    {
+      "id": "RDY-014", "title": "Wire Misconception Detection Pipeline",
+      "status": "done", "tier": 2, "depends_on": ["RDY-006", "RDY-013"], "enhances": ["RDY-033"], "blocks": []
+    },
+    {
+      "id": "RDY-015", "title": "Accessibility Sweep",
+      "status": "done", "tier": 1, "depends_on": ["RDY-002"], "blocks": ["RDY-030"]
+    },
+    {
+      "id": "RDY-016", "title": "Celebration Animations + Flow State UX",
+      "status": "done", "tier": 3, "depends_on": [], "enhances": ["RDY-034"], "blocks": []
+    },
+    {
+      "id": "RDY-017", "title": "NATS Dead-Letter Queue Stream + TLS",
+      "status": "done", "tier": 1, "depends_on": [], "blocks": ["RDY-017a"]
+    },
+    {
+      "id": "RDY-017a", "title": "DLQ Follow-ups",
+      "status": "pending", "tier": 3, "depends_on": ["RDY-017"], "blocks": []
+    },
+    {
+      "id": "RDY-018", "title": "Sympson-Hetter Exposure Control",
+      "status": "done", "tier": 2, "depends_on": ["RDY-003"], "blocks": []
+    },
+    {
+      "id": "RDY-019", "title": "Bagrut Corpus Ingestion + Topic Taxonomy",
+      "status": "pending", "tier": 3, "depends_on": [], "blocks": ["RDY-019a", "RDY-028"]
+    },
+    {
+      "id": "RDY-019a", "title": "Bagrut Content Follow-ups",
+      "status": "pending", "tier": 3, "depends_on": ["RDY-019"], "blocks": []
+    },
+    {
+      "id": "RDY-020", "title": "SignalR Event Push-Back Bridge",
+      "status": "done", "tier": 2, "depends_on": [], "blocks": ["RDY-034"]
+    },
+    {
+      "id": "RDY-021", "title": "Projection Idempotence Tests",
+      "status": "done", "tier": 2, "depends_on": [], "blocks": []
+    },
+    {
+      "id": "RDY-022", "title": "Session Timer + Fatigue Detection UI",
+      "status": "done", "tier": 2, "depends_on": [], "blocks": []
+    },
+    {
+      "id": "RDY-023", "title": "Diagnostic Quiz in Onboarding",
+      "status": "done", "tier": 3, "depends_on": [], "blocks": ["RDY-024"]
+    },
+    {
+      "id": "RDY-024", "title": "BKT Parameter Calibration (Phase A)",
+      "status": "done", "tier": 3, "depends_on": ["RDY-023"], "blocks": ["RDY-024b"]
+    },
+    {
+      "id": "RDY-024b", "title": "BKT Calibration Phase B (Post-Pilot)",
+      "status": "pending", "tier": 3, "depends_on": ["RDY-024", "RDY-032"], "blocks": []
+    },
+    {
+      "id": "RDY-025", "title": "Deployment Manifests (K8s + Docker)",
+      "status": "pending", "tier": 2, "depends_on": [], "blocks": []
+    },
+    {
+      "id": "RDY-026", "title": "Arabic Variable Input Normalization",
+      "status": "in_progress", "tier": 1, "depends_on": [], "blocks": []
+    },
+    {
+      "id": "RDY-027", "title": "Math/Physics Glossary Curation",
+      "status": "pending", "tier": 1, "depends_on": [], "blocks": ["RDY-004"]
+    },
+    {
+      "id": "RDY-028", "title": "Bagrut Calibration Baseline",
+      "status": "pending", "tier": 3, "depends_on": ["RDY-019", "RDY-032"], "blocks": []
+    },
+    {
+      "id": "RDY-029", "title": "Security Hardening Bundle",
+      "status": "pending", "tier": 2, "depends_on": [], "blocks": []
+    },
+    {
+      "id": "RDY-030", "title": "Accessibility Test Automation",
+      "status": "pending", "tier": 2, "depends_on": ["RDY-015"], "blocks": []
+    },
+    {
+      "id": "RDY-031", "title": "Readiness Task Dependency Graph",
+      "status": "done", "tier": 3, "depends_on": [], "blocks": []
+    },
+    {
+      "id": "RDY-032", "title": "Pilot Data Export Pipeline",
+      "status": "pending", "tier": 0, "depends_on": [], "blocks": ["RDY-024b", "RDY-028"]
+    },
+    {
+      "id": "RDY-033", "title": "Error Pattern Matching Infrastructure",
+      "status": "pending", "tier": 1, "depends_on": [], "blocks": [], "enhances": ["RDY-014"]
+    },
+    {
+      "id": "RDY-034", "title": "Flow State Backend API",
+      "status": "pending", "tier": 2, "depends_on": ["RDY-020"], "blocks": [], "enhances": ["RDY-016"]
+    }
+  ]
+}

@@ -1,0 +1,500 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Cena Platform — Application Services Overlay
+#
+# Extends docker-compose.yml with the backend services, SymPy CAS sidecar,
+# and DB migrator. Run with:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.app.yml up -d --build
+#
+# Infra services (postgres/redis/nats/neo4j) come from the base
+# compose file. This overlay adds:
+#   - sympy-sidecar: Python NATS worker for CAS Tier-2 verification
+#   - db-migrator:  one-shot DbUp migration runner
+#   - admin-api:    question bank + AI generation + role administration
+#   - student-api:  sessions + answers + hints + SignalR push
+#   - actor-host:   LearningSession/Student/Question actors on Proto.Cluster
+#
+# Auth note: APIs validate Firebase JWT. For local dev, set
+#   CENA_CAS_GATE_MODE=shadow and interact via admin endpoints that bypass
+#   auth (health + metrics). Full user-log-in requires Firebase emulator
+#   wiring — tracked separately.
+# ═══════════════════════════════════════════════════════════════════════
+
+services:
+  # ── Firebase Auth Emulator (RDY-056 §2.1) ──
+  firebase-emulator:
+    build:
+      context: ./docker/firebase-emulator
+      dockerfile: Dockerfile
+    container_name: cena-firebase-emulator
+    ports:
+      - "9099:9099"   # Auth emulator
+      - "4000:4000"   # Emulator UI
+    volumes:
+      - ./docker/firebase-emulator/seed-dev-users.sh:/seed/seed-dev-users.sh:ro
+      # Persist auth emulator state across container restarts. Entrypoint
+      # passes --import + --export-on-exit pointing at this directory so
+      # the dev user roster survives docker stop/start cycles AND Docker
+      # Desktop restarts. First boot (volume empty) → entrypoint runs the
+      # seed once and the next graceful shutdown captures it. See
+      # docker/firebase-emulator/entrypoint.sh.
+      - cena_firebase_users:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9099/ > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+
+  # ── SymPy CAS Sidecar (Python, NATS request/reply) ──
+  sympy-sidecar:
+    build:
+      context: ./docker/sympy-sidecar
+      dockerfile: Dockerfile
+    container_name: cena-sympy-sidecar
+    depends_on:
+      nats:
+        condition: service_healthy
+    environment:
+      - NATS_URL=nats://cena-nats:4222
+      - NATS_USER=sympy-sidecar
+      - NATS_PASSWORD=${NATS_SYMPY_PASSWORD:-dev_sympy_pass}
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.socket(); s.settimeout(2); s.connect(('cena-nats',4222)); s.close()\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Database Migrator (one-shot) ──
+  db-migrator:
+    build:
+      context: .
+      dockerfile: src/api/Cena.Db.Migrator/Dockerfile
+    container_name: cena-db-migrator
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - CENA_MIGRATOR_CONNECTION_STRING=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password
+    restart: "no"
+
+  # ── Admin API ──
+  admin-api:
+    build:
+      context: .
+      dockerfile: src/api/Cena.Admin.Api.Host/Dockerfile
+      # RDY-064 / ADR-0058 §3: release correlation. CI populates CENA_GIT_SHA
+      # from the commit short-sha; local dev defaults to "unknown".
+      args:
+        CENA_GIT_SHA: ${CENA_GIT_SHA:-unknown}
+    container_name: cena-admin-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      db-migrator:
+        condition: service_completed_successfully
+      sympy-sidecar:
+        condition: service_started
+      # actor-host owns Marten schema warm — wait until it's reconciled
+      # the schema before this API touches Marten on its own.
+      actor-host:
+        condition: service_healthy
+    ports:
+      - "5052:5052"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5052
+      # OTel OTLP exporter target. The collector lives in
+      # config/docker-compose.observability.yml and shares cena_default;
+      # override via Cluster__OtlpEndpoint so traces+metrics+logs reach
+      # otel-collector → Jaeger / Prometheus / Loki.
+      - Cluster__OtlpEndpoint=http://otel-collector:4317
+      # appsettings.Development.json pins localhost:5433 etc; override via
+      # ConnectionStrings__ so the container talks to the sibling services
+      # on the compose network.
+      - ConnectionStrings__PostgreSQL=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public;Command Timeout=30;Timeout=10
+      - CENA_POSTGRES_CONNECTION=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public;Command Timeout=30;Timeout=10
+      - ConnectionStrings__Redis=cena-redis:6379
+      - ConnectionStrings__NATS=nats://cena-nats:4222
+      - Redis__Password=${REDIS_PASSWORD:-cena_dev_redis}
+      - NATS_API_PASSWORD=${NATS_API_PASSWORD:-dev_api_pass}
+      - NATS_SETUP_PASSWORD=${NATS_SETUP_PASSWORD:-dev_setup_pass}
+      # ADR-0032: shadow mode while bootstrapping — gate runs but does not
+      # block writes on CAS failure. Flip to `enforce` after sympy is green.
+      - CENA_CAS_GATE_MODE=shadow
+      # AutoCreate=None: actor-host owns Marten schema reconciliation (it
+      # depends on the migrator and runs schema warm in dev). admin-api
+      # waits on actor-host's healthcheck before starting and trusts the
+      # schema as-is. Without this override, admin-api's lazy reconciliation
+      # would re-evaluate features and the events feature would drop our
+      # custom ix_mt_events_active_stream_seq index every boot.
+      - Marten__AutoCreate=None
+      # Firebase: project id + emulator host (RDY-056 §2.2). When
+      # FIREBASE_AUTH_EMULATOR_HOST is set, AddFirebaseAuth swaps to the
+      # emulator issuer and disables signature validation. The Admin SDK
+      # honours this env var natively.
+      - Firebase__ProjectId=cena-platform
+      - FIREBASE_AUTH_EMULATOR_HOST=cena-firebase-emulator:9099
+      # RDY-056 §3: CORS allows both SPAs' Vite dev ports.
+      - Cors__AllowedOrigins__0=http://localhost:5174
+      - Cors__AllowedOrigins__1=http://localhost:5175
+      # RDY-056 §5: service-monitoring probe URLs — admin-api container
+      # reaches siblings via compose DNS, not its own localhost.
+      - CENA_NATS_MONITORING_URL=http://cena-nats:8222/varz
+      - CENA_ACTOR_STATS_URL=http://cena-actor-host:5050/api/actors/stats
+      - CENA_SKIP_SEED=0
+      # OCR runner credentials (optional). Substituted from the
+      # repo-root .env (gitignored). When OCR_GEMINI_API_KEY is set,
+      # admin-api activates the real Gemini Vision runner; otherwise
+      # NotConfiguredOcrCascadeService stays registered and Bagrut
+      # ingest returns 503 ocr_circuit_open with remediation copy.
+      - Ocr__Gemini__ApiKey=${OCR_GEMINI_API_KEY:-}
+      - Ocr__Gemini__Model=${OCR_GEMINI_MODEL:-gemini-1.5-pro}
+      - Ocr__Mathpix__AppId=${OCR_MATHPIX_APP_ID:-}
+      - Ocr__Mathpix__AppKey=${OCR_MATHPIX_APP_KEY:-}
+      # OCR sidecar (Surya layout + pix2tex math). Same DNS name actor-host
+      # uses; both hosts hit a single sidecar.
+      - Ocr__Sidecar__BaseUrl=${OCR_SIDECAR_URL:-http://cena-ocr-sidecar:50051}
+      # ADR-0059 §15.5 + PRR-249 — source-anchored variant flow. Flag-flip
+      # ONLY after legal-delta memo signs §6. See docs/engineering/feature-flags.md.
+      - Cena__Variants__BagrutSeedToLlmEnabled=${OCR_VARIANTS_BAGRUT_SEED_ENABLED:-false}
+      # Visual-review (2026-05-01): persist Bagrut source PDFs + OCR figure
+      # crops to disk so curators can render them side-by-side with the
+      # extracted output. Both directories are container-internal paths; the
+      # named-volume binds below survive container recreation. Default
+      # `OutputDirectory` for figures lives under {Tmp}/cena-ocr-figures
+      # (FigureStorageOptions); override here to land both content types under
+      # /var/cena and use the matching named volumes.
+      - Ingestion__BagrutPdfStorage__RootDirectory=/var/cena/source-pdfs
+      - Ocr__FigureStorage__OutputDirectory=/var/cena/ocr-figures
+    volumes:
+      # Source PDFs (sha256-keyed). Curators read these via
+      # GET /api/admin/ingestion/items/{id}/source.pdf.
+      - cena_source_pdfs:/var/cena/source-pdfs
+      # OCR figure crops written by Layer2cFigureExtraction. Curators
+      # read these via the figure-stream endpoint surfaced on item detail.
+      - cena_ocr_figures:/var/cena/ocr-figures
+    restart: unless-stopped
+    # CPU ceiling only. The admin-api hot-loop incident on 2026-05-01
+    # (BagrutCorpusSeedData stalled on Postgres → Kestrel thread-pool
+    # starvation → 132% CPU) cascaded into the rest of the stack purely
+    # because the runaway grabbed enough host CPU to starve the Docker
+    # daemon's healthcheck timer threads. The CPU cap is the actual
+    # containment for that class of failure.
+    #
+    # No memory cap. Briefly tried 2G (too tight, OOM-killed in seed) and
+    # 4G (89% of cap at idle baseline of 3.6G — same growth pattern as
+    # sibling services actor-host / student-api which run uncapped at
+    # ~3.7G). Adding a memory cap only re-enabled the OOM crashloop class
+    # of failure without addressing the actual incident category. Match
+    # the sibling services' uncapped memory; rely on host-level monitoring
+    # for true leak detection.
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+    healthcheck:
+      # /health/ready returns 200 only when Postgres + Redis are reachable
+      # AND all IHostedService startup work has completed. Targeting /ready
+      # (vs /live) lets Docker mark the container unhealthy during a wedged
+      # seed without crashing it — Layer 3 CPU cap contains runaway,
+      # Layer 4 alert pages on sustained burn.
+      test: ["CMD", "curl", "-fsS", "http://localhost:5052/health/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  # ── Student API ──
+  student-api:
+    build:
+      context: .
+      dockerfile: src/api/Cena.Student.Api.Host/Dockerfile
+      # RDY-064 / ADR-0058 §3: release correlation.
+      args:
+        CENA_GIT_SHA: ${CENA_GIT_SHA:-unknown}
+    container_name: cena-student-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      db-migrator:
+        condition: service_completed_successfully
+      sympy-sidecar:
+        condition: service_started
+      # actor-host owns Marten schema warm — wait until it's reconciled
+      # the schema before this API touches Marten on its own.
+      actor-host:
+        condition: service_healthy
+    ports:
+      - "5050:5050"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5050
+      # Override the appsettings.json Kestrel endpoint (which pins port 5051)
+      # so the container listens on the port compose maps (5050).
+      - Kestrel__Endpoints__Http__Url=http://0.0.0.0:5050
+      # OTel OTLP exporter — see admin-api block above for context.
+      - Cluster__OtlpEndpoint=http://otel-collector:4317
+      - ConnectionStrings__PostgreSQL=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public;Command Timeout=30;Timeout=10
+      - CENA_POSTGRES_CONNECTION=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public;Command Timeout=30;Timeout=10
+      - ConnectionStrings__Redis=cena-redis:6379
+      - ConnectionStrings__NATS=nats://cena-nats:4222
+      - Redis__Password=${REDIS_PASSWORD:-cena_dev_redis}
+      - NATS_API_PASSWORD=${NATS_API_PASSWORD:-dev_api_pass}
+      - CENA_CAS_GATE_MODE=shadow
+      # AutoCreate=None: actor-host owns Marten schema reconciliation. See
+      # admin-api comment above for the full rationale (events feature
+      # would otherwise drop our custom event-store indexes on every boot).
+      - Marten__AutoCreate=None
+      - Firebase__ProjectId=cena-platform
+      - FIREBASE_AUTH_EMULATOR_HOST=cena-firebase-emulator:9099
+      # TASK-E2E-A-01-BE-01: open the trusted-tenant on-first-sign-in path so
+      # the e2e-flow student-register spec can bind a Firebase user to the
+      # worker's per-tenant. Production deployments leave this UNSET — when
+      # absent, the endpoint returns 501 (invite-code path is the production
+      # contract, tracked under a follow-up task).
+      - CENA_E2E_TRUSTED_REGISTRATION=true
+      # PRR-436: shared secret for /api/admin/test/probe (E2E DB-boundary
+      # probe). Production deployments MUST NOT set this env var — its
+      # absence makes the endpoint return 404 to every caller. The
+      # e2e-flow Playwright fixtures pass the same value in the
+      # X-Test-Probe-Token header. Rotate by updating both sides.
+      - CENA_TEST_PROBE_TOKEN=dev-only-test-probe-token-do-not-ship
+    restart: unless-stopped
+    # CPU cap mirrors admin-api (see admin-api block above for the
+    # 2026-05-01 hot-loop incident rationale). Memory uncapped to match
+    # actual ~3.7G steady-state working set; CPU cap is the actual
+    # containment for runaways. ALERT-CPU-001 pages on sustained >100%.
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5050/health/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  # ── Admin SPA (Vuexy Vue 3, Vite dev server) ──
+  admin-spa:
+    build:
+      context: ./src/admin/full-version
+      dockerfile: dev.Dockerfile
+    container_name: cena-admin-spa
+    depends_on:
+      firebase-emulator:
+        condition: service_started
+      admin-api:
+        condition: service_started
+    # Admin SPA's vite.config.ts pins port 5174 (strictPort). Map host 5174.
+    ports:
+      - "5174:5174"
+    # Bind-mount the host source so Vite's HMR picks up edits without a
+    # container rebuild. node_modules stays inside the container (an
+    # anonymous volume masks any host node_modules) so SDK-bound deps
+    # keep working across host/container architecture differences.
+    volumes:
+      - ./src/admin/full-version/src:/app/src
+      - ./src/admin/full-version/public:/app/public
+      - ./src/admin/full-version/package.json:/app/package.json
+      - ./src/admin/full-version/vite.config.ts:/app/vite.config.ts
+      - /app/node_modules
+    environment:
+      - VITE_FIREBASE_API_KEY=fake-api-key
+      - VITE_FIREBASE_AUTH_DOMAIN=cena-platform.firebaseapp.com
+      - VITE_FIREBASE_PROJECT_ID=cena-platform
+      - VITE_FIREBASE_STORAGE_BUCKET=cena-platform.appspot.com
+      - VITE_FIREBASE_MESSAGING_SENDER_ID=000000000000
+      - VITE_FIREBASE_APP_ID=1:000000000000:web:dev
+      # Scheme REQUIRED by connectAuthEmulator. SPA runs in the browser, so
+      # we point at the host-visible port 9099, not the container DNS name.
+      - VITE_FIREBASE_AUTH_EMULATOR_HOST=http://localhost:9099
+      - VITE_ADMIN_API_BASE_URL=http://localhost:5052
+      # Vite dev-server proxy targets: inside the SPA container, localhost
+      # is the container itself. Forward /api/* to sibling services on the
+      # compose network by DNS name.
+      - VITE_ADMIN_API_PROXY_TARGET=http://cena-admin-api:5052
+      - VITE_ACTOR_API_PROXY_TARGET=http://cena-actor-host:5050
+      # Architecture-diagram port labels (user-visible via the SPA build).
+      - VITE_PORT_FRONTEND=5174
+      - VITE_PORT_STUDENT_SPA=5175
+      - VITE_PORT_ADMIN_API=5052
+      - VITE_PORT_STUDENT_API=5050
+      - VITE_PORT_ACTOR_HOST=5050
+      - VITE_PORT_NATS=4222
+      - VITE_PORT_POSTGRES=5433
+      - VITE_PORT_REDIS=6379
+      - VITE_PORT_FIREBASE_EMU=9099
+      # Browser-facing URLs for cross-service health probes (Student API
+      # /health/live, Student SPA origin). The Firebase emulator host is
+      # already set above for the auth SDK.
+      - VITE_STUDENT_API_BASE_URL=http://localhost:5050
+      - VITE_STUDENT_SPA_URL=http://localhost:5175
+    restart: unless-stopped
+
+  # ── Student SPA (Vuexy Vue 3 PWA, Vite dev server) ──
+  student-spa:
+    build:
+      context: ./src/student/full-version
+      dockerfile: dev.Dockerfile
+    container_name: cena-student-spa
+    depends_on:
+      firebase-emulator:
+        condition: service_started
+      student-api:
+        condition: service_started
+    # Student SPA's vite.config.ts pins port 5175 (strictPort). Map host 5175.
+    ports:
+      - "5175:5175"
+    # Host source → container for Vite HMR. node_modules anonymous volume
+    # keeps the container's installed packages (SDK-bound binaries).
+    volumes:
+      - ./src/student/full-version/src:/app/src
+      - ./src/student/full-version/public:/app/public
+      - ./src/student/full-version/package.json:/app/package.json
+      - ./src/student/full-version/vite.config.ts:/app/vite.config.ts
+      - /app/node_modules
+    environment:
+      - VITE_FIREBASE_API_KEY=fake-api-key
+      - VITE_FIREBASE_AUTH_DOMAIN=cena-platform.firebaseapp.com
+      - VITE_FIREBASE_PROJECT_ID=cena-platform
+      - VITE_FIREBASE_STORAGE_BUCKET=cena-platform.appspot.com
+      - VITE_FIREBASE_MESSAGING_SENDER_ID=000000000000
+      - VITE_FIREBASE_APP_ID=1:000000000000:web:dev
+      - VITE_FIREBASE_AUTH_EMULATOR_HOST=http://localhost:9099
+      - VITE_STUDENT_API_BASE_URL=http://localhost:5050
+      # FIND-ux-014: Hebrew is hideable outside Israel but the dev stack
+      # is Israeli-first (English primary, Arabic + Hebrew secondary per
+      # feedback_language_strategy). Enable Hebrew in dev + local runs.
+      - VITE_ENABLE_HEBREW=true
+    restart: unless-stopped
+
+  # ── Student Emulator (simulated-traffic load tool) ──
+  # Runs N simulated students against the actor cluster via NATS. Off by
+  # default — bring up with an explicit `--profile emulator` so it doesn't
+  # flood the dev stack on `docker compose up`.
+  emulator:
+    build:
+      context: .
+      dockerfile: src/emulator/Dockerfile
+      # RDY-064 / ADR-0058 §3: release correlation.
+      args:
+        CENA_GIT_SHA: ${CENA_GIT_SHA:-unknown}
+    container_name: cena-emulator
+    profiles: ["emulator"]
+    depends_on:
+      nats:
+        condition: service_healthy
+      actor-host:
+        condition: service_started
+    environment:
+      - NATS_EMU_USER=emulator
+      - NATS_EMU_PASSWORD=${NATS_EMU_PASSWORD:-dev_emu_pass}
+    command:
+      - "--students=${EMU_STUDENTS:-50}"
+      # Default 5× (was 25×). At 25× with 50 students the event firehose
+      # overwhelms Marten's event-sequence allocator + Postgres I/O,
+      # producing the pkey_mt_events_seq_id duplicate-key collision
+      # tracked in docs/postmortems/mt-events-seq-collision-2026-04-19.md
+      # and has, on separate occasions, hung the host Docker Desktop VM.
+      # 5× gives realistic emulation throughput without overload.
+      # Override via `EMU_SPEED=25 docker compose up -d emulator` when
+      # specifically load-testing the seq-collision reproduction.
+      - "--speed=${EMU_SPEED:-5}"
+      - "--duration=${EMU_DURATION:-300}"
+      - "--nats=nats://cena-nats:4222"
+    restart: "no"
+
+  # ── Actor Host (Proto.Actor cluster) ──
+  actor-host:
+    build:
+      context: .
+      dockerfile: src/actors/Cena.Actors.Host/Dockerfile
+      # RDY-064 / ADR-0058 §3: release correlation.
+      args:
+        CENA_GIT_SHA: ${CENA_GIT_SHA:-unknown}
+    container_name: cena-actor-host
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      db-migrator:
+        condition: service_completed_successfully
+      sympy-sidecar:
+        condition: service_started
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      # OTel OTLP exporter — actor-host emits Proto.Cluster + actor-lifecycle
+      # spans + per-actor metrics. Same target as the API hosts.
+      - Cluster__OtlpEndpoint=http://otel-collector:4317
+      - ConnectionStrings__PostgreSQL=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public;Command Timeout=30;Timeout=10
+      - CENA_POSTGRES_CONNECTION=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public;Command Timeout=30;Timeout=10
+      - ConnectionStrings__Redis=cena-redis:6379
+      - ConnectionStrings__NATS=nats://cena-nats:4222
+      - Redis__Password=${REDIS_PASSWORD:-cena_dev_redis}
+      - NATS_ACTOR_PASSWORD=${NATS_ACTOR_PASSWORD:-dev_actor_pass}
+      - PROTO_CLUSTER_PROVIDER=test
+      - CENA_CAS_GATE_MODE=shadow
+      - CENA_SKIP_SEED=1
+      # appsettings.json pins AllowedHosts=localhost — override so sibling
+      # compose services (admin-api, emulator) can hit /health/live via the
+      # compose DNS name cena-actor-host.
+      - AllowedHosts=*
+      # Firebase JWT validation — match admin-api so the same emulator
+      # token is accepted by both /api/admin/* (admin-api) and
+      # /api/actors/* (actor-host).
+      - Firebase__ProjectId=cena-platform
+      - FIREBASE_AUTH_EMULATOR_HOST=cena-firebase-emulator:9099
+      # OCR runner credentials (optional). Substituted from repo-root .env
+      # (gitignored). Same set as admin-api so both hosts use identical
+      # cascade configuration via Cena.Infrastructure.Ocr.AddOcrCascadeWithRunners.
+      - Ocr__Gemini__ApiKey=${OCR_GEMINI_API_KEY:-}
+      - Ocr__Gemini__Model=${OCR_GEMINI_MODEL:-gemini-1.5-pro}
+      - Ocr__Mathpix__AppId=${OCR_MATHPIX_APP_ID:-}
+      - Ocr__Mathpix__AppKey=${OCR_MATHPIX_APP_KEY:-}
+      # OCR sidecar URL — admin-api & actor-host both reach the sidecar
+      # via the compose network DNS name when docker-compose.ocr-sidecar.yml
+      # is up. The sidecar's docker-compose listens on host port 50051.
+      - Ocr__Sidecar__BaseUrl=${OCR_SIDECAR_URL:-http://cena-ocr-sidecar:50051}
+      # Visual-review parity with admin-api: when actor-host's
+      # IngestionJobRunner runs the OCR cascade (e.g. CloudDir ingestion
+      # strategy), figure crops land in the same volume admin-api reads
+      # from so the figure-stream endpoint resolves regardless of which
+      # host wrote them. See admin-api block for the source-pdfs +
+      # ocr-figures rationale.
+      - Ocr__FigureStorage__OutputDirectory=/var/cena/ocr-figures
+    volumes:
+      - cena_ocr_figures:/var/cena/ocr-figures
+    restart: unless-stopped
+    # CPU cap mirrors admin-api + student-api (see admin-api block for the
+    # 2026-05-01 hot-loop incident rationale). actor-host owns the Marten
+    # schema warm; if a projection rebuild ever loops, the cap contains it
+    # before it can starve the Docker daemon's healthcheck timer threads.
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+    # actor-host owns Marten schema warm (CenaEventStoreIndexes etc).
+    # admin-api / student-api wait on this healthcheck via service_healthy
+    # before starting so only one host runs the schema reconcile, eliminating
+    # the 3-way DDL race we hit on pg_class_relname_nsp_index. /health/live
+    # only flips to "Healthy" after Marten reconciliation is complete.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5050/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s

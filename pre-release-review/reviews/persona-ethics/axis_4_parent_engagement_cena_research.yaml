@@ -1,0 +1,254 @@
+doc_path: pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md
+reviewer: persona-ethics
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 parent-engagement features (explainability card, bilingual
+  dashboard, parent-teacher bridge messages, privacy-preserving cohort
+  context, weekly 3-2-1 snapshot, growth-framed SMS nudges, culturally-
+  localized views, Bagrut countdown "Crisis Mode"). Multiple BORDERLINE
+  flags for cultural stereotyping and countdown anxiety.
+system_purpose_fit: 3
+  rationale:
+    - F1, F2, F3, F5, F6 are well-designed parent-engagement tools consistent
+      with autonomy and transparency
+    - F8 "Crisis Mode" countdown (L309-345) is a significant ethics concern:
+      countdown timers + "crisis" framing toward minors' families creates
+      surveillance-pressure pipeline
+    - F7 "Culturally-Localized Views" (L269-305) has stereotyping risk the
+      author flags but does not sufficiently mitigate
+    - F6 growth-framed SMS nudges (L227-265) need hard frequency caps
+    - The axis as a whole risks drifting parent-engagement into
+      parent-surveillance
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable: []
+adr_alignment:
+  honored:
+    - "ADR-0003 session-scope (F1, F4, F5 all session-only)"
+    - "No-profiling principle from ADR-0003 (F4 differential privacy pipeline)"
+  violated: []
+  missing_adr_needed:
+    - "ADR needed for 'crisis mode' activation UX — triggers, countdown display,
+      parent-visibility of student exam date, dark-time respect"
+    - "ADR for cultural-profile selection UX — self-selected, not auto-inferred,
+      with explicit anti-stereotyping copy"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F8 "Crisis Mode — Bagrut Countdown Dashboard" (L309-345) is the
+      ethics hotspot of this axis. Multiple concerns:
+      (a) "Crisis" branding itself is loss-aversion copy — ship-gate
+          definition: "FOMO urgency." The label should be "Final
+          Stretch," "Focus Mode," or student-selectable.
+      (b) Countdown timer to exam date (L312) is literally a
+          decreasing-number stressor. If shown, it must be collapsible
+          by default, not default-visible, and never animated.
+      (c) Parent-visible countdown creates a parent-to-student pressure
+          pipeline that undermines student autonomy.
+      (d) "Priority Topics ranked by exam weight × gap severity" (L312)
+          surfaces the student's weaknesses to the parent, weaponizing
+          the deficit view.
+      Author's mitigation (L342) acknowledges the tension but keeps the
+      countdown. Ethics lens: countdown must be student-opt-in to share
+      with parents (not the default), and "Crisis" must be renamed.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md:L309-L345
+    lens_note: |
+      Shipgate GD-004: "FOMO urgency" and "guilt/shame push
+      notifications" are banned. A parent-facing countdown titled
+      "Crisis" tied to a minor's exam date is exactly the pattern the
+      ban was written against. Even with mitigations, the name + default
+      parent-visibility cannot survive the informed-student test.
+  - severity: P1
+    finding: |
+      F6 "Encouragement Nudges (Growth-Framed SMS)" (L227-265) proposes
+      "2-3 times per week" SMS/WhatsApp nudges. Author flags nagging
+      risk (L262). Ethics lens requires:
+      (a) Hard cap enforced server-side at 2/week (not "recommended").
+      (b) Dark-time block: no sends between 21:00-08:00 local.
+      (c) Every message has one-tap "pause 30 days" link.
+      (d) First message must be an explicit opt-in confirmation, not
+          begin substantive nudging.
+      Without these, "encouragement" becomes an anxiety-delivery pipeline
+      that parents cannot easily escape once activated via a school flow.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md:L230, L253-L262
+    lens_note: |
+      Digital wellbeing research requires push notifications to minors'
+      family devices to respect notification-fatigue and dark-time. The
+      proposal lacks enforcement.
+  - severity: P1
+    finding: |
+      F7 "Culturally-Localized Parent Views" (L269-305) proposes
+      different default UI profiles per cultural background. Author
+      flags (L302) stereotyping risk. Ethics lens: this must be
+      user-selected (never inferred from name, language, or ethnicity),
+      the selection UI must be explicitly labeled as preference-not-
+      demographic ("which style feels most natural to you?"), and
+      there must be a "standard view" as a first-class default — not
+      a fallback.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md:L269-L305
+    lens_note: |
+      Auto-inferring cultural profile from language preference (L293)
+      is the exact pattern that creates segregated UIs and reinforces
+      stereotypes. Must be affirmative opt-in only.
+  - severity: P2
+    finding: |
+      F4 "Privacy-Preserving Cohort Context" (L146-183) frames student
+      progress against anonymized cohort data ("Students with similar
+      starting points typically need X sessions"). Even anonymized,
+      comparison framing can induce anxiety. Author mitigates (L179)
+      but doesn't forbid negative-framing copy ("your child is behind
+      the average"). Add shipgate rule: cohort-context strings may use
+      only positive-frame patterns ("on track," "typical range"), never
+      deficit patterns.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md:L149-L179
+    lens_note: |
+      Cohort comparison with differential privacy is technically clean
+      but rhetorically still a percentile. Shipgate should guard
+      parent-facing copy templates explicitly.
+  - severity: P2
+    finding: |
+      F3 "Parent-Teacher Bridge Messages" (L106-143) attaches a child's
+      "Cena analytics snippet" (L109) to parent-initiated teacher
+      messages. Ethics lens: student must see and approve the snippet
+      content before it's forwarded to a teacher by their parent.
+      Otherwise the feature bypasses the student's own agency over
+      their learning narrative.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md:L109
+    lens_note: |
+      Parent-teacher communication about a minor's learning is
+      legitimate but should not bypass the minor entirely. Self-
+      Determination Theory autonomy requires the student to remain in
+      the loop for any third-party disclosure of their data.
+already_built: []
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-017 through FD-021 covers same 5 features"
+  - "AXIS_6_Assessment_Feedback_Research.md: F7 Crisis Mode here overlaps with F7 there"
+extracted_tasks:
+  - title: "Rename 'Crisis Mode' + make countdown/parent-share explicit opt-in"
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Before any exam-proximity dashboard ships (F8 here, F7 Axis 6):
+      1. Replace "Crisis Mode" branding with neutral language ("Final
+         Stretch," "Focus Weeks," or student-selectable)
+      2. Countdown display must be collapsible; collapsed by default;
+         no animation; no color alarming
+      3. Parent visibility of countdown + priority topics requires
+         per-semester explicit student opt-in, logged
+      4. Shipgate scanner banned-phrase list adds: "running out of time,"
+         "only X days left," "crisis," "urgent"
+      ## Files
+      - docs/adr/00NN-exam-proximity-ui-policy.md (new)
+      - scripts/shipgate/banned.json
+      - src/student-web/src/features/exam-proximity/*
+      - src/actors/ParentSharing/*
+      ## Definition of Done
+      - ADR accepted
+      - Shipgate scanner rejects banned phrases in any locale
+      - Parent dashboard shows countdown only after per-semester student opt-in
+      - E2E test confirms default-off + opt-in path
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L309-L345]
+  - title: "Parent SMS/WhatsApp nudge policy: 2/week cap, dark-time, opt-in confirm"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Implement product-level nudge policy for F6 growth-framed nudges:
+      - 2 per parent per rolling 7 days max (not "recommended")
+      - 21:00-08:00 quiet hours in parent's local timezone
+      - First message is one-line opt-in confirmation, no content
+      - One-tap "pause 30 days" link on every message
+      - Audit log of all sends
+      ## Files
+      - src/notifications/ParentNudgePolicy.cs (new)
+      - src/actors/ParentEngagement/NudgeGrain.cs
+      - tests/parent-nudge-policy.test.cs
+      ## Definition of Done
+      - Policy enforced server-side (bypass impossible via admin toggle)
+      - Dark-time test: sends scheduled 22:00-07:00 queue until 08:00
+      - Cap test: 3rd send in 7 days rejected
+      - Opt-in test: first send = confirmation only
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L230, L253-L262]
+  - title: "Cultural parent-view profile: affirmative opt-in, never inferred"
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      F7 cultural-profile selection must be:
+      - Never inferred from language, ethnicity, or name
+      - Offered as a self-description preference, not a demographic label
+      - "Standard view" is a first-class option, not default fallback
+      - Copy reviewed by community representatives from each affected cohort
+        before ship
+      - Switchable at any time from a single settings page
+      ## Files
+      - src/parent-web/src/features/profile/CulturalPreference.vue
+      - docs/research/parent-view-cultural-ux-validation.md (new)
+      ## Definition of Done
+      - No code path sets cultural_view_profile from demographic data
+      - Community review sign-off documented
+      - E2E: language change does NOT change cultural profile
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L269-L305]
+  - title: "Cohort-context copy lockdown: positive-frame only"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F4 Privacy-Preserving Cohort Context copy templates must pass a
+      shipgate lint that forbids deficit-framing ("behind," "below
+      average," "slower than," "struggling compared to").
+      ## Files
+      - scripts/shipgate/banned.json
+      - src/parent-web/src/locales/*.json
+      ## Definition of Done
+      - Lint passes / fails with fixture tests
+      - All existing cohort-context strings pass
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L149-L179]
+  - title: "Student preview + consent for parent-to-teacher analytics snippet"
+    priority: P2
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F3 Parent-Teacher Bridge Messages: attached analytics snippet must
+      show a student-side preview + approve step before the parent's
+      message is sent to a teacher. If student has not approved within
+      48h, message queues indefinitely (no auto-send).
+      ## Files
+      - src/actors/ParentTeacherBridge/*
+      - src/student-web/src/features/bridge-approve/*
+      ## Definition of Done
+      - No analytics snippet sent without student approval event logged
+      - Preview UI accessible on student web + mobile
+      - E2E test covers approve / deny / timeout
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L109]
+verdict: revise
+verdict_reason: |
+  Parent-engagement is high-value but risks drifting into surveillance /
+  pressure patterns. Revise F8 (rename Crisis, opt-in countdown), F6
+  (hard-cap nudges), F7 (affirmative profile), F4 (copy lockdown), F3
+  (student preview). F1, F2, F5 ship as designed.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "F4 differential privacy implementation + F8 parent visibility of student exam date"
+  - to: persona-cogsci
+    about: "F6 'growth mindset' message claims (Berkowitz 2015, Yeager 2019) effect-size realism"
+  - to: persona-ministry
+    about: "F8 Bagrut countdown — is exam-date display compliant with Ministry communications policy?"

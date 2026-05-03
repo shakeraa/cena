@@ -1,0 +1,69 @@
+doc_path: pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md
+reviewer: persona-enterprise
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr. Nadia's pedagogical review of 20 findings from feature-discovery; SHIP/SHORTLIST/REJECT
+  verdicts through a veteran math-educator lens.
+system_purpose_fit: 3
+  rationale:
+    - Pedagogical review is outside enterprise lens; enterprise interest is limited to verdicts with structural implications.
+    - Several REJECT verdicts protect ADR-0003 and GD-004 (aligns with enterprise hygiene).
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Pedagogical soundness — not an enterprise claim."
+adr_alignment:
+  honored:
+    - "ADR-0003 (several REJECTs reject cross-session misconception retention)"
+    - "GD-004 (several REJECTs reject streak/variable-ratio proposals)"
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Several "SHIP with caveat" verdicts add conditions that translate to new event schemas or aggregate changes.
+      Those caveats must be read as enterprise work items, not pedagogical notes. Example: any SHIP that adds
+      "store student's learning goal across sessions" implies StudentProfile schema extension.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md:L~100-L~300
+    lens_note: Enterprise — pedagogical caveats often imply schema work; surface them.
+  - severity: P2
+    finding: |
+      REJECT verdicts on "streak-like" findings are load-bearing for GD-004. Echo them into the ship-gate scanner
+      rule set to prevent re-surfacing.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md (REJECT entries)
+    lens_note: Enterprise — turn pedagogical rejections into durable CI rules.
+already_built: []
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: Dr. Nadia cross-examination column"
+extracted_tasks:
+  - title: "Translate Nadia's SHIP-with-caveat findings into schema impact list"
+    priority: P2
+    estimate: S
+    suggested_assignee: claude-subagent-audit
+    queue_body: |
+      ## Goal
+      For each of Dr. Nadia's SHIP-with-caveat verdicts, enumerate the schema/event/aggregate impact. Output a table
+      to feed the synthesis step.
+
+      ## Files
+      - pre-release-review/reviews/SYNTHESIS.md (append)
+
+      ## Definition of Done
+      - Table of {finding_id, schema_delta, aggregate_touched, adr_needed}.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-audit --result "<branch>"
+    source_doc_lines: [L1-L410]
+verdict: revise
+verdict_reason: |
+  Most content is pedagogy (out of lens). Enterprise value is in the schema-impact table derived from SHIP-caveats and
+  the durable CI rules derived from REJECTs.
+cross_lens_handoff:
+  - to: persona-educator
+    about: "All pedagogical verdicts."
+  - to: persona-cogsci
+    about: "Evidence quality behind verdicts."
+  - to: persona-ethics
+    about: "REJECTs that protect GD-004 mechanics."

@@ -1,0 +1,120 @@
+doc_path: pre-release-review/AXIS_6_Assessment_Feedback_Research.md
+reviewer: persona-a11y
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 assessment/feedback features: formative-summative signal split, IRT-CAT
+  placement, AI partial-credit grading, CAS-validated AI grading, per-session
+  error analysis, real-time misconception tagging, crisis-mode compression,
+  confidence calibration. Mostly algorithmic; UI surface is dashboards and
+  feedback panels.
+system_purpose_fit: 3
+  rationale:
+    - Honors ADR-0002 (CAS oracle) and ADR-0003 (session-scope)
+    - Dashboards carry heavy color/icon load — CVD + WCAG risk
+    - Feedback messaging must be localized and honor RTL with inline math
+    - Confidence-calibration UI must not map to loss-aversion in translation
+code_reality_check:
+  claims_verified_in_code:
+    - "SymPy oracle is production-wired (ADR-0002 enforced): existing CAS tasks in .tasks/review queue"
+    - "Progress page with charts stub: src/student/full-version/src/pages/progress/index.vue"
+    - "Color-contrast a11y scanner already runs: src/student/full-version/tests/a11y/color-contrast.spec.ts"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Confidence-calibration UI (F8) — no prototype in repo"
+    - "Error-analysis report localization coverage"
+adr_alignment:
+  honored:
+    - "ADR-0002, ADR-0003 explicitly respected"
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: "F1 dual progress bars (Practice Strength + Exam Readiness) and F5 error analysis rely on green/red color coding per doc (L50-51). Color alone violates WCAG 1.4.1. Must add shape/icon/pattern."
+    evidence: "AXIS_6...md:L50-L51 ('color-coded gap indicator (green = aligned, red = large gap)')"
+    lens_note: "Especially bad for a CVD student reading their own readiness — they may misread 'aligned' vs 'large gap'."
+  - severity: P1
+    finding: "F3/F4 AI partial-credit feedback will contain inline math inside Hebrew/Arabic explanation sentences. Every such instance must use <bdi dir=\"ltr\"> — doc doesn't specify."
+    evidence: "AXIS_6...md:F3-F4 sections; feedback_math_always_ltr memory"
+    lens_note: "Rubric explanations like 'סימן הפחתה חסר ב-3x-2' must wrap 3x-2."
+  - severity: P1
+    finding: "F8 certainty-based marking could become loss-aversion: 'high-confidence wrong answer = -2 points' is literal loss-aversion framing. Doc already flags Foster 2021 null achievement result but framing risk remains."
+    evidence: "AXIS_6...md:F8 section; finding_assessment_dr_rami.md:FD-006"
+    lens_note: "Ship-gate banned-term concern. Calibration tool only, not graded."
+  - severity: P1
+    finding: "F2 IRT-CAT presents items to students with progressively harder/easier difficulty. If the UI indicates difficulty by color (red=hard), fails CVD; if by fire-emoji/star count, may register as gamification (variable-ratio)."
+    evidence: "AXIS_6...md:F2 section"
+    lens_note: "Keep difficulty invisible to student; show only post-test feedback."
+  - severity: P2
+    finding: "F5 per-session error analysis report — if printable/exportable, must ship tagged PDF with lang attribute matching student locale."
+    evidence: "AXIS_6...md:F5 section"
+    lens_note: "Same as teacher export concern in AXIS 5."
+  - severity: P2
+    finding: "F6 real-time misconception tags appear in-flight during a session. Must use aria-live='polite' and not aria-live='assertive' (which interrupts screen reader and increases anxiety)."
+    evidence: "AXIS_6...md:F6 section"
+    lens_note: "Doc is silent; default Vue composable may pick wrong politeness."
+already_built:
+  - feature: "Color-contrast, aria-live, heading-hierarchy a11y scanners"
+    evidence: "src/student/full-version/tests/a11y/*.spec.ts"
+    note: "Will automatically catch many F1/F5/F6 regressions if new views use existing components"
+duplicates_of_other_docs:
+  - "cena_dr_nadia_pedagogical_review_20_findings.md: FD-005, FD-006, FD-007, FD-008 (all overlap)"
+  - "finding_assessment_dr_rami.md: FD-006 confidence calibration WARNING, FD-008 REJECT"
+extracted_tasks:
+  - title: "Shape/pattern differentiation for readiness/error dashboards"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F1 dual progress bars and F5 error analysis must not rely on color alone. Add shape/icon (e.g., checkmark, triangle, cross) and pattern (solid/dashed/dotted) for every state so CVD users can interpret status.
+      ## Files
+      - src/student/full-version/src/components/progress/*.vue
+      - src/student/full-version/src/components/session/AnswerFeedback.vue
+      - extend tests/a11y/color-contrast.spec.ts to assert non-color redundancy
+      ## Definition of Done
+      - Every state in readiness/feedback UI has a non-color channel (shape or pattern)
+      - Scanner asserts presence of aria-label or icon per state
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L50-L51, F5 section]
+  - title: "Ship-gate language sweep on confidence-calibration (F8) microcopy"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Before F8 ships, ensure all three locale translations avoid loss-aversion framing. Microcopy should say 'calibrate your confidence' not 'lose points for overconfidence'.
+      ## Files
+      - src/student/full-version/src/plugins/i18n/locales/{he,ar,en}.json (confidenceCalibration namespace)
+      - tests/shipgate/banned-terms.spec.ts (ensure coverage)
+      ## Definition of Done
+      - All three locale keys pass ship-gate
+      - No 'lose', 'penalty', 'deduction' synonyms in he/ar translations
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F8 section]
+  - title: "aria-live='polite' for F6 real-time misconception tags"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Ensure misconception tags appearing mid-session use aria-live='polite' not assertive; assertive interrupts screen readers and elevates anxiety.
+      ## Files
+      - F6 component when built
+      - extend tests/a11y/aria-live-on-dynamic.spec.ts to assert politeness
+      ## Definition of Done
+      - All dynamic misconception tags carry aria-live='polite'
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F6 section]
+verdict: revise
+verdict_reason: "Assessment dashboards need non-color redundancy and localized RTL math handling. F8 framing risk requires ship-gate scrub before build."
+cross_lens_handoff:
+  - to: persona-ethics
+    about: "F8 certainty-based marking — loss-aversion framing risk"
+  - to: persona-cogsci
+    about: "F8 calibration effect on learning vs confidence (Foster 2021 null)"
+  - to: persona-privacy
+    about: "F6 session-scoped misconception tags — audit 30-day retention"

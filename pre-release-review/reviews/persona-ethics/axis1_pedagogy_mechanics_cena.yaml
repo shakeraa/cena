@@ -1,0 +1,197 @@
+doc_path: pre-release-review/axis1_pedagogy_mechanics_cena.md
+reviewer: persona-ethics
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 cognitive-science-backed pedagogy features (interleaving, spacing,
+  retrieval, elaboration, productive struggle, desirable difficulty, transfer
+  sequencing, worked-example fading). Each feature self-screens against
+  loss-aversion / variable-ratio / misconception-retention guardrails.
+system_purpose_fit: 4
+  rationale:
+    - Entirely focused on competence-building through mastery, not compulsion
+    - Every feature includes an explicit "no loss-aversion" / "no variable-ratio" check
+    - No streaks, no leaderboards, no dark-pattern vocabulary proposed
+    - Feature 2 "Spaced Mastery Challenge" (L72-126) reframes wrong answers as
+      "strengthening memory," not shame — textbook ethical-persuasion design
+    - One knock: Feature 3 retrieval prompts and Feature 5 hint governor are
+      BORDERLINE for subtle anxiety creation if framing slips
+code_reality_check:
+  claims_verified_in_code:
+    - "ship-gate banned-term lexicon exists -> docs/engineering/shipgate.md:1-58"
+    - "no streak mechanic in locale files (grep confirms absence in axis1 proposals)"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Interleaving + spacing claims to produce d=1.05/0.34 effect sizes -> out of my lens (cogsci)"
+    - "Productive-failure hint delay claims to reduce helplessness -> out of my lens (cogsci)"
+adr_alignment:
+  honored:
+    - "Implicit honor of GD-004 (shipgate) — every feature explicitly rule-checks against it"
+    - "ADR-0003 session-scoped misconception — features 1, 3, 5, 7 all respect"
+  violated: []
+  missing_adr_needed:
+    - "ADR for 'productive struggle hint delay' ceiling (F5) — risk of learned
+      helplessness inversion if delay tuned too aggressively; needs a written
+      floor/ceiling spec per-cohort"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 3 (Embedded Retrieval Micro-Checks, L129-181) self-flags a
+      BORDERLINE loss-aversion risk at L176 — "if students perceive retrieval
+      prompts as mini tests, anxiety could increase." Author proposes
+      "memory building" framing as mitigation, but no copy-lock rule is
+      proposed. Without a ship-gate-checked copy lockdown, the framing can
+      drift during implementation and re-introduce loss-aversion vocabulary.
+    evidence: axis1_pedagogy_mechanics_cena.md:L175-L181
+    lens_note: |
+      Ethical-persuasion research (docs/ethical-persuasion-research.md:L34)
+      requires the "informed student" test — if the student knew the
+      technique being used, would they still appreciate it? Retrieval
+      micro-checks pass IF framing is honest. A copy-lockdown gate in CI
+      would enforce this.
+  - severity: P1
+    finding: |
+      Feature 5 (Productive Struggle Hint Governor, L238-293) uses an
+      adaptive DELAY penalty for "chronic hint-seekers" — up to +120s
+      extra wait (L270). Delaying help for minors who are already
+      struggling is BORDERLINE coercive; it trades short-term frustration
+      for questionable long-term gain. Escape hatch (skip-to-example) is
+      mentioned (L290) but should be EQUAL PROMINENCE with the hint
+      button, not hidden behind "truly stuck" gating language.
+    evidence: axis1_pedagogy_mechanics_cena.md:L265-L293
+    lens_note: |
+      Shipgate policy bans guilt/coercion mechanics; an adaptive penalty
+      that scales with help-seeking is not the same as a streak counter,
+      but functionally creates a "punished for asking" pattern. Ethics
+      lens requires: no penalty should be tied to help-seeking behavior;
+      only to explicit skipping-without-attempt.
+  - severity: P2
+    finding: |
+      Feature 6 (Desirable Difficulty Targeting, L297-349) targets 60-70%
+      success rate. Author flags (L346) that anxious students should get
+      65% default. Missing from the spec: a student-controlled override
+      that is as prominent as the "challenge me more" button. Autonomy
+      requires the student to be able to raise OR lower challenge, not
+      only raise it.
+    evidence: axis1_pedagogy_mechanics_cena.md:L333
+    lens_note: |
+      Autonomy is a non-negotiable under Self-Determination Theory
+      (ethical-persuasion-research.md); features that silently adjust
+      challenge without a clear student-facing "gentler today" control
+      risk violating the autonomy principle even when pedagogically
+      sound.
+  - severity: P2
+    finding: |
+      Feature 8 (Worked-Example Fading, L409-467) optionally uses
+      Bayesian Knowledge Tracing. Author flags BORDERLINE ADR-0003
+      tension at L462-463. Ethics lens adds: even with fixed BKT
+      parameters, the UI should not display a "mastery probability"
+      number to the student — that would create exactly the kind of
+      persistent-deficit label ADR-0003 prohibits in principle.
+    evidence: axis1_pedagogy_mechanics_cena.md:L446-L463
+    lens_note: |
+      UI leakage of internal adaptive-engine state is a common
+      dark-pattern vector in EdTech. Ethics lens requires: student-facing
+      labels only describe current session behavior, never cumulative
+      "probability of mastery" scores.
+already_built:
+  - feature: "Ship-gate banned-term scanner"
+    evidence: docs/engineering/shipgate.md; scripts/shipgate/scan.mjs
+    note: |
+      The document's guardrail-check sections are honored by an existing CI
+      scanner. Good hygiene. No proposal here bypasses it.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-001 (Interleaving), FD-007 (Self-Explanation)"
+  - "axis2_motivation_self_regulation_findings.md: Feature 1 overlaps retrieval/elaboration concepts"
+extracted_tasks:
+  - title: "Ship-gate copy lockdown for retrieval/elaboration prompt strings"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Prevent future copy drift in Feature-3 (retrieval) and Feature-4
+      (elaboration) prompts from slipping into anxiety-inducing or
+      test-like framing. Extend scripts/shipgate/scan.mjs to lint a
+      dedicated locale namespace (e.g. `prompts.retrieval.*`,
+      `prompts.elaboration.*`) against an expanded banned-phrase list:
+      "mini test", "quiz", "grade", "score", "correct or incorrect",
+      "right or wrong answer".
+      ## Files
+      - scripts/shipgate/scan.mjs
+      - scripts/shipgate/banned-prompt-phrases.json (new)
+      - src/*/locales/*/prompts.*.json (to lint)
+      ## Definition of Done
+      - CI fails on any retrieval/elaboration prompt string containing
+        test-framing vocabulary
+      - Allowlist exists with explicit pedagogical justification per entry
+      - Unit tests cover 10 positive and 10 negative cases
+      - Existing axis1 F3/F4 prompts pass the lint cleanly
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L175-L181, L229-L231]
+  - title: "Ship-gate rule: no penalty delay scaled to help-seeking"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Add an architectural decision record (ADR) forbidding any
+      adaptive-engine penalty (timer, lockout, cooldown) whose magnitude
+      is scaled by help-seeking frequency. Hint-delay timing may be
+      calibrated by content type and student-declared preference, but
+      NOT by hint-dependency history.
+      ## Files
+      - docs/adr/00NN-no-help-seeking-penalty.md (new)
+      - docs/engineering/shipgate.md (cross-reference)
+      ## Definition of Done
+      - ADR accepted by coordinator
+      - Shipgate policy doc cross-references the ADR
+      - Axis 1 Feature 5 (Productive Struggle Hint Governor) revised to
+        remove penalty_factor scaling on hint_dependency_rate
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L265-L293]
+  - title: "Student-facing 'go gentler today' control for difficulty adjuster"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Surface an always-accessible "go gentler today" / "challenge me"
+      pair of controls in the session UI so that the Desirable
+      Difficulty Targeting engine (Feature 6) is never opaque to the
+      student. Both controls must be equally prominent.
+      ## Files
+      - src/student-web/src/components/session/DifficultyControl.vue (new)
+      - src/student-web/src/stores/session.ts
+      ## Definition of Done
+      - Toggle visible on every practice session
+      - Setting persists to student profile (explicit, not inferred)
+      - a11y: keyboard, screen reader, WCAG 2.2 AA contrast
+      - Unit + snapshot tests
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L330-L346]
+verdict: revise
+verdict_reason: |
+  The document is substantially aligned with shipgate / ethical-persuasion
+  principles — authors actively self-check against GD-004. Revise to (a)
+  lock in copy for retrieval/elaboration, (b) remove help-seeking-scaled
+  penalty in F5, (c) add explicit gentler-mode control in F6.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: |
+      Effect-size claims (d=1.05, d=0.79, d=1.25) — Dr. Rami's review
+      already flagged cherry-picking on FD-001; Kenji should validate
+      meta-analytic realism for F1, F2, F8.
+  - to: persona-a11y
+    about: |
+      F5 hint-delay timers need explicit WCAG 2.2 AA "Timeouts" (2.2.1)
+      review — auto-delaying help for students with cognitive
+      disabilities may violate accommodation requirements.
+  - to: persona-enterprise
+    about: |
+      F8 worked-example fading references "P(mastered)" persistence; needs
+      aggregate decomposition decision under ADR-0012 and explicit
+      session-vs-aggregate retention policy.

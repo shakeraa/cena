@@ -1,0 +1,132 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cena.fullname" . }}-actors
+  labels:
+    {{- include "cena.componentLabels" (dict "root" . "component" "actors") | nindent 4 }}
+spec:
+  # RDY-025: Actor Host is a Proto.Actor cluster member. Replica count is
+  # governed by Helm values and NOT scaled by HPA — cluster membership
+  # churn risks transient split-brain during gossip convergence.
+  replicas: {{ .Values.actors.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "cena.selectorLabels" (dict "root" . "component" "actors") | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Gentle rollout for cluster members — one at a time, never unavailable
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        {{- include "cena.componentLabels" (dict "root" . "component" "actors") | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "cena.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "cena.serviceAccountName" . }}
+      # Long grace period: actor passivation + event flush
+      terminationGracePeriodSeconds: {{ .Values.actors.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: actors
+          image: "{{ .Values.actors.image.repository }}:{{ .Values.actors.image.tag }}"
+          imagePullPolicy: {{ .Values.actors.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.actors.service.httpPort }}
+              protocol: TCP
+            - name: gossip
+              containerPort: {{ .Values.actors.service.gossipPort }}
+              protocol: TCP
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.actors.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.actors.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.actors.probes.readiness.periodSeconds }}
+            failureThreshold: {{ .Values.actors.probes.readiness.failureThreshold }}
+            timeoutSeconds: {{ .Values.actors.probes.readiness.timeoutSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.actors.probes.liveness.path }}
+              port: http
+            # Actor Host liveness is lenient — gossip convergence can take minutes
+            initialDelaySeconds: {{ .Values.actors.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.actors.probes.liveness.periodSeconds }}
+            failureThreshold: {{ .Values.actors.probes.liveness.failureThreshold }}
+            timeoutSeconds: {{ .Values.actors.probes.liveness.timeoutSeconds }}
+          env:
+            # RDY-025: All external service credentials via Secret references
+            - name: ConnectionStrings__PostgreSQL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretName }}
+                  key: connection-string-actors
+            - name: ConnectionStrings__Redis
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.redis.secretName }}
+                  key: connection-string
+            - name: ConnectionStrings__NATS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.nats.secretName }}
+                  key: connection-string
+            - name: Firebase__ProjectId
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "cena.fullname" . }}-config
+                  key: firebase.projectId
+            - name: Firebase__CredentialsJson
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.firebase.secretName }}
+                  key: credentials.json
+                  optional: true
+            - name: Cluster__AdvertisedHost
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: Cluster__AdvertisedPort
+              value: "{{ .Values.actors.service.gossipPort }}"
+            - name: ASPNETCORE_URLS
+              value: "http://+:{{ .Values.actors.service.httpPort }}"
+            {{- range .Values.actors.env }}
+            - name: {{ .name }}
+              {{- if .value }}
+              value: {{ .value | quote }}
+              {{- end }}
+              {{- if .valueFrom }}
+              valueFrom:
+                {{- toYaml .valueFrom | nindent 16 }}
+              {{- end }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.actors.resources | nindent 12 }}
+          volumeMounts:
+            # ASP.NET Core needs a writable /tmp even with readOnlyRootFilesystem
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

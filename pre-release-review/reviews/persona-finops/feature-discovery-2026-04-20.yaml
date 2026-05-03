@@ -1,0 +1,240 @@
+doc_path: pre-release-review/feature-discovery-2026-04-20.md
+reviewer: persona-finops
+reviewed_at: 2026-04-20
+doc_summary: |
+  1727-line INDEX/MEGA-DOC consolidating 55 findings (FD-001..FD-055+) across
+  10 axes + competitive + cross-domain. 18 SHIP-ready, 22 SHORTLIST, 12 DEFER,
+  3 REJECT. Top-10 shortlist + quick-wins list. This doc drives the actual
+  roadmap so FinOps scrutiny is highest-leverage here.
+system_purpose_fit: 4
+  rationale:
+    - Index correctly flags ADR-0003/GD-004/RDY-080 tensions.
+    - Quick-wins list is heavily front-loaded with zero-runtime-cost features (GOOD).
+    - Several SHIP items are hidden cost bombs if not tier-routed (F1 Socratic tutor, F3 misconception tagging, F8 grading).
+code_reality_check:
+  claims_verified_in_code:
+    - "LLM ACL + task routing in place -> contracts/llm/routing-config.yaml; src/llm-acl/Cena.LlmAcl/"
+    - "Per-student cost caps ($1.50 hard) -> contracts/llm/routing-config.yaml:286"
+    - "Global cost circuit breaker -> src/actors/Cena.Actors/RateLimit/RedisCostCircuitBreaker.cs"
+    - "L2 explanation cache pattern -> tasks/student-ai/done/SAI-003-l2-explanation-cache.md"
+    - "CAS 3-tier router -> src/actors/Cena.Actors/Cas/CasRouterService.cs"
+    - "Stuck classifier (Haiku + heuristic pre-pass) -> src/actors/Cena.Actors/Diagnosis/StuckClassifierOptions.cs"
+    - "AI generation + CAS gating -> src/api/Cena.Admin.Api/AiGenerationService.cs"
+    - "Anthropic prompt caching config (1h system, 5m student context) -> contracts/llm/routing-config.yaml:347"
+  claims_contradicted_by_code:
+    - "ADR-026 (3-tier Agent Booster / Haiku / Sonnet-Opus) referenced in superprompt — no such ADR file exists (docs/adr/ shows 0001-0004,0012,0031-0037). Routing is governed by contracts/llm/routing-config.yaml task_routing instead. Index doc should cite the YAML, not a non-existent ADR."
+  claims_unverifiable:
+    - "Exact prompt-caching hit rate (target 60% per routing-config.yaml:345) — no production metric yet (pre-launch)"
+    - "Batch API 50% discount for knowledge_graph_extraction — depends on Anthropic SLA"
+adr_alignment:
+  honored:
+    - "ADR-0002 CAS oracle — FD-002, FD-020 + CAS-first grading path"
+    - "ADR-0003 session scope — explicit in FD-003, FD-006, FD-015"
+    - "Bagrut reference-only — FD-002 'authored recreations' phrasing"
+    - "GD-004 banned terms — quick-wins list excludes streaks/loss-aversion"
+  violated: []
+  missing_adr_needed:
+    - "ADR for 3-tier model routing (currently contract YAML only, not an ADR) — FinOps needs this as an authoritative decision"
+    - "ADR for per-feature daily $ projection requirement at PR time"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      The 18 SHIP-ready findings include at least 5 LLM-heavy items that
+      will BLOW THE BUDGET at 10k concurrent if shipped with default
+      Sonnet routing:
+        * FD-003 Real-Time Misconception Tagging (mitigable w/ cache+Haiku, ~$75/day)
+        * FD-008 AI Partial-Credit Grading (mitigable w/ CAS-first, ~$200/day)
+        * FD-009 Socratic AI Tutor (MUST cap to 30 min/day/student + Haiku, else 16x global cap)
+        * FD-011 Culturally-Contextualized Problem Generator (MUST be authoring-time batch)
+        * FD-014 "Why This Problem" XAI (must cache at selection time)
+      Current routing-config.yaml defaults socratic_question, answer_evaluation,
+      feynman_explanation to claude_sonnet_4_6 — at 10k concurrency these hit
+      $30k-480k/month if naive. Caching + tier-downgrade is not optional.
+    evidence: feature-discovery-2026-04-20.md (FD-003, FD-008, FD-009, FD-011, FD-014); contracts/llm/routing-config.yaml:112,121,167,167
+    lens_note: These five features determine whether Cena is economically viable at 10k students. Must tier-down + cache before SHIP.
+  - severity: P0
+    finding: |
+      Doc/superprompt reference "ADR-026 3-tier model routing (Agent Booster
+      WASM / Haiku / Sonnet-Opus)" but docs/adr/ contains no such file and
+      Agent Booster WASM is not implemented (Grep: no "agent.?booster" in
+      src/). The actual routing authority is contracts/llm/routing-config.yaml
+      task_routing. FinOps-critical: promote the YAML to an ADR so compliance
+      tooling can reference it and new LLM features are gated by it.
+    evidence: docs/adr/ directory listing; Grep results for agent.?booster
+    lens_note: Without ADR-026 existing, "honors 3-tier routing" is an unenforced norm. Make it enforced.
+  - severity: P0
+    finding: |
+      Quick-wins list (Google SSO, Focus Ritual, TTS-highlighting, Confidence
+      Calibration, CSV Roster, Auto-Translate Parents, Learning Energy, I'm-
+      Confused-Too, Session Type Menu, Explainable Recs) — aggregate runtime
+      LLM cost projection is UNDER $100/month at 10k students IF each honors
+      the static/template pattern. Ship these first; they prove the cost
+      model before LLM-heavy features land.
+    evidence: feature-discovery-2026-04-20.md (quick-wins list ~L32)
+    lens_note: Stage rollout — cheap wins first validate unit economics before LLM-heavy features commit budget.
+  - severity: P1
+    finding: |
+      Prompt caching configured but target hit rate 60% (routing-config.yaml:345)
+      is aspirational. Without production metric it's unknown whether claude
+      cache_control blocks achieve that. Cost impact: every 10% miss = ~$500
+      -$1000/month extra at Sonnet volumes.
+    evidence: contracts/llm/routing-config.yaml:345,371
+    lens_note: Production dashboard for prompt-cache hit rate must ship before we rely on 60% figure for cost projections.
+  - severity: P1
+    finding: |
+      Batch API 50% discount for knowledge_graph_extraction (routing-config.
+      yaml:200) — extend this pattern to ALL one-time authoring jobs (cultural
+      variants, mother-tongue hints, lesson-plan templates). Potential savings:
+      $500-2000/month on authoring runs.
+    evidence: contracts/llm/routing-config.yaml:200
+    lens_note: Batch API is underused; expand coverage.
+  - severity: P1
+    finding: |
+      Per-model monthly caps set conservatively (Sonnet 4.6 $15k, Opus 4.6
+      $5k, Haiku 4.5 $3k, Kimi $500-1000 each). Total = ~$30k matches global
+      cap. Good. BUT: no inter-model fallback-when-cap-hit logic observed.
+      If Sonnet cap exhausts mid-month, fallback_chain should auto-route
+      new traffic to Haiku — verify.
+    evidence: contracts/llm/routing-config.yaml:291,301
+    lens_note: Cap-exhaustion fallback behavior should be explicit test case.
+  - severity: P1
+    finding: |
+      12 DEFER findings — zero cost implication (not built). 3 REJECT
+      findings = cost savings realized. Index doc doing FinOps work implicitly.
+    evidence: feature-discovery-2026-04-20.md (summary section)
+    lens_note: REJECT discipline is the most cost-positive act in this doc.
+  - severity: P2
+    finding: |
+      22 SHORTLIST findings — each needs individual FinOps review before
+      promotion to SHIP. Create a checklist item: "FinOps cost projection
+      at 10k concurrent + tier assignment + caching strategy" as gate.
+    evidence: feature-discovery-2026-04-20.md (SHORTLIST section)
+    lens_note: Gate promotion on FinOps review.
+already_built:
+  - feature: "LLM ACL with task routing + circuit breaker + caching config"
+    evidence: contracts/llm/routing-config.yaml; src/llm-acl/Cena.LlmAcl/
+    note: Core cost-control infra exists; doc should cite it as cost backbone.
+  - feature: "Per-student daily LLM budget ($1.50 hard, $0.70 warn)"
+    evidence: contracts/llm/routing-config.yaml:286
+    note: Budget rails live; every SHIP item inherits them.
+  - feature: "L2 explanation cache (template for all LLM result caching)"
+    evidence: tasks/student-ai/done/SAI-003-l2-explanation-cache.md
+    note: Reusable pattern — future features MUST reuse, not reinvent.
+  - feature: "CAS 3-tier router (MathNet -> SymPy -> fallback)"
+    evidence: src/actors/Cena.Actors/Cas/CasRouterService.cs
+    note: Correctness path is CAS-first at $0; LLM only for explanation.
+duplicates_of_other_docs: []
+extracted_tasks:
+  - title: "Promote contracts/llm/routing-config.yaml governance to ADR-026"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      The 3-tier routing convention is referenced in superprompts and memory
+      but has no ADR file. Create docs/adr/0026-llm-three-tier-routing.md
+      that codifies: (1) task->model mapping authority lives in routing-
+      config.yaml, (2) new LLM features MUST declare task_routing entry
+      before PR merge, (3) per-feature daily $ projection at 10k required,
+      (4) tier downgrade fallback chain mandatory.
+
+      ## Files
+      - docs/adr/0026-llm-three-tier-routing.md (new ADR)
+      - docs/engineering/shipgate.md (edit — add LLM-tier check)
+
+      ## Definition of Done
+      - ADR authored + reviewed
+      - Shipgate scanner check: any LLM call missing task_routing entry fails CI
+      - Cross-linked from CLAUDE.md non-negotiables
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L1-L60]
+  - title: "Ship Grafana dashboard: prompt-cache hit rate + per-task $ spend"
+    priority: P0
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Validate the 60% prompt-cache hit rate assumption in production and
+      surface per-task_type $ spend. Prerequisite to cost-gate any new LLM
+      feature.
+
+      ## Files
+      - ops/grafana/llm-cost-dashboard.json (new)
+      - src/llm-acl/Cena.LlmAcl/Tracking/PromptCacheMetrics.cs (extend)
+
+      ## Definition of Done
+      - Dashboard panels: hit rate per model, $ per task_type per day, top-10 most-expensive students
+      - Alert: hit rate < 40% for 6h
+      - Alert: any task_type > $500/day
+      - Documented runbook: docs/runbooks/llm-cost-spike.md
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L1-L100]
+  - title: "Add CI scanner: LLM call without task_routing entry fails build"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Prevent new LLM features landing without tier assignment by scanning
+      source for LLM invocations and cross-referencing task_routing keys.
+
+      ## Files
+      - scripts/ci/llm-routing-compliance-check.py (new)
+      - .github/workflows/llm-routing-check.yml (new)
+      - docs/engineering/shipgate.md (edit)
+
+      ## Definition of Done
+      - Scanner: find LlmRequest/CompleteAsync call sites, verify ModelPreference maps to task_routing key
+      - CI failure if call site uses unregistered task
+      - Bypass via comment // @finops-exempt: reason=<...>
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L1-L100]
+  - title: "Expand Batch API (50% discount) to all authoring-time generation jobs"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      routing-config.yaml:200 uses Batch API for knowledge_graph_extraction.
+      Extend to all one-time authoring jobs: cultural variants, mother-tongue
+      hints, lesson plan templates, question bank expansions.
+
+      ## Files
+      - src/api/Cena.Admin.Api/Authoring/BatchApiRunner.cs (new)
+      - contracts/llm/routing-config.yaml (add batch: true to authoring tasks)
+
+      ## Definition of Done
+      - Runner wraps Anthropic Message Batches API
+      - All tasks in routing-config.yaml with "authoring" tag route via runner
+      - Projected savings: 50% on authoring spend ($500-2000/month)
+      - Metric: cena.llm.batch_api.submissions_total
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L1-L100]
+verdict: revise
+verdict_reason: |
+  The mega-index is the roadmap. FinOps verdict: SHIP the quick-wins first
+  (they prove unit economics cheaply), then staged rollout of LLM-heavy
+  features ONLY after each has explicit tier + cache + per-student cap.
+  Promote routing-config.yaml to ADR-026 and add CI scanner. Without these
+  guardrails, the 18 SHIP-ready list includes features that individually
+  breach the global monthly cap.
+cross_lens_handoff:
+  - to: persona-sre
+    about: "Cost-spike runbook and incident-response on circuit-breaker-open"
+  - to: persona-enterprise
+    about: "Per-tenant budget enforcement for multi-institute (ADR-0001) — currently per-student but tenants may want group caps"
+  - to: persona-privacy
+    about: "Batch API submissions — confirm PII handling same as real-time path"
+  - to: persona-redteam
+    about: "Cost-exhaustion DoS: can a single student burn through global cap via repeated tutor asks?"
+  - to: persona-educator
+    about: "FD-009 Socratic tutor 30min/day cap — pedagogically adequate or premium-tier needed?"

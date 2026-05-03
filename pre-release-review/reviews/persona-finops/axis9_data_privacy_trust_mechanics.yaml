@@ -1,0 +1,147 @@
+doc_path: pre-release-review/axis9_data_privacy_trust_mechanics.md
+reviewer: persona-finops
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight privacy/trust features: Why-this-problem explainer, student profile
+  dashboard, data erasure, consent UX, plain-language privacy, inference
+  trail, differential-privacy cohort analytics, transparency report. Most
+  are UI/data-export features with near-zero runtime cost.
+system_purpose_fit: 5
+  rationale:
+    - Privacy features are mostly static UI, data exports, and batch jobs.
+    - Differential privacy is the one compute hotspot.
+    - LLM-generated explanations (F1, F6) are cost-controllable via caching.
+code_reality_check:
+  claims_verified_in_code:
+    - "Student profile snapshot exists -> src/actors/Cena.Actors/Events/StudentProfileSnapshot.cs"
+    - "Age gate + parental consent flows -> src/student/full-version/src/components/onboarding/"
+    - "Admin GDPR-style endpoints -> src/api/Cena.Admin.Api/AdminApiEndpoints.cs"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Differential privacy epsilon budget accounting not found in code"
+adr_alignment:
+  honored:
+    - "ADR-0003 (session scope, 30d max) — F2, F3, F7 align"
+    - "ADR-0001 (tenant scoping) — exports honor tenant boundary"
+  violated: []
+  missing_adr_needed:
+    - "ADR for differential-privacy epsilon budget + refresh cadence"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F1 "Why This Problem?" Explainable AI — if rationale is generated per
+      problem view per student, cost = 10k x 20 views/day x $0.002 Haiku =
+      $400/day. Must cache rationale per (student_mastery_state, problem_id)
+      tuple. OR precompute a rationale template when the adaptive engine
+      selects the problem (one call per selection, not per view).
+    evidence: axis9_data_privacy_trust_mechanics.md (F1)
+    lens_note: Cache at selection time, not render time. Reuse L1/L2 explanation cache pattern.
+  - severity: P1
+    finding: |
+      F7 Differential Privacy Cohort Analytics — DP queries are compute-
+      intensive (noise sampling, query composition tracking). At daily
+      aggregation with epsilon<1 per tenant, compute cost is moderate
+      ($50-100/month). But MUST batch — per-request DP computation is
+      prohibitively expensive and dangerous (epsilon leak per query).
+    evidence: axis9_data_privacy_trust_mechanics.md (F7)
+    lens_note: Nightly batch + 24h result cache; epsilon budget tracked in dedicated table.
+  - severity: P1
+    finding: |
+      F8 Transparency Report — periodic (quarterly?), not real-time. Cost
+      negligible. But if auto-generated via LLM summarization, cap at one
+      generation per quarter per tenant — pin the cadence.
+    evidence: axis9_data_privacy_trust_mechanics.md (F8)
+    lens_note: Quarterly cadence is natural cost cap.
+  - severity: P2
+    finding: |
+      F2 Student Profile Dashboard, F3 Delete My Journey, F4 Consent UX —
+      pure data query / state mutation. Zero LLM. Cheap.
+    evidence: axis9_data_privacy_trust_mechanics.md (F2, F3, F4)
+    lens_note: Ship cheap.
+  - severity: P2
+    finding: |
+      F5 Privacy in Your Language — age-appropriate static copy in he/ar/en
+      (and maybe ru/am). One-time authoring, static bundle. Zero runtime cost.
+    evidence: axis9_data_privacy_trust_mechanics.md (F5)
+    lens_note: i18n bundle; ship.
+  - severity: P2
+    finding: |
+      F6 Data Provenance / Inference Trail — read-only view over existing
+      event store. Zero LLM unless rationale text is LLM-generated, in which
+      case reuse F1 cache.
+    evidence: axis9_data_privacy_trust_mechanics.md (F6)
+    lens_note: Reuse F1 rationale cache.
+already_built:
+  - feature: "StudentProfileSnapshot event + parental consent flow"
+    evidence: src/actors/Cena.Actors/Events/StudentProfileSnapshot.cs; src/student/full-version/src/components/onboarding/ParentalConsentStep.vue
+    note: F2, F4 build on existing substrate.
+  - feature: "Admin data access endpoints"
+    evidence: src/api/Cena.Admin.Api/AdminApiEndpoints.cs
+    note: F3 erasure can extend existing admin endpoints.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-014 ('Why this problem' XAI) = F1"
+  - "AXIS_4: F1 'Why this topic' = F1 sibling"
+extracted_tasks:
+  - title: "Generate problem rationale at selection time (not view time), cache per state"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F1 "Why This Problem" rationale should be generated ONCE when the
+      adaptive engine selects the problem for a student, keyed to the
+      selection context (mastery snapshot hash + problem_id). Cached until
+      student's mastery state materially changes.
+
+      ## Files
+      - src/actors/Cena.Actors/Explainability/ProblemRationaleCache.cs (new)
+      - src/actors/Cena.Actors/Explainability/ProblemRationaleGenerator.cs (new)
+      - src/actors/Cena.Actors.Tests/Explainability/ProblemRationaleTests.cs
+
+      ## Definition of Done
+      - Generated at selection time, not view
+      - Redis cached keyed on sha256(student_mastery_hash + problem_id)
+      - 24h TTL; invalidated on mastery-state-changed event
+      - Tier: Haiku (rationale is short, deterministic)
+      - Metric: cena.rationale.cache_hit_rate (target >= 85%)
+      - Cost target: < $50/day at 10k students
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L40-L100]
+  - title: "Implement DP cohort analytics as nightly batch with epsilon ledger"
+    priority: P1
+    estimate: L
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      F7 differential-privacy analytics MUST be nightly batch (not per-query).
+      Track epsilon spend per tenant per month in a dedicated ledger table;
+      refuse further queries when budget exhausted.
+
+      ## Files
+      - src/api/Cena.Admin.Api/DpAnalytics/DpEpsilonLedger.cs (new)
+      - src/api/Cena.Admin.Api/DpAnalytics/DpNightlyAggregateJob.cs (new)
+      - docs/adr/00XX-dp-epsilon-budget.md (new ADR)
+
+      ## Definition of Done
+      - Epsilon budget per tenant: configurable, default epsilon<=1/month
+      - Ledger: query_id, epsilon_consumed, cumulative, tenant_id
+      - Query execution via IBM DPL or Google DP library (audited)
+      - Nightly batch 2am UTC; results cached 24h
+      - Metric: cena.dp.epsilon_remaining{tenant}
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L280-L360]
+verdict: adopt
+verdict_reason: |
+  Excellent unit economics across the board. F1 and F7 need caching/batching
+  patterns enforced but are within budget. Privacy features are a cost sink
+  only if naively implemented; the extracted tasks contain them.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "F7 epsilon budget sizing (is 1/month/tenant right, or finer granularity needed?)"
+  - to: persona-enterprise
+    about: "F3 erasure across event-sourced aggregates — tombstone strategy + storage cost."

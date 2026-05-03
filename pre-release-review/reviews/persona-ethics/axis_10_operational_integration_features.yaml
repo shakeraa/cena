@@ -1,0 +1,213 @@
+doc_path: pre-release-review/AXIS_10_Operational_Integration_Features.md
+reviewer: persona-ethics
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 ops/integration features (Google SSO, Mashov sync, CSV
+  roster import, offline practice, multi-device continuity, IT admin
+  dashboard, Google Classroom assignment+passback, student data export).
+  Pure infrastructure axis.
+system_purpose_fit: 3
+  rationale:
+    - Low direct-to-student ethics surface — mostly school infrastructure
+    - Ethics concerns concentrated in data-flow direction: (a) roster
+      import of minor data from school SIS, (b) grade passback to
+      teachers + parents, (c) offline mode's progress sync conflict resolution
+    - F1 Google SSO guardrail (L63) correctly limits OAuth scopes
+    - F7 Google Classroom grade passback (L396+) may propagate student
+      performance beyond student's awareness — needs review
+    - F4 offline mode + optimistic progress silently syncing back needs
+      student-visible reconciliation
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable: []
+adr_alignment:
+  honored:
+    - "ADR-0001 multi-tenant isolation (implied throughout integrations)"
+    - "GD-004 (no in-scope violations)"
+  violated: []
+  missing_adr_needed:
+    - "ADR on offline-progress optimistic sync conflict resolution — does the
+      student see what was discarded?"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F4 Offline-First Practice Mode with Optimistic Progress (L~185-230
+      per grep): server-overwrite conflict resolution with "brief toast:
+      Your progress has been updated from another device" (L308). Ethics
+      concern: optimistic local progress that gets silently discarded
+      (or even with brief toast) means the student did work the system
+      did not record. For a MINOR, this can feel disrespectful and
+      erodes trust. Recommend:
+      (a) Offline session data shown in a "sync conflict" review panel,
+          not discarded with a toast
+      (b) Student chooses which copy wins (or merges)
+      (c) Discarded data retained for 7 days in recoverable state
+    evidence: AXIS_10_Operational_Integration_Features.md:L255, L308
+    lens_note: |
+      "Silent discard with toast" is a dark-pattern defense even though
+      it has engineering convenience. Minor-respecting design requires
+      the student to see and choose.
+  - severity: P1
+    finding: |
+      F7 Google Classroom Assignment & Grade Passback (referenced
+      L~396+): propagating Cena-internal scores to external teacher
+      gradebooks. Ethics concern: Cena's adaptive, low-stakes practice
+      scores should not default-flow into teacher gradebooks where they
+      become summative. This conflates formative and summative data
+      (Axis 6 F1 explicitly separates these). Recommend:
+      (a) No default passback of adaptive practice scores
+      (b) Only explicit assignments (teacher creates, student
+          completes) pass back
+      (c) Student sees which scores are being sent to teacher before
+          submit
+    evidence: AXIS_10_Operational_Integration_Features.md:L396+
+    lens_note: |
+      Cena's formative/summative split (Axis 6 F1) is ethically
+      important. Google Classroom passback must respect it.
+  - severity: P2
+    finding: |
+      F3 CSV Bulk Roster Import (L~120-180) brings minor identifiers
+      into Cena from school SIS systems. Ethics lens requires: the
+      initial student-visible signup includes a plain-language notice
+      of "your school has enrolled you; here's what data was shared
+      and by whom" — not a fait accompli after account creation.
+    evidence: AXIS_10_Operational_Integration_Features.md:L~120-180
+    lens_note: |
+      COPPA 2025 + Israeli PPL both require disclosure of data
+      provenance to the subject.
+  - severity: P2
+    finding: |
+      F6 School IT Admin Deployment Dashboard (L~340+): admin-visible
+      metrics about student usage create a surveillance amplifier
+      surface. Recommend: admin sees only aggregate per-class data,
+      never individual student names or per-student session patterns
+      without explicit principal-level escalation reason logged.
+    evidence: AXIS_10_Operational_Integration_Features.md:L~340+
+    lens_note: |
+      Admin dashboards are a known lever for minor-surveillance drift.
+      Scope control is an ethics + privacy requirement.
+  - severity: P2
+    finding: |
+      F8 Student Data Portability Export (L~490+) is ethics-positive
+      — right-to-access implementation. Small note: the parent/admin
+      role-based access path (L497) must require student-side visibility
+      when parent triggers export of their minor's data (for 13+).
+    evidence: AXIS_10_Operational_Integration_Features.md:L~490-505
+    lens_note: |
+      Student should know when parent exports their data; silent
+      parent-export violates autonomy for 13+.
+already_built: []
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-042 (export), FD-047 (SSO/Classroom), FD-048 (Mashov)"
+  - "axis9_data_privacy_trust_mechanics.md: F3 data erasure = same intent as F8 here"
+extracted_tasks:
+  - title: "Offline sync conflict: surface to student, never silent-discard"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F4 offline progress sync conflicts:
+      - No silent server-overwrite
+      - Student shown "review offline work" panel with diff
+      - Student chooses keep-local / keep-server / merge
+      - Discarded data retained 7 days recoverable
+      ## Files
+      - src/student-web/src/features/offline-sync/*
+      - src/actors/SessionGrain/*
+      ## Definition of Done
+      - Conflict review panel rendered when delta detected
+      - Retention job purges discarded data after 7 days
+      - E2E test: offline attempt + conflict + student chooses local
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L255, L308]
+  - title: "Google Classroom passback: only explicit assignments, student-visible"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F7 Google Classroom grade passback:
+      - No adaptive practice scores default-passed-back
+      - Only explicit teacher-assigned work routes to gradebook
+      - Student sees "this will be sent to your teacher" confirmation
+        before each passback
+      ## Files
+      - src/integrations/GoogleClassroom/*
+      ## Definition of Done
+      - No code path sends adaptive score without explicit assignment_id
+      - Student confirmation UI shown before passback
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L396+]
+  - title: "Roster import: student-visible enrollment notice"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      When F3 CSV roster import enrolls a student, first login shows
+      a plain-language notice: "Your school shared these fields with
+      Cena: [list]. [What this means] [Who to contact]."
+      ## Files
+      - src/student-web/src/features/onboarding/EnrollmentNotice.vue
+      ## Definition of Done
+      - Notice rendered on first login after SIS-imported account creation
+      - Notice includes school contact + Cena DPO contact
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: []
+  - title: "Admin dashboard: aggregate-only view, escalation-logged individual access"
+    priority: P2
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F6 School IT Admin Dashboard: default view shows aggregate
+      per-class data. Access to individual student session details
+      requires a logged escalation rationale (principal/DPO role).
+      ## Files
+      - src/admin/features/it-dashboard/*
+      - src/actors/AuditLog/*
+      ## Definition of Done
+      - Admin default view has no individual student data
+      - Escalation UI prompts for rationale + logs
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: []
+  - title: "Parent export: student notification for 13+ accounts"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F8 Student Data Export: when a parent exports a 13+ student's
+      data, the student receives an in-app + email notification
+      noting the export event, the data categories exported, and a
+      link to review.
+      ## Files
+      - src/actors/PrivacyActor/ExportGrain.cs
+      - src/student-web/src/notifications/*
+      ## Definition of Done
+      - Notification sent on parent-initiated export for 13+
+      - Notification includes cancel-export link valid 24h
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L~490-505]
+verdict: revise
+verdict_reason: |
+  Infrastructure axis with mostly ethics-neutral content. Revise F4
+  (conflict surface), F7 (passback scope), F3/F6/F8 for student-
+  agency minor fixes. F1, F2, F5 ship as designed.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "F3 CSV import PII flow, F6 admin dashboard scope, F8 export authorization model"
+  - to: persona-enterprise
+    about: "F4 CRDT/optimistic sync architecture, F5 multi-device session reconciliation"
+  - to: persona-sre
+    about: "F2 Mashov API instability, F7 Google Classroom rate limits, F4 offline sync SLO"
+  - to: persona-redteam
+    about: "F1 OAuth scope limits, F3 CSV injection, F6 admin dashboard permission boundaries"

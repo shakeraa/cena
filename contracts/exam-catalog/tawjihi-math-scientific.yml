@@ -1,0 +1,46 @@
+# Tawjihi Math — scientific stream (Palestinian/Jordanian mainstream).
+
+exam_code: TAWJIHI_MATH_SCIENTIFIC
+family: TAWJIHI
+track: scientific
+units: null
+region: IL-Tawjihi
+regulator: other
+ministry_subject_code: null
+ministry_question_paper_codes: []
+availability: queued
+item_bank_status: unavailable
+passback_eligible: false
+default_lead_days: 120
+sittings:
+  - code: TAWJIHI_2026_SUMMER
+    academic_year: "2025-2026"
+    season: summer
+    moed: A
+    canonical_date: "2026-06-20"
+display:
+  en:
+    name: "Tawjihi Math (Scientific)"
+    short_description: "Tawjihi mathematics, scientific stream."
+  he:
+    name: "תווג'יהי מתמטיקה (המסלול המדעי)"
+    short_description: "מבחן התווג'יהי במתמטיקה, המסלול המדעי."
+  ar:
+    name: "التوجيهي — الرياضيات (العلمي)"
+    short_description: "امتحان التوجيهي في الرياضيات، المسار العلمي."
+topics:
+  - topic_id: algebra.core
+    display:
+      en: "Algebra"
+      he: "אלגברה"
+      ar: "الجبر"
+  - topic_id: calculus.derivatives
+    display:
+      en: "Calculus"
+      he: "חשבון דיפרנציאלי ואינטגרלי"
+      ar: "حساب التفاضل والتكامل"
+  - topic_id: trigonometry
+    display:
+      en: "Trigonometry"
+      he: "טריגונומטריה"
+      ar: "علم المثلثات"

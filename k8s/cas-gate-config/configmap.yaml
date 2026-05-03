@@ -1,0 +1,14 @@
+# Non-secret CAS gate config. Consumed by cena-admin-api + cena-actors-host
+# deployments as env vars. Flip the gate mode here and restart pods — no
+# image rebuild required.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cena-cas-gate
+  namespace: cena-platform
+  labels:
+    app.kubernetes.io/part-of: cena
+    app.kubernetes.io/component: cas-gate
+data:
+  # ADR-0032: Off | Shadow | Enforce. Default Enforce in production.
+  CENA_CAS_GATE_MODE: "Enforce"

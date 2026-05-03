@@ -1,0 +1,86 @@
+doc_path: pre-release-review/axis1_pedagogy_mechanics_cena.md
+reviewer: persona-a11y
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 pedagogy-mechanic features (interleaving scheduler, spaced mastery, retrieval
+  micro-checks, elaborative interrogation, hint governor, desirable-difficulty,
+  near-to-far transfer, adaptive worked-example fading). Most are algorithmic
+  backend work; a11y/l10n surface is limited to UI copy, prompts, and any new
+  math-rendering paths.
+system_purpose_fit: 3
+  rationale:
+    - Pedagogy mechanics mostly backend-facing; a11y/l10n surface is indirect
+    - Prompts and sentence-starters must be localized he/ar/en — doc is silent on this
+    - Worked-example fading introduces new UI elements that must honor RTL + math-LTR
+    - No dark-pattern violations; doc explicitly flags guardrails
+code_reality_check:
+  claims_verified_in_code:
+    - "WorkedExamplePanel exists with a11y awareness (aria-label, aria-live, <bdi> for math): src/student/full-version/src/components/session/WorkedExamplePanel.vue:1-60"
+    - "HintLadder component exists with anxiety-safe tests: src/student/full-version/tests/unit/HintLadder.anxietySafe.spec.ts"
+    - "i18n plumbed for he/ar/en: src/student/full-version/src/plugins/i18n/locales/{he,ar,en}.json"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Elaborative-interrogation prompts (F4) — no a11y/l10n mention in doc; doc does not specify how prompts render in RTL or for screen readers"
+    - "Self-explanation microsurvey (F1) — no spec for Arabic/Hebrew sentence starters"
+adr_alignment:
+  honored:
+    - "ADR-0002 (SymPy oracle) — features explicitly keep CAS as verifier"
+    - "ADR-0003 (session-scoped) — strategy discrimination scores explicitly session-local"
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: "Feature 8 (adaptive worked-example fading) introduces 'faded' steps. Doc does not specify that faded blanks must remain in the a11y tree (opacity, not display:none) and be announced. Existing WorkedExamplePanel.vue already does this — doc must not regress it."
+    evidence: "axis1...md:F8 section; src/student/full-version/src/components/session/WorkedExamplePanel.vue:11-17"
+    lens_note: "Without explicit requirement, a reimplementation could drop aria-live announcements and kill screen-reader access to faded steps."
+  - severity: P1
+    finding: "Features 3/4/5 introduce new in-flow prompts (retrieval micro-checks, elaborative interrogation, hint governor). Doc is silent on bidi: prompts containing variable names (x, f(x)) inside Hebrew/Arabic text must use <bdi dir=\"ltr\"> per memory rule."
+    evidence: "axis1...md:F3-F5 sections; feedback_math_always_ltr memory"
+    lens_note: "Prompts like 'שאל את עצמך: למה בחרת ב-cos(x)?' will render cos(x) backwards on RTL pages without <bdi>."
+  - severity: P2
+    finding: "Feature 1 'Which technique did you use?' self-report microsurvey needs Arabic/Hebrew sentence starters — doc only specifies English."
+    evidence: "axis1...md:F1 implementation sketch"
+    lens_note: "Arabic-first onboarding policy (see useLocaleInference) means the default UX for ~50% of cohort will be Arabic."
+  - severity: P2
+    finding: "Feature 7 (near-to-far transfer sequencing) — problem transitions may introduce new figures. Must route through QuestionFigure component (already has a11y: aria-label, MathML-adjacent path)."
+    evidence: "axis1...md:F7; src/student/full-version/src/components/QuestionFigure.vue"
+    lens_note: "Don't let a new scheduler emit raw <img> without alt/MathML."
+already_built:
+  - feature: "Worked-example fading a11y scaffolding (Feature 8)"
+    evidence: "src/student/full-version/src/components/session/WorkedExamplePanel.vue:1-60"
+    note: "The a11y pattern is already established — any F8 re-implementation must preserve aria-live + opacity-based fading + <bdi> math wrapping"
+  - feature: "HintLadder with anxiety-safe tests (Feature 5 adjacent)"
+    evidence: "src/student/full-version/tests/unit/HintLadder.anxietySafe.spec.ts"
+    note: "Hint-governor logic can extend HintLadder rather than greenfield"
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-001 Interleaving Scheduler"
+  - "axis2_motivation_self_regulation_findings.md: Feature 1 Socratic Self-Explanation (overlaps with F4 elaborative interrogation)"
+  - "cena_dr_nadia_pedagogical_review_20_findings.md: FD-001 through FD-008 (all covered)"
+extracted_tasks:
+  - title: "Add bidi + screen-reader contract to pedagogy-mechanic prompts"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Before any pedagogy-mechanic doc ships new student-facing prompts (self-explanation, retrieval check, hint, elaborative question), extend the existing bidi/a11y scanner to cover those component files. Prevents regressions where a new prompt forgets <bdi> for math or aria-live for dynamic steps.
+      ## Files
+      - src/student/full-version/tests/a11y/math-ltr-wrapper.spec.ts (extend allowlist)
+      - src/student/full-version/tests/a11y/aria-live-on-dynamic.spec.ts (extend)
+      - new: src/student/full-version/tests/a11y/prompt-i18n-coverage.spec.ts
+      ## Definition of Done
+      - Any .vue file under src/components/session/ that renders math in a prompt is covered by the scanner
+      - Any newly added he/ar locale key has parity across locales/{he,ar,en}.json (asserted in test)
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L270-L440]
+verdict: adopt
+verdict_reason: "Pedagogy mechanics are largely algorithmic; a11y exposure is limited to ensuring new prompts honor existing <bdi> + aria-live patterns. No non-negotiable violations."
+cross_lens_handoff:
+  - to: persona-educator
+    about: "Pedagogy soundness of interleaving effect sizes (see Dr. Rami WARNING on FD-001)"
+  - to: persona-cogsci
+    about: "Cognitive-load framing across F3/F4/F5 prompts"
+  - to: persona-enterprise
+    about: "Scheduler service boundaries; strategy-discrimination storage model"

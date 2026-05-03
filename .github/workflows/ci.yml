@@ -1,0 +1,22 @@
+name: Compliance CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  dpia-check:
+    name: DPIA existence gate (GDPR Art 35)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check DPIA exists for current quarter
+        run: node scripts/ci-dpia-check.mjs

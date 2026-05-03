@@ -1,0 +1,121 @@
+// ═══════════════════════════════════════════════════════════════════════
+// Cena Platform — Focus Experiment Metrics Collector (FOC-010.2)
+//
+// Collects per-student per-session metrics for focus A/B experiments.
+// All metrics are tagged with experiment arm for offline analysis.
+// ═══════════════════════════════════════════════════════════════════════
+
+namespace Cena.Actors.Services;
+
+/// <summary>
+/// Collects and stores experiment metrics per session.
+/// </summary>
+public interface IFocusExperimentCollector
+{
+    void RecordSessionMetrics(ExperimentSessionMetrics metrics);
+    IReadOnlyList<ExperimentSessionMetrics> GetMetrics(string experimentId);
+    IReadOnlyList<ExperimentSessionMetrics> GetMetricsForStudent(Guid studentId, string experimentId);
+}
+
+public sealed class FocusExperimentCollector : IFocusExperimentCollector
+{
+    // Cap in-memory metrics to prevent unbounded growth.
+    // Oldest entries are evicted when capacity is reached.
+    // Production should persist to Marten/Postgres before eviction.
+    private const int MaxMetrics = 100_000;
+
+    private readonly List<ExperimentSessionMetrics> _metrics = new();
+    private readonly object _lock = new();
+
+    public void RecordSessionMetrics(ExperimentSessionMetrics metrics)
+    {
+        lock (_lock)
+        {
+            if (_metrics.Count >= MaxMetrics)
+                _metrics.RemoveAt(0); // Evict oldest
+            _metrics.Add(metrics);
+        }
+    }
+
+    public IReadOnlyList<ExperimentSessionMetrics> GetMetrics(string experimentId)
+    {
+        lock (_lock)
+        {
+            var result = new List<ExperimentSessionMetrics>();
+            for (int i = 0; i < _metrics.Count; i++)
+            {
+                if (_metrics[i].ExperimentId == experimentId)
+                    result.Add(_metrics[i]);
+            }
+            return result;
+        }
+    }
+
+    public IReadOnlyList<ExperimentSessionMetrics> GetMetricsForStudent(Guid studentId, string experimentId)
+    {
+        lock (_lock)
+        {
+            var result = new List<ExperimentSessionMetrics>();
+            for (int i = 0; i < _metrics.Count; i++)
+            {
+                if (_metrics[i].StudentId == studentId && _metrics[i].ExperimentId == experimentId)
+                    result.Add(_metrics[i]);
+            }
+            return result;
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════
+
+public record ExperimentSessionMetrics(
+    Guid StudentId,
+    Guid SessionId,
+    string ExperimentId,
+    ExperimentArm Arm,
+    DateTimeOffset Timestamp,
+
+    // ── Focus metrics ──
+    double? FocusStateAccuracy,          // Model prediction vs self-report (0-1)
+    double? BreakEffectiveness,          // Post-break accuracy - pre-break accuracy
+    double? MicrobreakComplianceRate,    // Fraction of suggested microbreaks taken (0-1)
+
+    // ── Engagement metrics ──
+    bool? ReturnedNextSession,           // Did student come back within 48h?
+    double? NextSessionPerformanceDelta, // Accuracy improvement in next session
+
+    // ── Struggle metrics ──
+    double? ProductiveStrugglePrecision, // True positive rate of productive struggle classification
+
+    // ── Self-report (post-session) ──
+    int? SelfReportedFocus,             // 1-5 scale: "How focused were you?" (Hebrew/Arabic)
+    string? SelfReportLanguage,         // "he" or "ar" — for bilingual analysis
+
+    // ── SAI-006: Student AI Interaction metrics ──
+    string? ExplanationSource = null,          // "L1Static", "L2Cache", "L2Generated", "L3Personalized", "None"
+    float? HintCreditMultiplier = null,        // Actual P_T multiplier used (1.0, 0.7, 0.4, 0.1)
+    string? DeliveryGateAction = null,         // "Deliver", "Defer", "Suppress"
+    double? MasteryGainDelta = null,           // BKT delta on related concept (for explanation_tiers)
+    double? HintUsageRate = null,              // Hints requested / questions attempted (for hint_bkt_credit)
+    double? ConfusionResolutionRate = null,    // Confusions resolved / confusions detected (for confusion_gating)
+    int? SelfReportedUnderstanding = null,     // 1-5 scale: "How well did you understand the explanations?"
+
+    // ── SAI-006 extended: explanation_tiers metrics ──
+    int? TimeToMastery = null,                 // Questions to reach P_L >= 0.85 threshold per concept
+    double? RetrySuccessRate = null,           // After seeing explanation, does next attempt on same concept succeed?
+    int? SessionLengthQuestions = null,         // Total questions before voluntary session end
+    double? EngagementScore = null,            // Composite focus score from FocusDegradationService
+    double? ExplanationViewRate = null,        // Fraction of explanations the student reads (needs frontend event)
+
+    // ── SAI-006 extended: hint_bkt_credit metrics ──
+    double? MasteryAccuracy = null,            // Does P_L predict actual performance on unseen questions? (0-1)
+    double? HintRequestRate = null,            // Hints requested per question (detect gaming on lenient curve)
+    double? IndependentSuccessRate = null,     // Success rate on questions where hints were NOT used
+
+    // ── SAI-006 extended: confusion_gating metrics ──
+    double? ConfusionToMasteryTime = null,     // Questions from confusion onset to concept mastery
+    double? FrustrationAbandonmentRate = null, // Sessions ended with reason 'tired' during confusion
+    int? MasteryDepth = null                   // Bloom taxonomy level achieved post-confusion (1-6)
+);

@@ -1,0 +1,39 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Cena Platform — e2e-flow test overlay
+#
+# Flips test-only feature flags for the Playwright full-stack harness at
+# tasks/e2e-flow/. Layered on top of the hot-reload dev stack:
+#
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f docker-compose.app.yml \
+#     -f docker-compose.hotreload.yml \
+#     -f docker-compose.e2e-flow.yml \
+#     up -d
+#
+# What this overlay flips:
+#
+#   Cena:Testing:LlmRecorderEnabled=true
+#     Wraps ILlmClient in RecordingLlmClient (actor-host + student-api)
+#     and mounts the /api/test/llm-recorder/recordings endpoint on the
+#     admin-api. Consumed by EPIC-E2E-I-05 / EPIC-E2E-D-05 PII-scrub tests.
+#     See src/actors/Cena.Actors/Gateway/RecordingLlmClient.cs for the
+#     triple-gate rationale (flag + Development + localhost).
+#
+# Per memory "No stubs — production grade": this overlay is test-only.
+# Production composition never loads this file; the flag is never set in
+# prod appsettings.
+# ═══════════════════════════════════════════════════════════════════════
+
+services:
+  admin-api:
+    environment:
+      - Cena__Testing__LlmRecorderEnabled=true
+
+  student-api:
+    environment:
+      - Cena__Testing__LlmRecorderEnabled=true
+
+  actor-host:
+    environment:
+      - Cena__Testing__LlmRecorderEnabled=true

@@ -1,0 +1,363 @@
+// =============================================================================
+// Cena Platform -- StudentActor.Queries (Partial)
+// Extracted: Internal event handlers, query handlers, memory management
+// =============================================================================
+
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
+using System.Security.Cryptography;
+using System.Text;
+using Cena.Actors.Events;
+using Cena.Actors.Infrastructure;
+using Cena.Actors.Outreach;
+using Cena.Actors.Projections;
+using Cena.Actors.Services;
+using Cena.Actors.Sessions;
+using Cena.Actors.Stagnation;
+using Cena.Actors.Tutoring;
+using Marten;
+using Microsoft.Extensions.Logging;
+using NATS.Client.Core;
+
+using Proto;
+using Proto.Cluster;
+using StackExchange.Redis;
+
+namespace Cena.Actors.Students;
+
+public sealed partial class StudentActor
+{
+    // =========================================================================
+    // INTERNAL EVENT HANDLERS (from child actors)
+    // =========================================================================
+
+    private async Task HandleStagnationDetected(IContext context, StagnationDetected msg)
+    {
+        using var activity = _activitySource.StartActivity("StudentActor.StagnationDetected");
+        activity?.SetTag("student.id", _studentId);
+        activity?.SetTag("concept.id", msg.ConceptId);
+        activity?.SetTag("stagnation.score", msg.CompositeScore);
+
+        _logger.LogInformation(
+            "Stagnation detected for student {StudentId}, concept {ConceptId}. " +
+            "Score={Score:F3}, ConsecutiveSessions={Sessions}",
+            _studentId, msg.ConceptId, msg.CompositeScore, msg.ConsecutiveStagnantSessions);
+
+        var stagnationEvent = new StagnationDetected_V1(
+            _studentId, msg.ConceptId, msg.CompositeScore,
+            msg.Signals.AccuracyPlateau, msg.Signals.ResponseTimeDrift,
+            msg.Signals.SessionAbandonment, msg.Signals.ErrorRepetition,
+            msg.Signals.AnnotationSentiment, msg.ConsecutiveStagnantSessions);
+
+        StageEvent(stagnationEvent);
+
+        var currentMethodology = _state.MethodologyMap.GetValueOrDefault(
+            msg.ConceptId, Methodology.Socratic);
+
+        var dominantErrorType = DetermineDominantErrorType(msg.ConceptId);
+
+        var decision = await _methodologySwitchService.DecideSwitch(
+            new DecideSwitchRequest(
+                _studentId, msg.ConceptId, msg.ConceptId,
+                dominantErrorType, currentMethodology,
+                _state.MethodAttemptHistory.GetValueOrDefault(msg.ConceptId, new())
+                    .Select(m => m.Methodology).ToList(),
+                msg.CompositeScore, msg.ConsecutiveStagnantSessions));
+
+        MethodologySwitched_V1? switchEvent = null;
+        if (decision.ShouldSwitch)
+        {
+            switchEvent = new MethodologySwitched_V1(
+                _studentId, msg.ConceptId,
+                currentMethodology.ToString(),
+                decision.RecommendedMethodology.ToString(),
+                "stagnation_detected",
+                msg.CompositeScore,
+                dominantErrorType.ToString(),
+                decision.Confidence,
+                DateTimeOffset.UtcNow);
+
+            StageEvent(switchEvent);
+        }
+        else if (decision.AllMethodologiesExhausted)
+        {
+            _logger.LogWarning(
+                "All methodologies exhausted for student {StudentId}, concept {ConceptId}. " +
+                "Escalation: {Action}",
+                _studentId, msg.ConceptId, decision.EscalationAction);
+
+            // FIND-arch-021: Removed orphan NATS publisher (cena.student.escalation had no subscribers)
+            // Escalation events are persisted via Marten event stream and available via projections.
+        }
+
+        await FlushEvents();
+
+        // Apply SAME event instances to local state (after successful persist)
+        _state.Apply(stagnationEvent);
+        if (switchEvent != null)
+        {
+            _state.Apply(switchEvent);
+
+            if (_stagnationDetector != null)
+            {
+                context.Send(_stagnationDetector, new Stagnation.ResetAfterSwitch(
+                    msg.ConceptId));
+            }
+        }
+    }
+
+    // ACT-029: Flush immediately after staging to prevent data loss on passivation.
+    // Apply the event to local state after successful persistence.
+    // ACT-010: After flush, publish to per-student NATS subjects for SignalR bridge.
+    private async Task HandleDelegateEvent(DelegateEvent del)
+    {
+        StageEvent(del.Event);
+        await FlushEvents();
+
+        // Apply to local state based on event type.
+        // IDelegatedEvent marker ensures compile-time coverage when new events are added.
+        switch (del.Event)
+        {
+            case ConceptAttempted_V1 e: _state.Apply(e); break;
+            case ConceptMastered_V1 e: _state.Apply(e); break;
+            case SessionStarted_V1 e: _state.Apply(e); break;
+            case SessionEnded_V1 e: _state.Apply(e); break;
+            case MethodologySwitched_V1 e: _state.Apply(e); break;
+            case XpAwarded_V1 e: _state.Apply(e); break;
+            case StreakUpdated_V1 e: _state.Apply(e); break;
+            case AnnotationAdded_V1 e: _state.Apply(e); break;
+            case StagnationDetected_V1 e: _state.Apply(e); break;
+            case HintRequested_V1: break; // No state mutation
+            case QuestionSkipped_V1: break; // No state mutation
+            case MethodologyConfidenceReached_V1 e: _state.Apply(e); break;
+            case MethodologySwitchDeferred_V1 e: _state.Apply(e); break;
+            case TeacherMethodologyOverride_V1 e: _state.Apply(e); break;
+            // ACT-010: Tutoring events — no state mutation, persisted by StageEvent
+            case TutoringSessionStarted_V1: break;
+            case TutoringMessageSent_V1: break;
+            case TutoringSessionEnded_V1: break;
+            case TutoringEpisodeCompleted_V1: break;
+        }
+
+        // ACT-010: Publish to per-student NATS subjects (fire-and-forget, no await blocking)
+        _ = PublishEventToNatsAsync(del.Event);
+    }
+
+    /// <summary>
+    /// ACT-010: Routes persisted events to per-student NATS subjects for the SignalR bridge.
+    /// Fire-and-forget — Marten is the source of truth. NATS is best-effort.
+    /// </summary>
+    private Task PublishEventToNatsAsync(IDelegatedEvent evt)
+    {
+        return evt switch
+        {
+            SessionStarted_V1 e => _sessionEventPublisher.PublishSessionStartedAsync(_studentId, e),
+            SessionEnded_V1 e => _sessionEventPublisher.PublishSessionEndedAsync(_studentId, e),
+            ConceptAttempted_V1 e => _sessionEventPublisher.PublishConceptAttemptedAsync(_studentId, e),
+            ConceptMastered_V1 e => _sessionEventPublisher.PublishMasteryUpdatedAsync(_studentId, e),
+            HintRequested_V1 e => _sessionEventPublisher.PublishHintDeliveredAsync(_studentId, e),
+            XpAwarded_V1 e => _sessionEventPublisher.PublishXpAwardedAsync(_studentId, e),
+            StreakUpdated_V1 e => _sessionEventPublisher.PublishStreakUpdatedAsync(_studentId, e),
+            StagnationDetected_V1 e => _sessionEventPublisher.PublishStagnationDetectedAsync(_studentId, e),
+            MethodologySwitched_V1 e => _sessionEventPublisher.PublishMethodologySwitchedAsync(_studentId, e),
+            TutoringSessionStarted_V1 e => _sessionEventPublisher.PublishTutoringStartedAsync(_studentId, e),
+            TutoringMessageSent_V1 e => _sessionEventPublisher.PublishTutoringMessageAsync(_studentId, e),
+            TutoringSessionEnded_V1 e => _sessionEventPublisher.PublishTutoringEndedAsync(_studentId, e),
+            _ => Task.CompletedTask // AnnotationAdded, QuestionSkipped, etc. — no real-time need
+        };
+    }
+
+    // =========================================================================
+    // QUERY HANDLERS
+    // =========================================================================
+
+    private Task HandleGetProfile(IContext context, GetStudentProfile query)
+    {
+        var response = new StudentProfileDto(
+            _studentId,
+            _state.MasteryMap.AsReadOnly(),
+            _state.MethodologyMap.ToDictionary(kv => kv.Key, kv => kv.Value.ToString())
+                .AsReadOnly(),
+            _state.TotalXp,
+            _state.CurrentStreak,
+            _state.LongestStreak,
+            _state.LastActivityDate,
+            _state.ExperimentCohort,
+            _state.SessionCount);
+
+        context.Respond(new ActorResult<StudentProfileDto>(true, response));
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Returns spaced repetition review schedule from in-memory HLR timers.
+    /// Uses half-life regression: p(t) = 2^(-delta/h)
+    /// </summary>
+    private Task HandleGetReviewSchedule(IContext context, GetReviewSchedule query)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var reviewItems = _state.HlrTimers
+            .Select(kv =>
+            {
+                var delta = (now - kv.Value.LastReviewAt).TotalHours;
+                var predictedRecall = Math.Pow(2, -delta / kv.Value.HalfLifeHours);
+                var priority = predictedRecall < 0.5 ? "urgent"
+                    : predictedRecall < 0.7 ? "standard" : "low";
+                // When recall drops to threshold: solve threshold = 2^(-t/h) => t = -h * log2(threshold)
+                var dueAt = kv.Value.LastReviewAt.AddHours(
+                    -kv.Value.HalfLifeHours * Math.Log2(MasteryConstants.RecallReviewThreshold));
+
+                return new ReviewItem(
+                    kv.Key, kv.Key, // concept name resolution deferred to KST graph
+                    predictedRecall, kv.Value.HalfLifeHours, priority, dueAt);
+            })
+            .Where(r => r.PredictedRecall < MasteryConstants.RecallReviewThreshold)
+            .OrderBy(r => r.PredictedRecall)
+            .Take(query.MaxItems)
+            .ToList();
+
+        context.Respond(new ActorResult<IReadOnlyList<ReviewItem>>(
+            true, reviewItems.AsReadOnly()));
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// PWA-BE-001: Returns a complete session snapshot for SignalR reconnect.
+    /// Queries actor state and enriches with the LearningSessionQueueProjection.
+    /// </summary>
+    private async Task HandleGetSessionSnapshot(IContext context, GetSessionSnapshot query)
+    {
+        // 1. Verify the session is still active in actor state
+        if (_state.ActiveSessionId != query.SessionId)
+        {
+            await using var session = _documentStore.QuerySession();
+            var queue = await session.LoadAsync<LearningSessionQueueProjection>(query.SessionId);
+            if (queue is null)
+            {
+                context.Respond(new SessionSnapshotResponse(
+                    query.SessionId, 0, null, new(), "full", new(),
+                    DateTimeOffset.UtcNow, 0, Error: "session_not_found"));
+                return;
+            }
+
+            context.Respond(new SessionSnapshotResponse(
+                query.SessionId, 0, null, new(), "full", new(),
+                DateTimeOffset.UtcNow, 0, Error: "session_expired"));
+            return;
+        }
+
+        // 2. Expiry guard: >1h idle since last activity
+        var idleHours = (DateTimeOffset.UtcNow - _state.LastActivityDate).TotalHours;
+        if (idleHours > 1)
+        {
+            context.Respond(new SessionSnapshotResponse(
+                query.SessionId, 0, null, new(), "full", new(),
+                DateTimeOffset.UtcNow, 0, Error: "session_expired"));
+            return;
+        }
+
+        // 3. Load the queue projection to enrich the snapshot
+        await using var querySession = _documentStore.QuerySession();
+        var sessionQueue = await querySession.LoadAsync<LearningSessionQueueProjection>(query.SessionId);
+
+        var startedAt = sessionQueue?.StartedAt ?? _state.LastActivityDate;
+        var currentStepNumber = sessionQueue?.TotalQuestionsAttempted ?? 0;
+        if (sessionQueue?.PeekNext() != null)
+            currentStepNumber++;
+
+        var currentQuestionId = sessionQueue?.CurrentQuestionId;
+        if (string.IsNullOrEmpty(currentQuestionId) && sessionQueue?.PeekNext() is { } nextQ)
+            currentQuestionId = nextQ.QuestionId;
+
+        var bktSnapshot = _state.MasteryMap
+            .Select(kv => new SkillMasteryDto(
+                kv.Key,
+                kv.Value,
+                _state.MasteryOverlay.GetValueOrDefault(kv.Key)?.AttemptCount ?? 0,
+                _state.MasteryOverlay.GetValueOrDefault(kv.Key)?.CorrectCount ?? 0))
+            .ToDictionary(s => s.ConceptId);
+
+        var completedSteps = sessionQueue?.AnsweredQuestions
+            .Select((a, i) => new StepResultDto(
+                (i + 1).ToString(),
+                a.QuestionId,
+                "",
+                a.IsCorrect,
+                a.TimeSpentSeconds * 1000,
+                a.AnsweredAt))
+            .ToList() ?? new List<StepResultDto>();
+
+        var scaffoldingLevel = "exploratory";
+        if (sessionQueue != null && !string.IsNullOrEmpty(currentQuestionId))
+        {
+            var conceptId = sessionQueue.PeekNext()?.ConceptId
+                ?? sessionQueue.QuestionQueue.FirstOrDefault(q => q.QuestionId == currentQuestionId)?.ConceptId
+                ?? "";
+            var mastery = (float)_state.MasteryMap.GetValueOrDefault(conceptId, 0.5);
+            var level = Cena.Actors.Mastery.ScaffoldingService.DetermineLevel(mastery, 1.0f);
+            scaffoldingLevel = level switch
+            {
+                Mastery.ScaffoldingLevel.Full => "full",
+                Mastery.ScaffoldingLevel.Partial => "partial",
+                Mastery.ScaffoldingLevel.HintsOnly => "minimal",
+                Mastery.ScaffoldingLevel.None => "exploratory",
+                _ => "exploratory"
+            };
+        }
+
+        var durationSeconds = (int)(DateTimeOffset.UtcNow - startedAt).TotalSeconds;
+
+        context.Respond(new SessionSnapshotResponse(
+            query.SessionId,
+            currentStepNumber,
+            currentQuestionId,
+            bktSnapshot,
+            scaffoldingLevel,
+            completedSteps,
+            startedAt,
+            durationSeconds));
+    }
+
+    // =========================================================================
+    // MEMORY MANAGEMENT
+    // =========================================================================
+
+    private Task HandleMemoryCheck(IContext context)
+    {
+        var estimated = _state.EstimateMemoryBytes();
+        _actorMemoryUsage.Record(estimated,
+            new KeyValuePair<string, object?>("student.id", _studentId));
+
+        if (estimated > StudentState.MemoryBudgetBytes * 0.8)
+        {
+            _logger.LogWarning(
+                "StudentActor memory warning for {StudentId}: {EstimatedKB}KB / {BudgetKB}KB (80% threshold)",
+                _studentId, estimated / 1024, StudentState.MemoryBudgetBytes / 1024);
+        }
+
+        if (estimated > StudentState.MemoryBudgetBytes)
+        {
+            _logger.LogError(
+                "StudentActor memory EXCEEDED for {StudentId}: {EstimatedKB}KB / {BudgetKB}KB. " +
+                "Consider pruning concept history.",
+                _studentId, estimated / 1024, StudentState.MemoryBudgetBytes / 1024);
+        }
+
+        // Schedule next check
+        ScheduleMemoryCheck(context);
+
+        return Task.CompletedTask;
+    }
+
+    private void ScheduleMemoryCheck(IContext context)
+    {
+        var self = context.Self;
+        var system = context.System;
+        var token = _timerCts?.Token ?? CancellationToken.None;
+        _ = Task.Delay(MemoryCheckInterval, token).ContinueWith(t =>
+        {
+            if (!t.IsCanceled)
+                system.Root.Send(self, new MemoryCheckTick());
+        }, TaskContinuationOptions.NotOnCanceled);
+    }
+}

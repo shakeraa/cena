@@ -1,0 +1,185 @@
+doc_path: pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md
+reviewer: persona-privacy
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 content-authoring features: Bayesian IRT calibration error correction,
+  SymPy CAS-gated variation engine, Bagrut-aligned partial-credit rubric, Arabic RTL
+  math renderer, culturally-contextualized problem generator, mother-tongue hint system,
+  self-efficacy-calibrated difficulty presentation, hybrid Elo + expert difficulty calibration.
+  Most features are CONTENT-side (item bank, templates) with minimal student PII.
+
+system_purpose_fit: 4
+  rationale:
+    - Most features operate on item bank / problem templates, not student PII
+    - ADR-0002 (SymPy oracle) honored — Feature 2 IS the oracle enforcement
+    - ADR-0003 (session scope) honored — distractors derived algebraically, not from student responses
+    - Feature 5 cultural contextualization introduces a dignity concern (stereotyping) noted by Dr. Nadia
+    - Feature 6 mother-tongue hints must not track language-proficiency profiles
+
+code_reality_check:
+  claims_verified_in_code:
+    - "SymPy CAS integration referenced in CAS-gated services -> src/actors/Cena.Actors/"
+    - "CAS-gated ingestion ADR exists -> docs/adr/0032-cas-gated-question-ingestion.md"
+    - "Hebrew/Arabic locales present -> src/*/full-version/src/plugins/i18n/locales/{he,ar}.json"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "No IRT item bank in src/ — proposed"
+    - "No MathML Arabic RTL renderer in src/ — proposed"
+    - "No Elo/item difficulty calibration in src/ — proposed"
+
+adr_alignment:
+  honored:
+    - ADR-0002 (SymPy oracle — Feature 2 enforces it)
+    - ADR-0003 (distractors derived algebraically, not from student data)
+    - ADR-0032 (CAS-gated question ingestion)
+  violated: []
+  missing_adr_needed:
+    - "ADR for mother-tongue detection (Feature 6) — must not track/retain language-proficiency profile"
+    - "ADR for cultural-contextualization review board (Feature 5)"
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 6 (Mother-Tongue-Mediated Hint System) implies the system knows the student's
+      mother tongue. If inferred from usage patterns, that's language-proficiency profiling
+      — Art 22 adjacent. If declared by student, it's fine. Must be: explicit declaration
+      via profile preference, never inferred, never linked to performance analytics.
+    evidence: "AXIS_8_Content_Authoring_Quality_Research.md:16 (Feature 6 listing) + Dr. Rami finding FD-013 (finding_assessment_dr_rami.md:29) 'Do not track language proficiency profiles'"
+    lens_note: |
+      Aligned with Dr. Nadia's and Dr. Rami's review notes — confirmed from privacy lens too.
+
+  - severity: P1
+    finding: |
+      Feature 5 (Culturally-Contextualized Problem Generator) uses demographic/cultural
+      metadata per student (Arab/Ethiopian/Russian cohort tag) to select contexts. Even if
+      student self-declares, this tag becomes sensitive data (ethnic origin = GDPR Art 9).
+      Needs: (a) explicit [Pii(Level=SpecialCategory)] classification on the tag field;
+      (b) separate consent purpose; (c) never exposed in dashboards or exports without
+      user acknowledgment.
+    evidence: "AXIS_8_Content_Authoring_Quality_Research.md:15"
+    lens_note: |
+      Ethnic/cultural tag is GDPR Art 9 special-category. PPL draft opinion on sensitive
+      data applies. This feature has higher compliance burden than its effort estimate suggests.
+
+  - severity: P1
+    finding: |
+      Feature 7 (Self-Efficacy-Calibrated Difficulty) implies per-student self-efficacy
+      profile. Overlaps Axis 6 Feature 8 (confidence calibration) — same behavioral profile
+      surface. One canonical self-efficacy profile, one consent purpose, one retention window.
+    evidence: "AXIS_8_Content_Authoring_Quality_Research.md:17 + AXIS_6_Assessment_Feedback_Research.md:20 (Feature 8)"
+    lens_note: |
+      Two docs propose different features that end up writing to the same behavioral
+      profile. Coordination needed.
+
+  - severity: P2
+    finding: |
+      Feature 1 (Bayesian IRT Calibration) uses student response data to update item
+      parameter posteriors. Claim: "not ML training, just Bayesian inference". From
+      privacy lens: both update model params from student data. Must use aggregate
+      response data (no per-student response matrices exported), documented as
+      ADR-0003 Decision 6 aggregate boundary.
+    evidence: "AXIS_8_Content_Authoring_Quality_Research.md:52-54"
+    lens_note: |
+      "Bayesian inference vs ML training" is a legal grey zone. Safer to explicitly
+      document: item parameter updates use only (correct/incorrect, anonymized timing)
+      aggregated across cohort ≥N.
+
+already_built:
+  - feature: CAS-gated question ingestion
+    evidence: docs/adr/0032-cas-gated-question-ingestion.md
+    note: Feature 2 aligned with existing ingestion ADR.
+  - feature: Hebrew/Arabic locale scaffolding
+    evidence: src/*/full-version/src/plugins/i18n/locales/{he,ar}.json
+    note: Feature 4 (RTL math renderer) has partial infrastructure (non-negotiable #6 enforces bdi dir=ltr).
+
+duplicates_of_other_docs:
+  - "axis3_accessibility_accommodations_findings.md: Feature 7 (Arabic RTL renderer) = Feature 4 here"
+  - "feature-discovery-2026-04-20.md: FD-002 / FD-010 / FD-011 / FD-012 / FD-013 all mapped"
+  - "cena_dr_nadia_pedagogical_review_20_findings.md: FD-011 (cultural contextualization) has community-review caveat"
+
+extracted_tasks:
+  - title: "Mother tongue = declared-only, not inferred (Feature 6)"
+    priority: P1
+    estimate: XS
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Student profile has explicit language preferences. Feature 6 MUST read from
+      profile preference only; never infer from typing patterns, response times, or
+      hint-language selections. No language-proficiency profile built from behavior.
+
+      ## Files
+      - Feature 6 implementation (future)
+      - StudentPreferencesDocument — ensure LanguagePreference field
+      - Lint/test: no service reads "inferred_mother_tongue" or similar
+
+      ## Definition of Done
+      - Convention documented
+      - Code-review checklist updated
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L16"]
+
+  - title: "Classify cultural/ethnic cohort tag as GDPR Art 9 special-category"
+    priority: P1
+    estimate: S
+    suggested_assignee: claude-subagent-compliance
+    queue_body: |
+      ## Goal
+      Feature 5 cohort tag (Arab/Ethiopian/Russian/Jewish) is ethnic-origin data = Art 9.
+      Mirror accommodation-data classification task from Axis 3.
+
+      ## Files
+      - src/actors/Cena.Actors/Events/StudentProfileSnapshot.cs (add [Pii(SpecialCategory)])
+      - src/shared/Cena.Infrastructure/Compliance/ProcessingPurpose.cs
+      - Review board policy for cultural content (docs/content/culturally-contextualized-review-board.md)
+
+      ## Definition of Done
+      - Field classified
+      - Consent purpose ContentContextualization (default deny)
+      - Review board policy published
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-compliance --result "<branch>"
+    source_doc_lines: ["L15"]
+
+  - title: "Consolidate self-efficacy / confidence profile storage (Axis 8 F7 + Axis 6 F8)"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Two docs propose overlapping self-efficacy/confidence profiles. Decide one store,
+      one consent purpose, one retention window before implementation.
+
+      ## Definition of Done
+      - ADR: single SelfEfficacyState aggregate field
+      - Axis 6 F8 + Axis 8 F7 roadmap consolidated
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: ["L17"]
+
+verdict: adopt
+verdict_reason: |
+  Content-authoring features are the lowest-privacy-risk in the corpus — most operate
+  on item bank, not student data. Features 1, 2, 3, 4, 8 shippable as-is. Features 5, 6, 7
+  ship after the 3 tasks above consolidate special-category classification and
+  behavioral-profile storage.
+
+cross_lens_handoff:
+  - to: persona-a11y
+    about: |
+      Feature 4 (Arabic RTL math) is lens-core — WCAG + bdi dir=ltr compliance.
+  - to: persona-educator
+    about: |
+      Feature 5 cultural contextualization — stereotyping risk per Dr. Nadia; community review board.
+  - to: persona-cogsci
+    about: |
+      Dr. Rami flagged FD-011 ES 1.16 as cherry-picked; effect size defensibility.
+  - to: persona-ministry
+    about: |
+      Arabic-medium content authoring — Ministry alignment + 22% Meitzav gap cited.

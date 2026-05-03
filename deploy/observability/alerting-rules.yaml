@@ -1,0 +1,456 @@
+# Cena Platform — Alerting Rules for deployment health
+# Import into Prometheus/Alertmanager or Grafana alerting
+
+groups:
+  - name: cena-deploy-health
+    rules:
+      # Migrator job failure — page on-call immediately
+      - alert: CenaMigratorJobFailed
+        expr: kube_job_status_failed{job_name=~".*-migrator.*"} > 0
+        for: 0m
+        labels:
+          severity: critical
+          team: cena-platform
+        annotations:
+          summary: "Cena migrator job failed"
+          description: >-
+            The database migrator job {{ $labels.job_name }} has failed.
+            This blocks all host deployments. Check migrator pod logs immediately.
+          runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/operations/deploy-runbook.md#migrator-failure"
+
+      # Schema assert error on any host startup — page on-call
+      - alert: CenaSchemaAssertError
+        expr: sum(rate(aspnetcore_healthcheck_status{name="schema_assert", status="Unhealthy"}[5m])) by (app) > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: cena-platform
+        annotations:
+          summary: "Schema assertion failed on {{ $labels.app }}"
+          description: >-
+            The health check AssertDatabaseMatchesConfiguration is failing on {{ $labels.app }}.
+            This means the running code expects a schema that does not match the database.
+            Either the migrator did not run or a migration is missing.
+          runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/operations/deploy-runbook.md#schema-assert-failure"
+
+      # Host stuck in CrashLoopBackOff for > 5 min — page on-call
+      - alert: CenaHostCrashLoop
+        expr: >-
+          sum(increase(kube_pod_container_status_restarts_total{container=~"student|admin"}[5m])) by (container, pod) > 3
+        for: 5m
+        labels:
+          severity: critical
+          team: cena-platform
+        annotations:
+          summary: "{{ $labels.container }} pod {{ $labels.pod }} is crash-looping"
+          description: >-
+            Pod {{ $labels.pod }} (container {{ $labels.container }}) has restarted more than
+            3 times in the last 5 minutes. Likely CrashLoopBackOff. Check pod logs and events.
+          runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/operations/deploy-runbook.md#crash-loop-backoff"
+
+      # ─────────────────────────────────────────────────────────────────
+      # prr-047 — LLM prompt-cache hit-rate SLO
+      # Target: >= 40% over any rolling 24h window by cache_type.
+      # Alert thresholds:
+      #   warning  — 1h hit rate < 40% (SLO degraded)
+      #   critical — 1h hit rate < 20% (cost cascade; escalate)
+      # Guard: only fires when there is enough traffic (>= 0.1 req/sec mean
+      # over the window) so low-traffic environments don't page overnight.
+      # ─────────────────────────────────────────────────────────────────
+      - alert: CenaPromptCacheHitRateDegraded
+        expr: >-
+          (
+            sum by (cache_type) (rate(cena_prompt_cache_hits_total[1h]))
+            /
+            clamp_min(
+              sum by (cache_type) (
+                rate(cena_prompt_cache_hits_total[1h])
+                + rate(cena_prompt_cache_misses_total[1h])
+              ),
+              0.001
+            )
+          ) < 0.40
+          and
+          sum by (cache_type) (
+            rate(cena_prompt_cache_hits_total[1h])
+            + rate(cena_prompt_cache_misses_total[1h])
+          ) > 0.1
+        for: 1h
+        labels:
+          severity: warning
+          team: cena-platform
+        annotations:
+          summary: "Prompt cache hit rate for {{ $labels.cache_type }} below 40% SLO"
+          description: >-
+            Cache type {{ $labels.cache_type }} has a 1h hit rate of {{ $value | humanizePercentage }}
+            (target >= 40%). Check whether a recent deploy changed a prompt template,
+            invalidated a large cache slice, or wired a new LLM call site without a cache guard.
+          runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/operations/llm-cache-runbook.md"
+
+      - alert: CenaPromptCacheHitRateCritical
+        expr: >-
+          (
+            sum by (cache_type) (rate(cena_prompt_cache_hits_total[1h]))
+            /
+            clamp_min(
+              sum by (cache_type) (
+                rate(cena_prompt_cache_hits_total[1h])
+                + rate(cena_prompt_cache_misses_total[1h])
+              ),
+              0.001
+            )
+          ) < 0.20
+          and
+          sum by (cache_type) (
+            rate(cena_prompt_cache_hits_total[1h])
+            + rate(cena_prompt_cache_misses_total[1h])
+          ) > 0.1
+        for: 1h
+        labels:
+          severity: critical
+          team: cena-platform
+        annotations:
+          summary: "Prompt cache hit rate for {{ $labels.cache_type }} critically low (<20%)"
+          description: >-
+            Cache type {{ $labels.cache_type }} has a 1h hit rate of {{ $value | humanizePercentage }}.
+            This is burning the Anthropic token budget ~5x faster than planned and may exhaust the
+            daily 25k output-token cap per student. Triage immediately.
+          runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/operations/llm-cache-runbook.md"
+
+      # ─────────────────────────────────────────────────────────────────
+      # prr-046 — Per-feature LLM cost projection alert
+      # Projected monthly spend per feature = 7d rolling × (30/7). Fires
+      # when that projection exceeds the ceiling recorded in
+      # contracts/llm/routing-config.yaml §feature_monthly_ceiling_usd.
+      # The ceiling is emitted as a static recording rule, so the alert
+      # expr compares two time-series and is self-explanatory.
+      # Runbook entry (TODO: write at docs/operations/llm-cost-runbook.md):
+      #   1. Which feature crossed ceiling — $labels.feature.
+      #   2. Which model did the drift come from — check the
+      #      "Feature × model mix" panel on the cost-projection dashboard.
+      #   3. If a routing-config change shipped in the last 24h,
+      #      consider rolling back; otherwise raise the ceiling in the
+      #      YAML only after finops sign-off (ADR-0026 §Consequences).
+      # Ceilings are placeholder numbers per task DoD — product MUST
+      # replace them before GA, otherwise this alert warns on
+      # artificially low thresholds.
+      # ─────────────────────────────────────────────────────────────────
+      - alert: CenaLlmFeatureProjectedMonthlySpendOverCeiling
+        expr: >-
+          (
+            sum by (feature) (increase(cena_llm_call_cost_usd_total[7d])) * 30/7
+          )
+          > on(feature)
+          group_left
+          (
+            label_replace(
+              label_replace(
+                # Ceiling time-series is emitted by a static recording rule
+                # (see CenaLlmFeatureMonthlyCeilingUsd below); one sample per
+                # feature per scrape.
+                cena_llm_feature_monthly_ceiling_usd,
+                "feature", "$1", "feature", "(.+)"
+              ),
+              "__name__", "", "", ""
+            )
+          )
+        for: 30m
+        labels:
+          severity: warning
+          team: cena-finops
+        annotations:
+          summary: "LLM feature {{ $labels.feature }} projected to exceed monthly ceiling"
+          description: >-
+            Feature {{ $labels.feature }} is projected to spend ${{ $value | humanize }} / month
+            (7d rolling × 30/7), exceeding the configured ceiling in
+            contracts/llm/routing-config.yaml §feature_monthly_ceiling_usd.
+            Verify with the "Projected monthly spend per feature" panel on the
+            LLM Cost Projection dashboard. If the drift came from a routing-config
+            change, roll back before raising the ceiling.
+          runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/operations/llm-cost-runbook.md"
+
+      # prr-046: ceiling source-of-truth. Hand-maintained recording rule
+      # mirroring contracts/llm/routing-config.yaml §feature_monthly_ceiling_usd
+      # so Prometheus can compare the projection against a stored time-series.
+      # Keep this block in sync with the YAML. A feature missing a ceiling
+      # here fires CenaLlmFeatureUnknownFeatureSpend below.
+  - name: cena-llm-cost-projection-ceilings
+    interval: 1m
+    rules:
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(12000)"
+        labels: { feature: socratic }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(10)"
+        labels: { feature: hint-l1 }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(500)"
+        labels: { feature: hint-l2 }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(2000)"
+        labels: { feature: hint-l3 }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(3000)"
+        labels: { feature: explanation-l2 }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(5000)"
+        labels: { feature: explanation-l3 }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(300)"
+        labels: { feature: classification }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(2500)"
+        labels: { feature: question-generation }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(500)"
+        labels: { feature: quality-gate }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(800)"
+        labels: { feature: figure-generation }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(600)"
+        labels: { feature: content-segmentation }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(400)"
+        labels: { feature: stuck-classification }
+
+  - name: cena-llm-cost-projection-unknown-feature
+    interval: 5m
+    rules:
+      # prr-046: catch features that spend $ but have no ceiling entry. A
+      # non-empty result here means a developer added a new [FeatureTag]
+      # value without adding the ceiling row to routing-config.yaml. The
+      # alert is severity:info so operators see it without paging.
+      - alert: CenaLlmFeatureMissingCeiling
+        expr: >-
+          sum by (feature) (increase(cena_llm_call_cost_usd_total[1d])) > 0
+          unless on (feature) cena_llm_feature_monthly_ceiling_usd
+        for: 15m
+        labels:
+          severity: info
+          team: cena-finops
+        annotations:
+          summary: "LLM feature {{ $labels.feature }} has spend but no ceiling"
+          description: >-
+            Feature {{ $labels.feature }} emitted non-zero cost in the last 24h
+            but has no entry in contracts/llm/routing-config.yaml
+            §feature_monthly_ceiling_usd. Add a ceiling row (and update
+            alerting-rules.yaml recording rules) so the projection alert can fire.
+
+  # ─────────────────────────────────────────────────────────────────
+  # prr-084 — Per-institute LLM spend breach alerts.
+  #
+  # Each institute has a configured monthly ceiling. The projection is
+  # the 7-day rolling increase × 30/7 (same shape as the per-feature
+  # projection above). We fire two severities:
+  #
+  #   - warning  at 80%   — route to Slack #cena-finops
+  #   - critical at 100%  — route to SRE PagerDuty
+  #
+  # Ceilings are sourced from the recording rule
+  # `cena_llm_institute_monthly_ceiling_usd{institute_id}` which
+  # operators maintain alongside the per-feature ceilings. An
+  # institute that has LLM spend but no ceiling entry fires
+  # CenaLlmInstituteMissingCeiling (severity:info).
+  #
+  # Runbook: docs/ops/runbooks/llm-cost-breach.md
+  # ─────────────────────────────────────────────────────────────────
+  - name: cena-llm-cost-per-institute-ceilings
+    interval: 1m
+    rules:
+      # Example ceilings — production overwrites these via the
+      # institute-admin UI (prr-084 roadmap). The placeholder shape
+      # keeps Prometheus parseable on day-1 with a single bootstrap
+      # institute.
+      - record: cena_llm_institute_monthly_ceiling_usd
+        expr: "vector(500)"
+        labels: { institute_id: demo-institute }
+      # Fallback-catchall so an institute without an explicit ceiling
+      # row has a *conservative* $100/mo cap until finops bumps it.
+      # Ops gets a CenaLlmInstituteMissingCeiling alert to drive the
+      # conversation; the fallback prevents an unlimited-spend bug.
+      - record: cena_llm_institute_monthly_ceiling_usd_default
+        expr: "vector(100)"
+
+  - name: cena-llm-cost-per-institute
+    rules:
+      - alert: CenaLlmInstituteSpendWarning
+        expr: >-
+          (
+            sum by (institute_id) (increase(cena_llm_call_cost_usd_total[7d])) * 30/7
+          )
+          > on(institute_id) group_left()
+          (cena_llm_institute_monthly_ceiling_usd * 0.80)
+        for: 30m
+        labels:
+          severity: warning
+          team: cena-finops
+          channel: slack
+        annotations:
+          summary: "LLM spend at institute {{ $labels.institute_id }} projected to exceed 80% of monthly ceiling"
+          description: >-
+            Institute {{ $labels.institute_id }} is projected to spend ${{ $value | humanize }} / month
+            (7d rolling × 30/7), crossing 80% of the configured monthly ceiling in
+            cena_llm_institute_monthly_ceiling_usd. Verify with the "Per-institute projected spend"
+            panel on the LLM Cost Projection dashboard. Finops can raise the ceiling after sign-off
+            or triage the driving cohort / feature mix.
+          runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/ops/runbooks/llm-cost-breach.md"
+
+      - alert: CenaLlmInstituteSpendCritical
+        expr: >-
+          (
+            sum by (institute_id) (increase(cena_llm_call_cost_usd_total[7d])) * 30/7
+          )
+          > on(institute_id) group_left()
+          cena_llm_institute_monthly_ceiling_usd
+        for: 15m
+        labels:
+          severity: critical
+          team: cena-sre
+          channel: pagerduty
+        annotations:
+          summary: "LLM spend at institute {{ $labels.institute_id }} projected to EXCEED monthly ceiling"
+          description: >-
+            Institute {{ $labels.institute_id }} is projected to spend ${{ $value | humanize }} / month
+            (7d rolling × 30/7), EXCEEDING the configured ceiling. This is a budget-breach event —
+            page finops-on-call AND SRE-on-call. Immediate actions: (a) identify cohort /
+            feature driving the drift via the cost-per-cohort dashboard (prr-112); (b) decide
+            soft-cap vs. hard-throttle per docs/ops/runbooks/llm-cost-breach.md §4.
+          runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/ops/runbooks/llm-cost-breach.md"
+
+      # prr-084: catch institutes that spend $ but have no ceiling entry.
+      # Severity: info — operators see it without paging, but the gap
+      # is visible.
+      - alert: CenaLlmInstituteMissingCeiling
+        expr: >-
+          sum by (institute_id) (increase(cena_llm_call_cost_usd_total[1d])) > 0
+          unless on (institute_id) cena_llm_institute_monthly_ceiling_usd
+        for: 15m
+        labels:
+          severity: info
+          team: cena-finops
+        annotations:
+          summary: "LLM institute {{ $labels.institute_id }} has spend but no monthly ceiling"
+          description: >-
+            Institute {{ $labels.institute_id }} emitted non-zero LLM cost in the last 24h
+            but has no entry in cena_llm_institute_monthly_ceiling_usd. Add a recording rule
+            (and reconcile with institute-admin UI) so prr-084 breach alerts can fire for
+            this tenant. Default fallback of $100/mo applies until then.
+
+  # ─────────────────────────────────────────────────────────────────
+  # prr-233 — Per-target prompt-cache SLO + cache-miss spend projection.
+  #
+  # Motivation (persona-finops): multi-target plans pull the GLOBAL cache
+  # hit rate from ~85% down to ~68-72% because the per-target prompt
+  # context varies. The global average view hides a failing target — the
+  # per-target split surfaces it.
+  #
+  # SLO (prr-233 §DoD):
+  #   7-day rolling hit rate >= 60% per (feature, exam_target_code).
+  #   Alert fires below 60% sustained for 1h so flapping cold-start
+  #   doesn't page. Guard: denom > 0.1 req/sec (same shape as the
+  #   global SLO alert in §prr-047).
+  #
+  # The "unknown" target is EXCLUDED from the per-target SLO. Rationale:
+  # it aggregates every call where no active-target scope was open
+  # (legacy prr-148, migrations, system-prompt warmups). Holding it to
+  # the per-target SLO would constantly fire on the bootstrap cohort.
+  # The GLOBAL SLO (§prr-047 above) still catches catastrophic drops in
+  # the "unknown" bucket via the combined hits+misses rollup.
+  #
+  # The second rule group emits a RECORDING rule
+  # `cena_llm_cache_miss_spend_usd_projected{feature, exam_target_code}`
+  # which converts the 'hit rate dipped' signal into a 30-day dollar
+  # projection. The dashboard consumes this recording directly so the
+  # cost panel paints per target without re-deriving the math per query.
+  # Formula: projection = cost_7d * (1 - hit_rate_7d) * (30/7)
+  # ─────────────────────────────────────────────────────────────────
+  - name: cena-prompt-cache-per-target
+    rules:
+      - alert: CenaPromptCacheHitRatePerTargetDegraded
+        expr: >-
+          (
+            sum by (task, exam_target_code) (rate(cena_prompt_cache_hits_total{exam_target_code!="unknown"}[7d]))
+            /
+            clamp_min(
+              sum by (task, exam_target_code) (
+                rate(cena_prompt_cache_hits_total{exam_target_code!="unknown"}[7d])
+                + rate(cena_prompt_cache_misses_total{exam_target_code!="unknown"}[7d])
+              ),
+              0.001
+            )
+          ) < 0.60
+          and
+          sum by (task, exam_target_code) (
+            rate(cena_prompt_cache_hits_total{exam_target_code!="unknown"}[7d])
+            + rate(cena_prompt_cache_misses_total{exam_target_code!="unknown"}[7d])
+          ) > 0.1
+        for: 1h
+        labels:
+          severity: warning
+          team: cena-finops
+        annotations:
+          summary: "Prompt cache hit rate for (task={{ $labels.task }}, target={{ $labels.exam_target_code }}) below 60% SLO"
+          description: >-
+            Per-target SLO breach: (task, exam_target_code) =
+            ({{ $labels.task }}, {{ $labels.exam_target_code }}) has a 7d
+            rolling hit rate of {{ $value | humanizePercentage }} (target >=
+            60%). Check the 'Cache hit rate per exam target' heatmap on the
+            LLM Prompt Cache Hit Rate dashboard. Likely causes:
+            (1) a per-target prompt template introduced a new variable that
+            defeats the cache; (2) a target just went live and is in cold
+            start (wait out the 1h window); (3) the active-target resolver
+            (prr-226 / ADR-0050 §10) is mis-scoping a student's session.
+          runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/operations/llm-cache-runbook.md#per-target-slo-breach"
+
+  - name: cena-llm-cache-savings-projection
+    interval: 5m
+    rules:
+      # prr-233: per-(feature, exam_target_code) projected 30d cache-miss
+      # spend. The dashboard consumes this recording directly (no re-
+      # derivation per panel query). Only computed when the denom
+      # > 0.1 req/sec so cold environments don't surface noise numbers.
+      - record: cena_llm_cache_miss_spend_usd_projected
+        expr: >-
+          (
+            sum by (feature, exam_target_code) (increase(cena_llm_call_cost_usd_total[7d]))
+            *
+            (
+              1 -
+              (
+                sum by (feature, exam_target_code) (rate(cena_prompt_cache_hits_total[7d]))
+                /
+                clamp_min(
+                  sum by (feature, exam_target_code) (
+                    rate(cena_prompt_cache_hits_total[7d])
+                    + rate(cena_prompt_cache_misses_total[7d])
+                  ),
+                  0.001
+                )
+              )
+            )
+            * 30 / 7
+          )
+          and
+          sum by (feature, exam_target_code) (
+            rate(cena_prompt_cache_hits_total[7d])
+            + rate(cena_prompt_cache_misses_total[7d])
+          ) > 0.1
+
+  - name: cena-deploy-health-continued
+    rules:
+      # Migrator job running too long (> 5 min)
+      - alert: CenaMigratorSlow
+        expr: >-
+          time() - kube_job_status_start_time{job_name=~".*-migrator.*"} > 300
+          and kube_job_status_succeeded{job_name=~".*-migrator.*"} == 0
+          and kube_job_status_failed{job_name=~".*-migrator.*"} == 0
+        for: 0m
+        labels:
+          severity: warning
+          team: cena-platform
+        annotations:
+          summary: "Cena migrator job is running longer than 5 minutes"
+          description: >-
+            The migrator job {{ $labels.job_name }} has been running for over 5 minutes
+            without completing. This may indicate a stuck migration or connectivity issue.

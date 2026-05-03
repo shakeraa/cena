@@ -1,0 +1,29 @@
+{
+  "track": "PHYSICS-BAGRUT-036",
+  "description": "Bagrut Physics 036 (5 units)",
+  "skills": {
+    "physics-units-measurement": { "prerequisites": [], "category": "conceptual" },
+    "physics-vectors": { "prerequisites": ["physics-units-measurement"], "category": "procedural" },
+    "kinematics-1d": { "prerequisites": ["physics-units-measurement"], "category": "procedural" },
+    "kinematics-2d": { "prerequisites": ["kinematics-1d", "physics-vectors"], "category": "procedural" },
+    "newton-laws-1-2": { "prerequisites": ["kinematics-1d", "physics-vectors"], "category": "conceptual" },
+    "newton-law-3": { "prerequisites": ["newton-laws-1-2"], "category": "conceptual" },
+    "friction": { "prerequisites": ["newton-laws-1-2"], "category": "procedural" },
+    "inclined-planes": { "prerequisites": ["friction", "physics-vectors"], "category": "procedural" },
+    "circular-motion": { "prerequisites": ["newton-laws-1-2", "kinematics-2d"], "category": "procedural" },
+    "work-energy": { "prerequisites": ["newton-laws-1-2"], "category": "mixed" },
+    "energy-conservation": { "prerequisites": ["work-energy"], "category": "conceptual" },
+    "momentum": { "prerequisites": ["newton-laws-1-2"], "category": "procedural" },
+    "momentum-conservation": { "prerequisites": ["momentum", "energy-conservation"], "category": "conceptual" },
+    "gravitation": { "prerequisites": ["newton-laws-1-2", "circular-motion"], "category": "procedural" },
+    "electrostatics-charge": { "prerequisites": ["physics-units-measurement"], "category": "conceptual" },
+    "electrostatics-field": { "prerequisites": ["electrostatics-charge", "physics-vectors"], "category": "procedural" },
+    "electric-potential": { "prerequisites": ["electrostatics-field", "work-energy"], "category": "procedural" },
+    "dc-circuits": { "prerequisites": ["electric-potential"], "category": "procedural" },
+    "magnetism": { "prerequisites": ["dc-circuits", "physics-vectors"], "category": "mixed" },
+    "electromagnetic-induction": { "prerequisites": ["magnetism"], "category": "procedural" },
+    "waves-basics": { "prerequisites": ["kinematics-1d"], "category": "conceptual" },
+    "sound-waves": { "prerequisites": ["waves-basics"], "category": "conceptual" },
+    "light-optics": { "prerequisites": ["waves-basics"], "category": "procedural" }
+  }
+}

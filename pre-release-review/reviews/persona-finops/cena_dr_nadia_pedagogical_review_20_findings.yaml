@@ -1,0 +1,110 @@
+doc_path: pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md
+reviewer: persona-finops
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr. Nadia's pedagogical cross-examination of 20 findings (FD-001..FD-020).
+  17 PASS, 3 WARNING, 0 REJECT. Pedagogy-focused review; FinOps lens applies
+  to flagging which "pass" findings are cost bombs and which warnings have
+  cost implications orthogonal to pedagogy.
+system_purpose_fit: 4
+  rationale:
+    - Review itself is a meta-doc; its cost impact is how it influences which findings ship.
+    - Dr. Nadia does not price features — that's our job.
+    - Her PASSes on LLM-heavy features (FD-003, FD-008, FD-009) need cost-gating before shipping.
+code_reality_check:
+  claims_verified_in_code:
+    - "ADR-0003 Redis TTL for session-scoped data -> consistent with StuckClassifierOptions.RetentionDays=30"
+    - "SymPy CAS infra -> src/actors/Cena.Actors/Cas/SymPySidecarClient.cs"
+    - "Existing explanation cache substrate -> tasks/student-ai/done/SAI-003-l2-explanation-cache.md"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "DeepMind/Eedi 95.4% resolution — Dr. Rami REJECTs this; Nadia PASSes. Cost implication: if feature ships per Nadia, must still meet per-student $ cap."
+adr_alignment:
+  honored: [ADR-0002, ADR-0003]
+  violated: []
+  missing_adr_needed:
+    - "ADR to reconcile Nadia PASS vs Rami REJECT (FD-003, FD-008, FD-011) — cost can't be decided without resolving this."
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      FD-003 Real-Time Misconception Tagging — Nadia PASSes with ADR-0003
+      compliance note. Rami REJECTs due to fabricated 95% resolution. Cost
+      impact: if shipped, at 10k x 15 wrong/day x LLM classification, cost
+      is ~$75/day on Haiku with caching. Acceptable IF caching works. Must
+      cache on (question, wrong_answer_hash) per SAI-003 pattern; without
+      cache, cost is ~10x.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md (FD-003); finding_assessment_dr_rami.md (FD-003 REJECT)
+    lens_note: Pedagogy-review conflict must resolve before cost commitment.
+  - severity: P0
+    finding: |
+      FD-008 AI Partial-Credit Grading — Nadia PASSes w/ human-in-loop.
+      Rami REJECTs (fabricated Yu et al. 2026 citation + DPA concern). Cost
+      impact: human-in-loop validation at launch is LABOR cost, not LLM
+      cost. Estimate: 10k graded answers/day x 1/20 human review = 500/day
+      reviews x $0.50/review = $250/day = $7.5k/month human grading cost.
+      Non-trivial.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md (FD-008); finding_assessment_dr_rami.md (FD-008 REJECT)
+    lens_note: HITL is the cost hidden in Nadia's pedagogical green-light.
+  - severity: P1
+    finding: |
+      FD-009 Socratic AI Tutor — Nadia WARNING (friction for time-pressured
+      students). Cost-wise also WARNING: see cena_competitive_analysis YAML
+      — Socratic default-Sonnet routing at 10k students is 16x global cap.
+      Nadia's "escape hatch" recommendation aligns with FinOps per-student
+      minute cap.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md (FD-009)
+    lens_note: Pedagogy + FinOps converge on "cap the tutor".
+  - severity: P1
+    finding: |
+      FD-011 Culturally-Contextualized Problem Generator — Nadia PASSes
+      with stereotype risk caveat. Rami REJECTs (ES 1.16 cherry-pick).
+      Cost: if ship, MUST be authoring-time not runtime per my axis8
+      finding. Cohort review board is the cost line ($200-500/cohort).
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md (FD-011)
+    lens_note: Authoring-time design keeps cost bounded; review board is one-time per cohort.
+  - severity: P2
+    finding: |
+      FD-001..FD-007, FD-010, FD-012..FD-020 PASS with no FinOps concerns
+      beyond what's already captured in axis-level YAMLs.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md
+    lens_note: No additional cost findings beyond the axis reviews.
+already_built: []
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: all FD-### findings are indexed there — this doc is the pedagogy adjudication layer"
+  - "finding_assessment_dr_rami.md: conflicts to be resolved in synthesis"
+extracted_tasks:
+  - title: "Reconcile Nadia PASS vs Rami REJECT on FD-003, FD-008, FD-011 before cost commitment"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Three findings have conflicting verdicts between Nadia (pedagogy) and
+      Rami (statistical honesty). FinOps cost projections assume resolution
+      one way. Produce a single-page decision memo for each finding.
+
+      ## Files
+      - docs/decisions/fd003-misconception-tagging-resolution.md (new)
+      - docs/decisions/fd008-ai-grading-resolution.md (new)
+      - docs/decisions/fd011-cultural-context-resolution.md (new)
+
+      ## Definition of Done
+      - Each memo: Nadia position, Rami position, FinOps cost-at-scale, recommendation
+      - Signed off by one human architect (user)
+      - If SHIP, link to cost-bounded task in persona-finops YAMLs
+      - If RETIRE, update feature-discovery-2026-04-20.md
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L14-L40]
+verdict: adopt
+verdict_reason: |
+  Dr. Nadia's review is a reasoned pedagogical filter; FinOps concurs
+  mostly. The 3 conflicts with Dr. Rami (FD-003, FD-008, FD-011) must be
+  resolved before cost sign-off — otherwise projections are unstable.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: "Final adjudication on conflicting FD-003/008/011 verdicts"
+  - to: persona-privacy
+    about: "FD-008 DPA §7 concern — is human-in-loop mitigation sufficient?"

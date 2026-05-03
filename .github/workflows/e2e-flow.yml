@@ -1,0 +1,200 @@
+# =============================================================================
+# E2E Flow tests (TASK-E2E-INFRA-06)
+#
+# Runs the full-stack workflow specs under
+# `src/student/full-version/tests/e2e-flow/workflows/` against a live
+# docker-compose dev stack.
+#
+# Trigger matrix:
+#   - PR to main           → fast lane: smoke matrices + per-epic flagship
+#                            specs (-grep "@auth|@billing|@admin-smoke|
+#                            @student-smoke|@responsive|@cross-page|@perf")
+#   - push to main         → same as PR lane (regression on every merge)
+#   - nightly cron         → full suite incl. perf budgets, a11y, visual
+#   - workflow_dispatch    → manual run with full suite
+#
+# Existing CI workflows already cover other surfaces; this one fills the
+# specific gap that EPIC-A..L + EPIC-X coverage matrices don't run anywhere
+# today (see senior-architect audit on 2026-04-27).
+#
+# Sibling workflows (do NOT duplicate them):
+#   - student-web-ci.yml   → vitest unit + npm test:e2e (tests/e2e/* — stuw*, a11y-full-page-scan, etc.)
+#   - a11y-tests.yml       → static a11y rules + component axe + e2e a11y full-page scan
+#   - e2e-load-nightly.yml → k6 load tests
+#   - frontend.yml         → admin SPA build + lint
+#   - backend.yml          → .NET solution build + tests
+# =============================================================================
+
+name: E2E Flow
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/student/full-version/tests/e2e-flow/**'
+      - 'src/student/full-version/src/**'
+      - 'src/admin/full-version/src/**'
+      - 'src/api/**'
+      - 'src/actors/**'
+      - 'src/shared/**'
+      - 'docker-compose*.yml'
+      - 'docker/**'
+      - 'scripts/seed-marten-from-firebase.sh'
+      - '.github/workflows/e2e-flow.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/student/full-version/tests/e2e-flow/**'
+      - 'src/student/full-version/src/**'
+      - 'src/admin/full-version/src/**'
+      - 'src/api/**'
+      - 'src/actors/**'
+      - 'src/shared/**'
+      - 'docker-compose*.yml'
+      - 'docker/**'
+      - '.github/workflows/e2e-flow.yml'
+  schedule:
+    - cron: '17 3 * * *'   # nightly @ 03:17 UTC
+  workflow_dispatch:
+    inputs:
+      grep:
+        description: 'Optional --grep pattern to narrow the run'
+        type: string
+        required: false
+        default: ''
+
+concurrency:
+  group: e2e-flow-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-flow:
+    name: E2E flow specs (live stack)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      CENA_TEST_PROBE_TOKEN: dev-only-test-probe-token-do-not-ship
+      FIREBASE_EMU_HOST: localhost:9099
+      E2E_FLOW_BASE_URL: http://localhost:5175
+      E2E_ADMIN_SPA_URL: http://localhost:5174
+      E2E_STUDENT_API_URL: http://localhost:5050
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── 1. Stack up ────────────────────────────────────────────────────
+      - name: Boot docker compose dev stack
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.app.yml up -d --wait
+          docker ps --format 'table {{.Names}}\t{{.Status}}'
+
+      - name: Seed Firebase emulator users
+        run: |
+          docker exec cena-firebase-emulator /seed/seed-dev-users.sh
+
+      - name: Seed Marten from Firebase
+        run: ./scripts/seed-marten-from-firebase.sh
+
+      - name: Verify env vars on student-api
+        run: |
+          docker exec cena-student-api env \
+            | grep -E "CENA_E2E_TRUSTED_REGISTRATION|CENA_TEST_PROBE_TOKEN" \
+            || (echo "::error::Required env vars missing on student-api" && exit 1)
+
+      # ── 2. Endpoint smoke ──────────────────────────────────────────────
+      # Cheap pre-flight: if these don't return the expected codes the
+      # whole run is going to fail anyway, so fail fast with a clear msg.
+      - name: Endpoint pre-flight
+        run: |
+          set -euo pipefail
+          on_first=$(curl -sS -o /dev/null -w "%{http_code}" -X POST \
+            http://localhost:5050/api/auth/on-first-sign-in \
+            -H 'Content-Type: application/json' -d '{"tenantId":"x"}')
+          if [ "$on_first" != "401" ]; then
+            echo "::error::on-first-sign-in expected 401, got $on_first"
+            exit 1
+          fi
+          probe=$(curl -sS -o /dev/null -w "%{http_code}" \
+            "http://localhost:5050/api/admin/test/probe?type=studentProfile&tenantId=x&id=u")
+          if [ "$probe" != "404" ]; then
+            echo "::error::test-probe expected 404, got $probe"
+            exit 1
+          fi
+
+      # ── 3. Playwright + spec run ───────────────────────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: src/student/full-version/package-lock.json
+
+      - name: Install student SPA deps
+        working-directory: src/student/full-version
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: src/student/full-version
+        run: npx playwright install --with-deps chromium
+
+      - name: Determine grep filter
+        id: grep
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "filter=" >> $GITHUB_OUTPUT
+            echo "lane=nightly (full suite)" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.grep }}" ]; then
+            echo "filter=--grep ${{ inputs.grep }}" >> $GITHUB_OUTPUT
+            echo "lane=manual (${{ inputs.grep }})" >> $GITHUB_OUTPUT
+          else
+            # PR / push fast lane: smoke + per-epic flagship + cross-page
+            echo "filter=--grep @auth|@billing|@admin-smoke|@student-smoke|@responsive|@cross-page|@perf|@epic-c|@epic-d|@epic-e|@epic-f|@epic-h|@epic-i|@epic-j|@epic-k|@epic-l" >> $GITHUB_OUTPUT
+            echo "lane=fast (smoke + per-epic flagship)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run e2e-flow specs (${{ steps.grep.outputs.lane }})
+        working-directory: src/student/full-version
+        run: |
+          npx playwright test \
+            --config playwright.e2e-flow.config.ts \
+            --workers=2 \
+            --reporter=list,html \
+            ${{ steps.grep.outputs.filter }}
+
+      # ── 4. Diagnostics on failure ──────────────────────────────────────
+      - name: Capture container logs on failure
+        if: failure()
+        run: |
+          mkdir -p test-results/container-logs
+          for c in cena-student-api cena-actor-host cena-admin-api cena-nats \
+                   cena-postgres cena-firebase-emulator cena-redis cena-sympy-sidecar; do
+            docker logs --tail 500 "$c" > "test-results/container-logs/${c}.log" 2>&1 || true
+          done
+
+      - name: Upload Playwright report (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-html-report-${{ github.run_id }}
+          path: src/student/full-version/test-results/e2e-flow/report/
+          retention-days: 14
+
+      - name: Upload artifacts (per-test traces / screenshots)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts-${{ github.run_id }}
+          path: src/student/full-version/test-results/e2e-flow/artifacts/
+          retention-days: 7
+
+      - name: Upload container logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-logs-${{ github.run_id }}
+          path: src/student/full-version/test-results/container-logs/
+          retention-days: 7
+
+      - name: Stack down (cleanup)
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.app.yml down -v

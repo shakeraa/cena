@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="FirebaseAdmin" Version="3.2.0" />
+    <PackageReference Include="Marten" Version="8.26.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
+    <PackageReference Include="NATS.Net" Version="2.7.3" />
+    <PackageReference Include="NCrontab" Version="3.3.3" />
+    <PackageReference Include="Serilog" Version="4.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="9.0.0" />
+    <PackageReference Include="StackExchange.Redis" Version="2.12.8" />
+    <PackageReference Include="YamlDotNet" Version="16.2.0" />
+    <!-- RDY-064 / ADR-0058: Sentry .NET SDK + Serilog sink. Concrete
+         IErrorAggregator backend. PII scrubbing runs source-layer via
+         IExceptionScrubber BEFORE any event reaches SentrySdk. -->
+    <PackageReference Include="Sentry" Version="6.3.0" />
+    <PackageReference Include="Sentry.Serilog" Version="6.3.0" />
+  </ItemGroup>
+
+  <!-- ADR-0033 OCR cascade runtime deps -->
+  <ItemGroup>
+    <!-- PDF triage (Layer 0) — pure C#, no native bindings -->
+    <PackageReference Include="PdfPig" Version="0.1.9" />
+    <!-- Image preprocessing (Layer 0) + figure cropping (Layer 2c) — pure managed -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.10" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.6" />
+    <!-- gRPC client for the OCR sidecar (Layer 1 + 2b) -->
+    <PackageReference Include="Grpc.Net.Client" Version="2.66.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.28.2" />
+    <PackageReference Include="Grpc.Tools" Version="2.66.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- gRPC stubs generated from the sidecar's proto at build time. Single
+       source of truth: docker/ocr-sidecar/app/ocr.proto. -->
+  <ItemGroup>
+    <Protobuf Include="..\..\..\docker\ocr-sidecar\app\ocr.proto"
+              GrpcServices="Client"
+              ProtoRoot="..\..\..\docker\ocr-sidecar\app\"
+              Link="Ocr\Grpc\ocr.proto" />
+  </ItemGroup>
+
+</Project>

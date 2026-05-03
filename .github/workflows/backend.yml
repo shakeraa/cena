@@ -1,0 +1,100 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/actors/**', 'src/api/**', 'src/shared/**', 'src/emulator/**']
+  pull_request:
+    branches: [main]
+    paths: ['src/actors/**', 'src/api/**', 'src/shared/**', 'src/emulator/**']
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: |
+          dotnet restore src/actors/Cena.Actors.Host/Cena.Actors.Host.csproj
+          dotnet restore src/api/Cena.Api.Host/Cena.Api.Host.csproj
+          dotnet restore src/api/Cena.Admin.Api/Cena.Admin.Api.csproj
+          dotnet restore src/api/Cena.Student.Api.Host/Cena.Student.Api.Host.csproj
+          dotnet restore src/emulator/Cena.Emulator.csproj
+          dotnet restore src/actors/Cena.Actors.Tests/Cena.Actors.Tests.csproj
+          dotnet restore src/api/Cena.Admin.Api.Tests/Cena.Admin.Api.Tests.csproj
+          dotnet restore src/shared/Cena.Infrastructure.Tests/Cena.Infrastructure.Tests.csproj
+
+      - name: Restore .NET tools
+        run: dotnet tool restore
+
+      - name: Build (Release)
+        run: |
+          dotnet build src/actors/Cena.Actors.Host/ -c Release --no-restore
+          dotnet build src/api/Cena.Api.Host/ -c Release --no-restore
+          dotnet build src/api/Cena.Admin.Api/ -c Release --no-restore
+          dotnet build src/api/Cena.Admin.Api.Host/ -c Release --no-restore
+          dotnet build src/api/Cena.Student.Api.Host/ -c Release --no-restore
+          dotnet build src/emulator/ -c Release --no-restore
+          dotnet build src/actors/Cena.Actors.Tests/ -c Release --no-restore
+          dotnet build src/api/Cena.Admin.Api.Tests/ -c Release --no-restore
+          dotnet build src/shared/Cena.Infrastructure.Tests/ -c Release --no-restore
+
+      - name: Assert OpenAPI specs generated (PRR-438 regression gate)
+        # The Admin.Api.Host + Student.Api.Host csproj files have a
+        # post-build `dotnet swagger tofile` target that writes openapi.json
+        # to bin/Release/net9.0/. If the host cannot boot (swagger-gen
+        # crash, SIGABRT, startup dependency that cannot degrade in
+        # Release-sans-Postgres) the file will not exist. Fail the CI run
+        # loudly instead of silently uploading an empty artifact.
+        run: |
+          for f in "src/api/Cena.Admin.Api.Host/bin/Release/net9.0/openapi.json" \
+                   "src/api/Cena.Student.Api.Host/bin/Release/net9.0/openapi.json"; do
+            if [ ! -s "$f" ]; then
+              echo "::error::$f missing or empty — swagger-gen post-build target failed"
+              exit 1
+            fi
+            if ! grep -q '"openapi"' "$f"; then
+              echo "::error::$f does not contain an openapi root key — likely malformed"
+              exit 1
+            fi
+          done
+
+      - name: Run Actor Tests
+        run: dotnet test src/actors/Cena.Actors.Tests/ -c Release --no-build --logger "trx;LogFileName=actors.trx"
+
+      - name: Run Admin API Tests
+        run: dotnet test src/api/Cena.Admin.Api.Tests/ -c Release --no-build --logger "trx;LogFileName=admin-api.trx"
+
+      - name: Run Infrastructure Tests (incl. SQLi regression suite)
+        run: dotnet test src/shared/Cena.Infrastructure.Tests/ -c Release --no-build --logger "trx;LogFileName=infrastructure.trx"
+
+      - name: Check for vulnerable packages
+        run: |
+          dotnet list src/actors/Cena.Actors.Host/ package --vulnerable --include-transitive 2>&1 | tee vuln.txt
+          dotnet list src/api/Cena.Api.Host/ package --vulnerable --include-transitive 2>&1 | tee -a vuln.txt
+          dotnet list src/api/Cena.Admin.Api/ package --vulnerable --include-transitive 2>&1 | tee -a vuln.txt
+          dotnet list src/emulator/ package --vulnerable --include-transitive 2>&1 | tee -a vuln.txt
+          if grep -q "has the following vulnerable packages" vuln.txt; then
+            echo "::warning::Vulnerable packages detected — see vuln.txt for details"
+          fi
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: '**/*.trx'
+
+      - name: Upload OpenAPI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-specs
+          path: |
+            src/api/Cena.Student.Api.Host/bin/Release/net9.0/openapi.json
+            src/api/Cena.Admin.Api.Host/bin/Release/net9.0/openapi.json

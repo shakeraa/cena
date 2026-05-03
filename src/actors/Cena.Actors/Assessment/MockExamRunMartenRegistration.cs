@@ -1,0 +1,81 @@
+// =============================================================================
+// Cena Platform — Mock-exam (Bagrut שאלון playbook) Marten registration
+//
+// Activates the orphan exam-simulation scaffolding (ExamFormat,
+// ExamSimulationState, ExamSimulationStarted_V1 / Submitted_V2) by registering
+// the document + events with Marten. Bounded-context owns its own
+// registration so cross-cutting MartenConfiguration.cs stays under the
+// 500-LOC ratchet (ADR-0012).
+//
+// Storage shape:
+//   * ExamSimulationState — keyed on SimulationId (the runId). Single row per
+//     run; mutated as the student progresses (PartB selection, answers,
+//     visibility events, submission). Append-only events on the student
+//     stream provide the durable audit trail; the doc is the read model.
+//   * Events appended to the student stream so a future Marten replay can
+//     reconstruct any historical run.
+//
+// ADR alignment:
+//   * ADR-0043 — every item the runner serves goes through
+//     ExamSimulationDelivery.AssertDeliverable so raw Ministry text never
+//     leaks. Enforced at the endpoint layer, not here.
+//   * ADR-0048 / GD-004 — runner UI must not carry streak / loss-aversion
+//     copy. Enforced by the ship-gate scanner + spec assertions, not here.
+//   * ADR-0002 — grading uses ICasRouterService. The grader is the only
+//     correctness oracle; LLM never decides correctness.
+// =============================================================================
+
+using Cena.Actors.Events;
+using Cena.Infrastructure.Documents;
+using Marten;
+
+namespace Cena.Actors.Assessment;
+
+public static class MockExamRunMartenRegistration
+{
+    public static void RegisterMockExamRunContext(this StoreOptions opts)
+    {
+        // Document: ExamSimulationState keyed on SimulationId.
+        // Identity is set explicitly because the class predates Marten convention
+        // (it has SimulationId, not Id).
+        opts.Schema.For<ExamSimulationState>().Identity(s => s.SimulationId);
+
+        // Phase 1B: per-paper structure catalog. Keyed by composite
+        // "{examCode}/{paperCode}" so per-paper lookup is a 1-row LoadAsync.
+        opts.Schema.For<BagrutPaperStructureDocument>().Identity(d => d.Id);
+
+        // PRR-291 — cohort fairness frozen pool. Keyed on
+        // "{paperCode}|{windowStartUtc:yyyy-MM-ddTHH}". First start in a
+        // window seeds the pool; subsequent starts in the same window
+        // load the row and reuse the frozen PartA/PartB lists verbatim.
+        opts.Schema.For<BagrutPaperRunPool>()
+            .Identity(d => d.Id)
+            .Index(d => d.PaperCode)
+            .Index(d => d.WindowStart);
+
+        // Phase 2A: multi-part Bagrut questions (a/b/c sub-parts with
+        // per-subpart canonical answers + point weights).
+        opts.Schema.For<BagrutMultipartQuestion>()
+            .Identity(d => d.Id)
+            .Index(d => d.Subject)
+            .Index(d => d.Topic);
+
+        // PRR-322 — per-run cost telemetry doc. Keyed on runId; written
+        // once by SubmitAsync. Indexed on ExamCode + ComputedAt so the
+        // admin dashboard's daily-rollup + per-exam-code filter queries
+        // hit indexes instead of full-scanning the JSONB column.
+        opts.Schema.For<MockExamRunCost>()
+            .Identity(d => d.Id)
+            .Index(d => d.ExamCode)
+            .Index(d => d.ComputedAt);
+
+        // Events on the student stream so audit replay reconstructs runs.
+        opts.Events.AddEventType<ExamSimulationStarted_V1>();
+        opts.Events.AddEventType<ExamSimulationSubmitted_V2>();
+        opts.Events.AddEventType<ExamSimulationItemDelivered_V1>();
+        opts.Events.AddEventType<ExamVisibilityWarning_V1>();
+        // PRR-283 — per-answer audit so subpart-level interaction is
+        // recoverable from the stream.
+        opts.Events.AddEventType<ExamSimulationAnswerSubmitted_V1>();
+    }
+}

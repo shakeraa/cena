@@ -1,0 +1,129 @@
+# =============================================================================
+# Cena Platform — Actor-host deployment for k3d capacity validation (PRR-430)
+#
+# Real Proto.Cluster wiring with KubernetesProvider. The deployment has
+# replicas: 2 so ClusterProvider partition/identity placement actually has
+# something to rebalance across. The ServiceAccount + RoleBinding give the
+# pods read access to the other pods in the namespace so the Kubernetes
+# provider can enumerate cluster members.
+#
+# Apply with: kubectl apply -f tests/load/actor-host-deployment.yaml
+# Observe:    kubectl get pods -w
+# Scale:      kubectl scale deployment/cena-actor-host --replicas=3
+# =============================================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cena-capacity
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cena-actor-host
+  namespace: cena-capacity
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cena-actor-host-pods-read
+  namespace: cena-capacity
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "endpoints"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cena-actor-host-pods-read
+  namespace: cena-capacity
+subjects:
+  - kind: ServiceAccount
+    name: cena-actor-host
+    namespace: cena-capacity
+roleRef:
+  kind: Role
+  name: cena-actor-host-pods-read
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cena-actor-host
+  namespace: cena-capacity
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cena-actor-host
+  template:
+    metadata:
+      labels:
+        app: cena-actor-host
+    spec:
+      serviceAccountName: cena-actor-host
+      containers:
+        - name: actor-host
+          image: k3d-cena-capacity-registry:5000/cena-actor-host:dev
+          imagePullPolicy: Always
+          env:
+            - name: CENA_CLUSTER_PROVIDER
+              value: "Kubernetes"
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - containerPort: 5119
+              name: metrics
+            - containerPort: 8080
+              name: remote-actor
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 5119
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 5119
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cena-actor-host
+  namespace: cena-capacity
+spec:
+  type: NodePort
+  selector:
+    app: cena-actor-host
+  ports:
+    - name: metrics
+      port: 5119
+      targetPort: metrics
+      nodePort: 30119
+    - name: remote-actor
+      port: 8080
+      targetPort: remote-actor
+      nodePort: 30080

@@ -1,0 +1,74 @@
+# =============================================================================
+# Ship-gate rule pack: effect-size citations (ADR-0049 / prr-042)
+# =============================================================================
+# Source:  docs/adr/0049-citation-integrity-effect-size-communication.md
+# Policy:  Every effect-size claim in UI copy, admin copy, feature specs, or
+#          marketing surfaces must be backed by a citation_id= reference
+#          resolvable against contracts/citations/approved-citations.yml.
+#
+# These are the REGEX rules — they flag bare ES claims that lack a
+# citation_id tag. The companion cross-reference scanner
+# (scripts/shipgate/citation-integrity-scan.mjs) validates each citation_id
+# against the manifest.
+#
+# Rule shape: see banned-citations.yml header.
+# =============================================================================
+
+rules:
+  # --------------------------------------------------------------------------
+  # Bare "d = 0.xx" without a citation tag
+  # --------------------------------------------------------------------------
+  - id: es-bare-d-value
+    reason: "Bare effect-size 'd=N.NN' without citation_id= tag (ADR-0049)"
+    near:
+      a: "\\bd\\s*=\\s*[0-9]+\\.[0-9]+"
+      b: "^(?!.*citation_id\\s*=).*$"
+    flags: i
+
+  - id: es-bare-d-of
+    reason: "Bare effect-size 'd of N.NN' without citation_id= tag (ADR-0049)"
+    near:
+      a: "\\bd\\s+of\\s+[0-9]+\\.[0-9]+"
+      b: "^(?!.*citation_id\\s*=).*$"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # "effect size N.NN" without citation
+  # --------------------------------------------------------------------------
+  - id: es-bare-effect-size
+    reason: "Bare 'effect size N.NN' claim without citation_id= tag (ADR-0049)"
+    near:
+      a: "effect\\s+size\\s+(of\\s+)?[0-9]+\\.[0-9]+"
+      b: "^(?!.*citation_id\\s*=).*$"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # "ES of N.NN" / "ES N.NN" without citation
+  # --------------------------------------------------------------------------
+  - id: es-bare-es-abbrev
+    reason: "Bare 'ES N.NN' / 'ES of N.NN' without citation_id= tag (ADR-0049)"
+    near:
+      a: "\\bES\\s+(of\\s+)?[0-9]+\\.[0-9]+"
+      b: "^(?!.*citation_id\\s*=).*$"
+    flags: ""
+
+  # --------------------------------------------------------------------------
+  # Cohen's d references without citation
+  # --------------------------------------------------------------------------
+  - id: es-bare-cohen-d
+    reason: "Bare 'Cohen's d = N.NN' without citation_id= tag (ADR-0049)"
+    near:
+      a: "Cohen'?s?\\s+d\\s*=\\s*[0-9]+\\.[0-9]+"
+      b: "^(?!.*citation_id\\s*=).*$"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # Percentage-gain claims framed as research effect size
+  # "N% improvement", "N% boost in learning/achievement/retention"
+  # --------------------------------------------------------------------------
+  - id: es-bare-percent-improvement
+    reason: "Bare 'N% improvement/boost in learning/achievement/retention' without citation_id= tag (ADR-0049)"
+    near:
+      a: "\\d{1,3}\\s*%\\s+(improvement|boost|gain|increase)\\s+in\\s+(learning|achievement|retention|mastery|scores?)"
+      b: "^(?!.*citation_id\\s*=).*$"
+    flags: i

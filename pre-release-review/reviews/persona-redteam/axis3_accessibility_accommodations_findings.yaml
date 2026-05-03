@@ -1,0 +1,123 @@
+doc_path: pre-release-review/axis3_accessibility_accommodations_findings.md
+reviewer: persona-redteam
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight accessibility features (subitizing, number line, digital graph paper,
+  ADHD session builder, color-blind palette, MathML/TTS, Arabic RTL renderer,
+  anxiety-reducing UI). Mostly client-side rendering with low server surface,
+  but F6 (MathML pipeline) and F7 (Arabic RTL math) touch the LaTeX renderer —
+  a known XSS sink — and F3 (digital graph paper) stores student sketches.
+system_purpose_fit: 4
+  rationale:
+    - A11y features are mostly safe client-side work
+    - KaTeX/MathML pipeline is historically an XSS hotspot (\href, \url, \input)
+    - Graph-paper sketch storage is a new upload channel if not carefully scoped
+code_reality_check:
+  claims_verified_in_code:
+    - "LaTeXSanitizer exists and is used on OCR output -> src/shared/Cena.Infrastructure/Security/LaTeXSanitizer.cs; src/api/Cena.Student.Api.Host/Endpoints/PhotoUploadEndpoints.cs:194"
+    - "Photo upload magic-byte + content-type validation -> src/api/Cena.Student.Api.Host/Endpoints/PhotoUploadEndpoints.cs:222-239"
+  claims_contradicted_by_code:
+    - "Doc F6 implies MathML comes from a trusted source; in reality OCR cascade feeds extracted LaTeX which must always be sanitized -> src/shared/Cena.Infrastructure/Security/LaTeXSanitizer.cs"
+  claims_unverifiable:
+    - "F3 sketch storage format (PNG/SVG?) — SVG would open XXE / script injection"
+adr_alignment:
+  honored:
+    - ADR-0033 (OCR stack) — F6/F7 read from the same cascade
+  violated: []
+  missing_adr_needed:
+    - "Student-authored graphical artifact (sketch) sanitizer policy — SVG vs PNG-only decision needs ADR if SVG is on the table"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F3 Digital Graph Paper "stores student sketches". If the sketch format
+      is SVG (common for vector math), an attacker can upload SVG with
+      <script> or external entities, which then execute inside the teacher
+      console when rendered. Doc is silent on format constraints; must be
+      PNG/JPEG-only raster, or SVG through a strict sanitizer (DOMPurify with
+      SVG profile) and never inline-injected into teacher or peer views.
+    evidence: pre-release-review/axis3_accessibility_accommodations_findings.md Feature 3
+    lens_note: SVG uploads are the #1 forgotten XSS vector in EdTech.
+  - severity: P1
+    finding: |
+      F6 MathML-native screen reader pipeline proposes rendering author-
+      supplied MathML. MathML `<annotation-xml encoding="text/html">` blocks
+      allow raw HTML injection into the DOM via some browsers. Pipeline must
+      emit SpokenMath labels, not accept untrusted MathML from students or
+      ingestion. Doc treats MathML as inherently safe; not true.
+    evidence: pre-release-review/axis3_accessibility_accommodations_findings.md Feature 6
+    lens_note: Same pattern as LaTeX injection; LaTeXSanitizer covers LaTeX, not MathML.
+  - severity: P1
+    finding: |
+      F7 Arabic RTL math renderer. The existing LaTeXSanitizer strips most
+      command-injection vectors but has not been audited for Arabic/Hebrew
+      Unicode direction-override spoofs (U+202E RLO, U+2067 RLI) that can
+      make a rendered formula look different from what the CAS evaluated.
+      This is an OCR→CAS→render inconsistency attack where a student sees
+      "1+1=2" but CAS accepted "1+1=3".
+    evidence: pre-release-review/axis3_accessibility_accommodations_findings.md Feature 7; src/shared/Cena.Infrastructure/Security/LaTeXSanitizer.cs
+    lens_note: RTL bidi attacks are documented CVEs in other renderers (Trojan Source 2021).
+  - severity: P2
+    finding: |
+      F8 "predictable UI" includes "configurable animation speeds" stored per
+      user. Preferences endpoint is a known IDOR target — confirm settings
+      endpoints enforce owner check, not just auth.
+    evidence: pre-release-review/axis3_accessibility_accommodations_findings.md Feature 8
+    lens_note: Boring but almost always missed in accommodation features.
+already_built:
+  - feature: LaTeX sanitizer applied on OCR cascade output
+    evidence: src/api/Cena.Student.Api.Host/Endpoints/PhotoUploadEndpoints.cs:194
+    note: Must also apply on any student-authored LaTeX entry channel introduced by F6/F7.
+  - feature: Magic-byte file validation on photo upload
+    evidence: src/api/Cena.Student.Api.Host/Endpoints/PhotoUploadEndpoints.cs:222
+    note: Reusable pattern for any new sketch/upload endpoint F3 would add.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-010 Arabic RTL / FD-013 mother-tongue hints overlap with F7"
+extracted_tasks:
+  - title: Forbid SVG uploads in student-authored sketch endpoints (PNG raster only)
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Any new endpoint introduced by F3 Digital Graph Paper must accept PNG
+      only, verified by magic bytes (0x89 50 4E 47). No SVG, no HTML.
+      Piggyback on the existing PhotoUploadEndpoints validator.
+      ## Files
+      - New sketch upload endpoint (future)
+      - Reuse: src/api/Cena.Student.Api.Host/Endpoints/PhotoUploadEndpoints.cs VerifyMagicBytes
+      ## Definition of Done
+      - [ ] Magic-byte check rejects SVG / HTML / XML
+      - [ ] Content-type whitelist excludes image/svg+xml
+      - [ ] Test: SVG payload with <script> is rejected at boundary
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L95-L180]
+  - title: Audit LaTeXSanitizer for bidi-override (U+202E, U+2066-2069) spoofs
+    priority: P1
+    estimate: S
+    suggested_assignee: claude-subagent-sec
+    queue_body: |
+      ## Goal
+      Verify LaTeXSanitizer strips/normalizes Unicode directional-override
+      characters so RTL-math render cannot disagree with CAS evaluation.
+      ## Files
+      - src/shared/Cena.Infrastructure/Security/LaTeXSanitizer.cs
+      - new golden tests under src/shared/Cena.Infrastructure.Tests
+      ## Definition of Done
+      - [ ] Test: input containing U+202E is stripped or normalized
+      - [ ] Test: CAS-evaluated string matches the render output byte-for-byte
+      - [ ] ADR-0033 cross-ref updated if behaviour changes
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-sec --result "<branch>"
+    source_doc_lines: [L240-L340]
+verdict: revise
+verdict_reason: |
+  A11y features are pedagogically fine but the doc understates three injection
+  vectors (SVG, MathML, bidi). Two P1 tasks + one P2 owner-check audit before
+  ship.
+cross_lens_handoff:
+  - to: persona-a11y
+    about: Layla owns the actual RTL / MathML correctness; red-team only flags the attack surface
+  - to: persona-privacy
+    about: Sketch storage retention — student-authored artifacts inherit ADR-0003 or need their own policy

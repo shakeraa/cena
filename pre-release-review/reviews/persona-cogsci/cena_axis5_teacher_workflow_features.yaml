@@ -1,0 +1,194 @@
+doc_path: pre-release-review/cena_axis5_teacher_workflow_features.md
+reviewer: persona-cogsci
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight teacher-workflow features: smart lesson planner, homework auto-generator,
+  in-class diagnostic sprint, exit ticket generator, Bagrut rubric alignment,
+  conference-prep talking points, class health pulse, Bagrut-readiness tracker.
+  Primarily operational/workflow — limited direct cogsci claims to adjudicate.
+system_purpose_fit: 3
+  rationale:
+    - F3 (diagnostic sprint) and F4 (exit ticket) are formative-assessment features
+      with strong classical cogsci warrants (Black & Wiliam 1998).
+    - F1, F2 surface class weakness profiles; the "common error" aggregation must
+      not slide into cross-session misconception retention (ADR-0003).
+    - F7 privacy-preserving class health pulse matches cogsci principles on
+      glanceability/simplicity for teacher sensemaking.
+code_reality_check:
+  claims_verified_in_code:
+    - "Error classification / MisconceptionCatalog already exists -> docs/adr/0031-error-pattern-matching-approach.md:31-42"
+    - "Session-scoped state model (LearningSessionState) -> docs/adr/0003-misconception-session-scope.md:49-52"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "'Weekly Planning Hours: 10→6 (-40%)' EJ1475735 2024 — Dr. Rami-style citation check: needs full title/author. Doc lists only ID."
+    - "Abu-Raya & Olsher 2021 STEP platform: verified in principle (DOI 10.1007/s40751-024-00148-7)."
+  claims_unsupported_in_literature:
+    - "F2 claims 2-week retention of per-student misconception profiles is ADR-0003 compliant (axis5:86). It is not — ADR-0003 scopes misconception data to *session*, not 2 weeks. This is a direct misread of the ADR."
+adr_alignment:
+  honored:
+    - ADR-0002 (F5 Bagrut rubric runs downstream of CAS)
+    - ADR-0026 (implied — model routing for homework generation)
+  violated:
+    - "ADR-0003: F2 Homework Auto-Generator proposes 'Student level is recalculated weekly; historical misconception tags are not retained beyond 2 weeks' — ADR-0003 says session, not 2 weeks. Violation even if sub-lethal. Must be re-scoped to session-only, with weekly *aggregate mastery* recomputed from fresh session data, not retained error tags."
+  missing_adr_needed:
+    - "F1/F2 'ClassWeaknessProfile' aggregate: is it a new aggregate root (ADR-0012)? Needs decomposition ADR confirming it is derived view, not an event-sourced aggregate carrying misconception state."
+non_negotiable_violations:
+  - "3 (no misconception retention): F2 axis5:86 '2-week retention' of misconception tags. Must reduce to session-only before ship."
+persona_findings:
+  - severity: P0
+    finding: |
+      F2 (Homework Auto-Generator) explicitly proposes retaining per-student
+      "misconception tags" for up to 2 weeks (axis5:86) as its ADR-0003 mitigation.
+      ADR-0003 says session. 2-week retention is a first-order policy violation
+      regardless of intent. Either (a) regenerate the "level" each week purely
+      from fresh session summary mastery (no error-type data leaves the session),
+      or (b) supersede ADR-0003 via explicit new ADR with privacy-counsel review —
+      but that requires a COPPA/PPL re-review and is unlikely to pass.
+    evidence: cena_axis5_teacher_workflow_features.md:85-87
+    lens_note: |
+      Misconception data is the exact attribute class ADR-0003 protects. The
+      Edmodo/FTC 2023 precedent cited in ADR-0003 was specifically about derived
+      ML/labels of children's error patterns. A 2-week retention, even for a
+      "profile", puts the product in the same class of regulatory risk.
+  - severity: P1
+    finding: |
+      F1 (Smart Lesson Planner) generates lesson plans from "class weakness
+      profiles". If those profiles are aggregate per-topic accuracy (mastery
+      snapshot), they are ADR-0003-clean. If they include error-type frequencies
+      ("distractor X was chosen 40% of the time"), they are close enough to
+      misconception data to require the same scoping. Doc is ambiguous (axis5:47).
+      Must be disambiguated in DoD: aggregate accuracy yes, distractor-choice
+      frequency no.
+    evidence: cena_axis5_teacher_workflow_features.md:47-52
+    lens_note: |
+      The doc's "common errors without naming students" mitigation doesn't
+      address the category question — class-level error-type aggregation is
+      still the attribute ADR-0003 excludes from long retention.
+  - severity: P1
+    finding: |
+      F3 (In-Class Diagnostic Sprint) claims "results appear as an anonymous
+      aggregate histogram" (axis5:95), and the doc correctly says "aggregate data
+      does not retain individual responses beyond the session" (axis5:122). This
+      is cogsci-sound formative assessment (Black & Wiliam). The warrant for the
+      STEP-platform evidence (Abu-Raya & Olsher) specifically *Israeli* contexts
+      strengthens the claim. SHIP as-is.
+    evidence: cena_axis5_teacher_workflow_features.md:92-124
+    lens_note: |
+      Strongest formative-assessment feature in the doc from the cogsci lens.
+  - severity: P2
+    finding: |
+      F4 (Exit Ticket Auto-Generator) proposes sharing per-student results with
+      students as "You mastered X / You might want to review Y" (axis5:131). This
+      is a "bare confidence prompt" anti-pattern (Klar et al. 2023 on confidence
+      prompts without feedback support) — a terse sentence without scaffolded
+      follow-up does not produce learning gains and risks negative self-talk for
+      struggling students. Pair every "you might want to review Y" with an
+      immediate 1-tap action ("Try a warm-up on Y"), or don't ship that feature
+      fragment.
+    evidence: cena_axis5_teacher_workflow_features.md:131
+    lens_note: |
+      Mechanism: the student receives an evaluation but no scaffold. This is
+      exactly the bare-prompts failure mode in the metacog literature.
+  - severity: P2
+    finding: |
+      F8 (Bagrut-Readiness Tracker) color-codes per-student readiness (green/yellow/red)
+      for target unit (axis5:273). Cogsci note: the doc's own mitigation ("teacher-
+      facing only; no student-facing labels") is correct — red-tagging a 12-18-year-old
+      for "significant gap" is a stereotype-threat amplifier even if the student
+      never sees it (teacher behavior follows the label). Consider: (a) use a
+      "progress to target" percentage only, no traffic-light; (b) tooltip must
+      explain the gap concretely, avoiding global ability language.
+    evidence: cena_axis5_teacher_workflow_features.md:273
+    lens_note: |
+      Pygmalion-effect / stereotype-threat-adjacent consideration. Small UI
+      choice, non-trivial downstream impact.
+already_built:
+  - feature: "Error-type taxonomy (inputs to F1/F2 class weakness profile)"
+    evidence: docs/adr/0031-error-pattern-matching-approach.md:31-42 (MisconceptionCatalog, ErrorPatternMatcherEngine)
+    note: "The classifier exists. Tasks must leverage it and respect its session-scoped outputs."
+  - feature: "Session aggregate state (LearningSessionState)"
+    evidence: docs/adr/0003-misconception-session-scope.md:49-52
+    note: "F1/F2 'class weakness' must aggregate from session-scoped results, not retained labels."
+duplicates_of_other_docs:
+  - "AXIS_6_Assessment_Feedback_Research.md: F1 Formative-Summative Split pairs with F3 here"
+  - "axis9_data_privacy_trust_mechanics.md: Differential privacy features overlap F7 class health pulse"
+  - "feature-discovery-2026-04-20.md: FD-019 Mashov sync = AXIS_10 overlap, not axis5-specific"
+extracted_tasks:
+  - title: "Reduce F2 Homework Auto-Generator retention to session-only"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Rewrite F2's data model so "student level" is derived week-over-week from
+      aggregate mastery snapshots (allowed; matches F1 lesson planner) rather
+      than from retained misconception tags (2-week retention banned by ADR-0003).
+
+      ## Files
+      - Edit pre-release-review/cena_axis5_teacher_workflow_features.md F2 guardrail tension and data-model sections.
+      - Reference ADR-0003 explicitly.
+
+      ## Definition of Done
+      - Doc updated.
+      - SYNTHESIS.md flags this as a required revision before any queue task is enqueued.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-f2-retention-fix"
+    source_doc_lines: [L85-L87]
+  - title: "Ship F3 In-Class Diagnostic Sprint (session-aggregated histogram)"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Teacher-launched 3-5 question micro-assessment pushed to student devices;
+      aggregate histogram displays within 90s; results session-scoped (Redis).
+
+      ## Files
+      - src/actors/Cena.Actors/Classroom/DiagnosticSprint.cs (new)
+      - src/teacher-web/src/features/diagnostic-sprint/*.vue (new)
+
+      ## Definition of Done
+      - No individual response retained post-session.
+      - WebSocket fan-out tested for 30+ students.
+      - Distractor-most-chosen shown in aggregate only.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-diagnostic-sprint"
+    source_doc_lines: [L92-L124]
+  - title: "F4 Exit Ticket: pair every 'you might review Y' with 1-tap practice"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Student-facing post-exit-ticket UI must always offer immediate scaffolded
+      practice, never a bare evaluation sentence. Reviews must be opt-in.
+
+      ## Files
+      - src/student-web/src/features/exit-ticket/*.vue
+      - Copy review with Dr. Kenji persona (cogsci) for warm, actionable framing.
+
+      ## Definition of Done
+      - No terminal "you might want to review X" without practice CTA.
+      - Student can skip the review suggestion.
+      - No comparison to class average.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-exit-ticket-scaffold"
+    source_doc_lines: [L128-L160]
+verdict: revise
+verdict_reason: |
+  From the cogsci lens only F3, F4, (and F7's glanceability claim) are primary
+  evaluations. F2 violates ADR-0003 on retention and must be fixed before
+  anything ships. F3 ships. F4 ships with scaffolded action. Other features
+  hand off to enterprise / ministry / privacy lenses.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "F1, F2, F6, F7, F8 all touch student data aggregation at the teacher surface. Primary handoff."
+  - to: persona-ministry
+    about: "F5 Bagrut Rubric Alignment — does encoding official Ministry rubrics trigger any reference-only constraint?"
+  - to: persona-enterprise
+    about: "F1 'ClassWeaknessProfile' / F7 'ClassHealthSnapshot' aggregate-root design (ADR-0012)."
+  - to: persona-ethics
+    about: "F8 readiness traffic-light stereotype-threat risk."

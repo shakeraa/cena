@@ -1,0 +1,100 @@
+# TASK-PRR-148: Student-input UI for AdaptiveScheduler (deadline + weekly time budget)
+
+**Superseded-By**: PRR-217 + PRR-218 + PRR-219 + PRR-234 (EPIC-PRR-F). ADR-0050
+establishes the multi-target `StudentPlan` aggregate; the single-target
+`StudentPlanConfig` VO this task shipped is replaced by `ExamTarget`
+records, and the `/api/me/study-plan` endpoints are replaced by
+`/api/me/exam-targets`. Legacy events (`ExamDateSet_V1`,
+`WeeklyTimeBudgetSet_V1`) remain on the stream for backward compat
+during the prr-219 migration window. The single-target
+`StudentPlanConfig` VO is retained only as the internal projection shim
+between the multi-target aggregate and the prr-149 scheduler bridge
+until PRR-220 catalog lands; at that point the VO can be deleted
+outright (follow-up marker in [StudentPlanConfig.cs](../../../src/actors/Cena.Actors/StudentPlan/StudentPlanConfig.cs)).
+
+**Superseded-On**: 2026-04-21 via commit `claude-subagent-wave1a/prr-218-219-234-aggregate-migration`
+
+**Priority**: P1 — strongly-recommended pre-launch (lens consensus: 2)
+**Effort**: M — 1-2 weeks
+**Lens consensus**: persona-educator, persona-enterprise
+**Source docs**: `axis1_pedagogy_mechanics_cena.md:L40`, `retired.md R-01` (user decision 2026-04-20)
+**Assignee hint**: kimi-coder
+**Tags**: source=pre-release-review-2026-04-20, lens=educator, cluster=scheduler-wiring, superseded
+**Status**: Superseded — 2026-04-21 (marked Done 2026-04-20, but DoD #1 never met; see ADR-0050 §Context)
+**Source**: R-01 walk-through (Adaptive Interleaving Scheduler) — 2026-04-20 user-surfaced wiring gap
+**Tier**: mvp
+**Epic**: EPIC-PRR-A (originally) → EPIC-PRR-F (superseding epic)
+
+---
+
+## Goal
+`SchedulerInputs` (src/actors/Cena.Actors/Mastery/AdaptiveScheduler.cs) has fields for `DeadlineUtc` and `WeeklyTimeBudget` but no UI captures them. Only `MotivationProfile` is set, via RDY-057 onboarding. Add a student-facing settings form (onboarding + editable later) that captures exam date + weekly time commitment, persists them into whatever aggregate owns student plan config, and makes them available to the scheduler at session-start time.
+
+## Files
+- `src/student/full-version/src/views/apps/onboarding/ExamPlanStep.vue` (new onboarding step)
+- `src/student/full-version/src/views/apps/settings/StudyPlanSettings.vue` (editable later)
+- `src/actors/Cena.Actors/Students/StudentPlanConfig.cs` (new VO; lives on StudentActor or its successor aggregate post ADR-0012 — coordinate with prr-002)
+- `src/actors/Cena.Actors/Students/StudentActor.Commands.cs` (SetStudyPlanConfig command handler)
+- API endpoint + validator (deadline must be future, weekly budget must be 1-40h)
+- Tests: happy path, boundary conditions, locale-correct date picker for he/ar
+
+## Definition of Done
+- Student can set exam date + weekly time budget during onboarding and edit from settings.
+- Values persist and flow into `SchedulerInputs` at session start.
+- `StudyPlanSettings.vue` renders RTL-correct with `<bdi dir="ltr">` wrapping dates/numerics.
+- E2E test covers onboarding → settings edit → scheduler consuming the new values.
+- Full Cena.Actors.sln builds cleanly.
+
+## Reporting
+complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+
+---
+
+## Non-negotiable references
+- ADR-0001 (tenant isolation)
+- ADR-0012 (StudentActor split — see prr-002; this new VO must live on the correct successor aggregate)
+
+## Implementation Protocol — Senior Architect
+
+Implementation of this task must be driven by a senior-architect mindset, not a checklist. Before writing any code, the implementer (human or agent) must answer both sets of questions in writing — either in a task-comment, the PR description, or a `docs/decisions/` note:
+
+### Ask why
+- **Why does this task exist?** Read the source-doc lines cited above and the persona reviews in `/pre-release-review/reviews/persona-*/` that raised it. If you cannot restate the motivation in one sentence, do not start coding.
+- **Why this priority?** Read the lens-consensus list. Understand which persona lens raised it and what evidence they cited.
+- **Why these files?** Trace the data flow end-to-end. Verify the files listed are the right seams. A bad seam invalidates the whole task.
+- **Why are the non-negotiables above relevant?** Show understanding of how each constrains the solution, not just that they exist.
+
+### Ask how
+- **How does this interact with existing aggregates and bounded contexts?** Name them.
+- **How does it respect tenant isolation (ADR-0001), event sourcing, the CAS oracle (ADR-0002), and session-scoped misconception data (ADR-0003)?**
+- **How will it fail?** What's the runbook at 03:00 on a Bagrut exam morning? If you cannot describe the failure mode, the design is incomplete.
+- **How will it be verified end-to-end, with real data?** Not mocks. Query the DB, hit the APIs, compare field names and tenant scoping — see user memory "Verify data E2E" and "Labels match data".
+- **How does it honor the <500 LOC per file rule, the no-stubs-in-prod rule, and the full `Cena.Actors.sln` build gate?**
+
+### Before committing
+- Full `Cena.Actors.sln` must build cleanly (branch-only builds miss cross-project errors — learned 2026-04-13).
+- Tests cover golden path **and** edge cases surfaced in the persona reviews.
+- No cosmetic patches over root causes. No "Phase 1 stub → Phase 1b real" pattern (banned 2026-04-11).
+- No dark-pattern copy (ship-gate scanner must pass).
+- If the task as-scoped is wrong in light of what you find, **push back** and propose the correction via a task comment — do not silently expand scope, shrink scope, or ship a stub.
+
+### If blocked
+- Fail loudly: `node .agentdb/kimi-queue.js fail <task-id> --worker <you> --reason "<specific blocker, not 'hard'>"`.
+- Do not silently reduce scope. Do not skip a non-negotiable. Do not bypass a hook with `--no-verify`.
+
+### Definition of done is higher than the checklist above
+- Labels match data (UI label = API key = DB column intent).
+- Root cause fixed, not masked.
+- Observability added (metrics, structured logs with tenant/session IDs, runbook entry).
+- Related personas' cross-lens handoffs addressed or explicitly deferred with a new task ID.
+
+**Reference**: full protocol and its rationale live in [`/tasks/pre-release-review/README.md`](../../tasks/pre-release-review/README.md#implementation-protocol-senior-architect) (this section is duplicated there for skimming convenience).
+
+---
+
+## Related
+- [Full synthesis](../../pre-release-review/reviews/SYNTHESIS.md)
+- [Retired proposals](../../pre-release-review/reviews/retired.md) (R-01)
+- [Conflicts needing decision](../../pre-release-review/reviews/conflicts.md)
+- [Canonical task JSON](../../pre-release-review/reviews/tasks.jsonl) (id: prr-148)
+- Sibling wiring tasks: prr-149 (live caller), prr-150 (mentor override), prr-151 (Group-A audit)

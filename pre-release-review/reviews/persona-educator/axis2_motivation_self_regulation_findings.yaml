@@ -1,0 +1,261 @@
+doc_path: pre-release-review/axis2_motivation_self_regulation_findings.md
+reviewer: persona-educator
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 motivation + SRL features: Socratic self-explanation prompts, if-then
+  session planner, wise-feedback engine, non-loss mastery path, confidence
+  check-ins, process-praise, SRL micro-prompts, reflective study plan.
+  Recommends SHIP for F1-F4, SHORTLIST for F5-F7, DEFER F8.
+
+system_purpose_fit: 4
+  rationale:
+    - Motivation/SRL for 16-year-olds preparing for high-stakes Bagrut is
+      arguably the biggest unmet need — the research base the doc cites is
+      strong (Breitwieser 2026 implementation intentions g=0.31, Dignath
+      2008 SRL d=0.69-1.00).
+    - Respects non-negotiable #3 (no dark patterns) — F4 explicitly forbids
+      streaks / decay / fire emojis.
+    - Respects ADR-0003 — all reflection text proposed as ephemeral,
+      stored only as aggregate scores.
+    - Minus one because the proposed "Arabic-cohort sentence starters"
+      and Ramadan-scheduling nuance in F2 is welcome but buried under
+      generic research citations; needs field-validation with actual Arab-
+      Israeli teachers before shipping.
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Self-explanation infrastructure (F1) already exists" -> src/actors/Cena.Actors/Pedagogy/ExplainItBack.cs:20-172
+    - "LLM judge sidecar for coherence scoring pattern exists (RDY-074 Phase 1B)" -> src/actors/Cena.Actors/Pedagogy/LlmJudgeSidecar.cs
+    - "Explanation-cache keyed by (question, errorType, language) — not student — supporting F1/F3 without violating ADR-0003" -> src/actors/Cena.Actors/Services/ExplanationCacheService.cs
+    - "Mastery path (F4) scaffolding" -> src/actors/Cena.Actors/Mastery/MasteryPipeline.cs, src/actors/Cena.Actors/Graph/ (concept graph)
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Wise feedback (F3) — no evidence that error-type-specific feedback templates exist yet; likely new" -> src/actors/Cena.Actors/Services/ErrorClassificationService.cs exists but a *wise-feedback template library* keyed by error type + locale is not apparent.
+    - "If-then planner (F2)" -> no code found; appears to be fully new feature.
+
+adr_alignment:
+  honored:
+    - ADR-0003 — explicit session-locality on self-explanation responses and
+      confidence judgments; aggregate-only for calibration scores.
+    - Ship-gate banned terms — F4 explicitly forbids streaks and loss-
+      aversion, consistent with docs/engineering/shipgate.md.
+  violated: []
+  missing_adr_needed:
+    - Process-praise / feedback-design ADR. Several features (F3 wise
+      feedback, F6 process praise) prescribe feedback-template structure as
+      core product behavior; this should be ADR-locked like ADR-0002 rather
+      than left as per-feature configuration.
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 2 (If-Then Session Planner) uses WhatsApp/SMS reminders. From a
+      classroom teacher's standpoint, the reminder voice matters enormously:
+      IL Bagrut students already get WhatsApp-bombarded by teachers, private
+      tutors, and parents. Another SMS will be silenced within 2 weeks. The
+      doc's framing "Your study time is ready!" is fine copy but insufficient
+      as a design principle. Recommend: bundle the trigger with a *concrete
+      single-problem-preview* ("תרגיל מחכה לך — פונקציה ריבועית, 3 דקות") so
+      the message is *the session*, not a link *to* the session. Reduces
+      intention-action gap by 100%.
+    evidence: axis2_motivation_self_regulation_findings.md:L87-L90
+    lens_note: |
+      Decades of watching students get reminded to study vs. actually study.
+      The gap is always the click. Remove the click.
+  - severity: P1
+    finding: |
+      Feature 5 (Metacognitive Confidence Check-ins) proposes a 3-point
+      pre-problem confidence rating. Klar et al. 2023 (which the doc cites)
+      found high non-compliance with bare prompts. Asking a 16-year-old
+      Bagrut student to rate confidence before *every* problem will cause
+      them to click low/medium/high at random within 3 problems. The prompt
+      should fire ≤1 in 5 problems, and only on flagged "high-leverage"
+      items — otherwise we're training the exact opposite of calibration.
+    evidence: axis2_motivation_self_regulation_findings.md:L181-L217, L212-L214
+    lens_note: |
+      Any prompt a student can auto-dismiss *will* be auto-dismissed. The
+      doc's own mitigation (cite 4 "key is pairing with feedback") isn't
+      enough — frequency control is more important than feedback design.
+  - severity: P1
+    finding: |
+      Feature 3 (Wise Feedback Engine) proposes cultural framing for Arab-
+      speaking students: "Your preparation matters for your future and your
+      community." In Israeli classroom reality, many Arab-Israeli students
+      (especially girls in traditional communities) experience collective-
+      achievement framing as *more* pressure, not less. Yeager's US-
+      African-American research does not automatically transfer. Must
+      field-test with Arab-Israeli teachers before deploying collective-
+      framing variants — default to individual-respect framing ("אתה מסוגל
+      להגיע לזה") as the Hebrew/Arabic baseline.
+    evidence: axis2_motivation_self_regulation_findings.md:L105, L346
+    lens_note: |
+      Cultural sensitivity is not the same as cultural competence. Borrowing
+      the Yeager frame directly into Arab-Israeli context is a research
+      import that needs pedagogue review.
+  - severity: P2
+    finding: |
+      Feature 1 (Socratic Self-Explanation Prompts) — the doc says "mandatory
+      but low-stakes." For an anxious student already self-explaining is
+      cognitively loaded. "Mandatory" language is the wrong commitment — make
+      it the default with a one-tap "skip" that the LLM judge sees and
+      factors into fatigue tracking. ExplainItBack's PromptFatigueGate
+      (src/actors/Cena.Actors/Pedagogy/ExplainItBack.cs:149) already limits
+      to ≤1 prompt/session — the doc should acknowledge that guardrail exists
+      and defer to it rather than proposing mandatory prompts.
+    evidence: axis2_motivation_self_regulation_findings.md:L28, src/actors/Cena.Actors/Pedagogy/ExplainItBack.cs:149-172
+    lens_note: |
+      Prompt fatigue is real. The system already handles it. Don't re-propose.
+  - severity: P2
+    finding: |
+      Feature 7 (SRL Micro-Strategy Prompts) pre/mid/post session triplet is
+      pedagogically beautiful and practically intrusive. A session that's 20
+      minutes gets 3 interruptions plus the learning content. Recommend:
+      pre-session prompt is opt-in weekly (not per session); mid-session
+      prompt fires only when struggle signal detected; post-session prompt is
+      shown only if student completed ≥50% of planned items.
+    evidence: axis2_motivation_self_regulation_findings.md:L263-L302
+    lens_note: |
+      Three prompts in a 20-minute session is the equivalent of a teacher
+      interrupting four times during independent practice. No 16-year-old
+      tolerates that.
+
+already_built:
+  - feature: "Socratic self-explanation prompt (F1)"
+    evidence: src/actors/Cena.Actors/Pedagogy/ExplainItBack.cs (RDY-074 Phase 1A+1B shipped)
+    note: |
+      F1 is ~70% built. The interface, prompt-fatigue gate, LLM-judge sidecar,
+      and rubric category enum (ExplainRubricCategory) already exist. What is
+      missing is the step-level (not problem-level) surface and the
+      structured-sentence-starter UI. Retire F1-from-scratch, extract only
+      the UI/surface sub-task.
+
+duplicates_of_other_docs:
+  - feature-discovery-2026-04-20.md: FD-014 ("Why this problem?" overlaps F3 wise-feedback rationale)
+  - cena_cross_domain_feature_innovation.md: Feature 5 Cena Companion Bot (overlaps F3 tone, F6 process praise)
+  - axis1_pedagogy_mechanics_cena.md: F4 Elaborative Interrogation (overlaps F1)
+  - AXIS_4_Parent_Engagement_Cena_Research.md: Feature 6 Growth-framed encouragement SMS (overlaps F2 reminders)
+
+extracted_tasks:
+  - title: "Add sentence-starter surface to ExplainItBack for L-D/Arabic students"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Add structured sentence-starter buttons ("כי...", "זה דומה ל...", "القاعدة هي...")
+      next to the free-text input in ExplainItBack surface. Reduces language
+      barrier for Arabic-dominant students and executive-function load for LD
+      students. Backend already supports free-text; this is a UI-only task.
+      ## Files
+      - src/student/student-web/src/components/explain-it-back/ (frontend)
+      - src/actors/Cena.Actors/Pedagogy/ExplainItBack.cs (no backend change needed)
+      ## Definition of Done
+      - 6 Hebrew + 6 Arabic sentence starters per rubric category.
+      - Tap-to-insert into the free-text field (students still type the
+        continuation).
+      - Works RTL with <bdi dir="ltr"> for any embedded math.
+      - A11y: keyboard-reachable.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: explain-it-back sentence starters"
+    source_doc_lines: [L27-L61]
+  - title: "Build if-then implementation-intentions planner (F2) with preview reminders"
+    priority: P1
+    estimate: M
+    suggested_assignee: claude-subagent-pedagogy
+    queue_body: |
+      ## Goal
+      Ship a simple end-of-session planner where students set 1-2 if-then
+      plans ("if it's Tuesday 4pm, then I will open Cena and do a 15-minute
+      quadratics set"). Reminders delivered via WhatsApp/SMS must embed a
+      *preview* of the planned first problem, not just a link. Student self-
+      generated plans, not ML-inferred.
+      ## Files
+      - src/actors/Cena.Actors/Students/ (new ImplementationIntentionState.cs)
+      - src/api/Cena.Student.Api.Host/Endpoints/ (new intention endpoints)
+      - src/actors/Cena.Actors/Outreach/ (reminder channel wiring)
+      - src/student/student-web/ (plan form UI)
+      ## Definition of Done
+      - Plan storage is student-scoped (not session-scoped) — plans persist.
+      - Reminder messages include first-problem preview (concept, est time).
+      - Reminder frequency cap: max 1/day/student.
+      - Test: plan + reminder + fire + open-session integration path.
+      - Compliant with ADR-0003 (no misconception tags in plan).
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-pedagogy --result "<branch>: if-then planner"
+    source_doc_lines: [L64-L98]
+  - title: "Wise-feedback template library keyed by error type + locale"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Build a feedback-template library: for each ErrorType (from
+      ErrorClassificationService) x locale (he/ar/en), supply a 2-sentence
+      wise-feedback template (high-standards sentence + assurance sentence).
+      Default to individual-respect framing; no collective-framing variants
+      unless field-tested with Arab-Israeli teachers.
+      ## Files
+      - src/actors/Cena.Actors/Services/ErrorClassificationService.cs
+      - src/actors/Cena.Actors/Services/ (new WiseFeedbackTemplateLibrary.cs)
+      - content/wise-feedback-templates/ (he.json, ar.json, en.json)
+      - docs/adr/ (new ADR: feedback-design-principles)
+      ## Definition of Done
+      - ≥20 error types covered.
+      - All templates reviewed by ≥1 IL classroom teacher per locale.
+      - ADR locks "no collective-achievement framing by default."
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: wise-feedback library"
+    source_doc_lines: [L102-L139]
+  - title: "Throttle confidence check-ins to ≤1 per 5 problems, high-leverage only"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      If F5 confidence calibration is shipped, fire the pre-problem confidence
+      rating on at most 1 of every 5 problems and only on items flagged as
+      "calibration-eligible" (i.e., high-leverage Bagrut concepts where
+      over/under-confidence is known to predict study choices). Reduces
+      non-compliance cascade documented by Klar et al. 2023.
+      ## Files
+      - src/actors/Cena.Actors/Pedagogy/ (new ConfidenceCalibrationGate.cs)
+      - src/actors/Cena.Actors.Tests/Pedagogy/ConfidenceCalibrationGateTests.cs
+      ## Definition of Done
+      - Per-session counter + eligibility flag on items.
+      - Default rate ≤ 1 in 5.
+      - Tests: student is prompted at most once in first 5 items of a session.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: confidence-check-in throttle"
+    source_doc_lines: [L181-L216]
+
+verdict: revise
+verdict_reason: |
+  Strong research base and mostly compliant, but three shipping-level details
+  (reminder preview-vs-link, confidence-check-in frequency, Arab-Israeli
+  cultural framing) need pedagogue revision before the features hit students.
+  F1 is already mostly built — retire the "build from scratch" framing and
+  extract the sentence-starter surface only.
+
+cross_lens_handoff:
+  - to: persona-privacy
+    about: |
+      F8 (Reflective Study Plan Generator) proposes parent-shareable plans
+      with student-controlled sharing. privacy should review the under-16
+      consent flow + what exactly is shared (topic names vs. accuracy
+      metrics).
+  - to: persona-ethics
+    about: |
+      F4 Mastery Path explicitly avoids streaks, but "micro-milestones"
+      ("you're over halfway!") could accidentally become variable-ratio
+      rewards if celebration cadence isn't deterministic. Ethics should
+      audit the milestone trigger rules.
+  - to: persona-ministry
+    about: |
+      F2 reminder framing should avoid anything that implies a guaranteed
+      pass rate or score on the Bagrut (RDY-080). Verify reminder copy.
+  - to: persona-a11y
+    about: |
+      F6 process-praise frequency and visual animation intensity needs
+      a11y review (reduced-motion preference, no flashing).

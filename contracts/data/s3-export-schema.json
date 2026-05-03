@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cena.education/schemas/s3-export/v1",
+  "title": "Cena Platform — S3 Nightly Parquet Export Schema",
+  "description": "Defines the structure of anonymized event records exported nightly to S3 for intelligence layer retraining. All records are written as Parquet files partitioned by event_type and export_date. Fields align with the Marten event store domain events (marten-event-store.cs). PII fields (StudentId) are replaced with a rotating anonymous_id via HMAC-SHA256 keyed per export epoch.",
+
+  "$defs": {
+
+    "export_metadata": {
+      "type": "object",
+      "description": "Common metadata attached to every exported record. Populated by the export pipeline, not the application.",
+      "properties": {
+        "export_id":        { "type": "string", "format": "uuid", "description": "Unique identifier for this export batch." },
+        "export_date":      { "type": "string", "format": "date", "description": "UTC date of export (YYYY-MM-DD). Used as S3 partition key." },
+        "export_version":   { "type": "integer", "const": 1, "description": "Schema version. Increment on breaking changes; consumers must handle." },
+        "source_stream":    { "type": "string", "description": "Marten event stream identifier (anonymized)." },
+        "sequence_number":  { "type": "integer", "minimum": 0, "description": "Event sequence number within the source stream." },
+        "event_timestamp":  { "type": "string", "format": "date-time", "description": "Original event timestamp from Marten (UTC ISO 8601)." },
+        "anonymous_id":     { "type": "string", "minLength": 64, "maxLength": 64, "description": "HMAC-SHA256 of StudentId with epoch-rotating key. Not reversible without the key." },
+        "experiment_cohort": { "type": ["string", "null"], "description": "A/B test cohort assignment at time of event, if any." }
+      },
+      "required": ["export_id", "export_date", "export_version", "source_stream", "sequence_number", "event_timestamp", "anonymous_id"]
+    },
+
+    "concept_attempt": {
+      "type": "object",
+      "title": "concept_attempts",
+      "description": "Anonymized projection of ConceptAttempted_V1. Core training signal for the BKT/mastery model.",
+      "allOf": [{ "$ref": "#/$defs/export_metadata" }],
+      "properties": {
+        "event_type":           { "type": "string", "const": "concept_attempt" },
+        "concept_id":           { "type": "string", "description": "Concept identifier (not PII)." },
+        "session_id":           { "type": "string", "description": "Anonymized session identifier." },
+        "is_correct":           { "type": "boolean" },
+        "response_time_ms":     { "type": "integer", "minimum": 0 },
+        "question_id":          { "type": "string" },
+        "question_type":        { "type": "string", "enum": ["multiple_choice", "numeric", "expression", "free_text"] },
+        "methodology_active":   { "type": "string", "enum": ["socratic", "spaced_repetition", "feynman", "worked_examples", "gamified_drill"] },
+        "error_type":           { "type": "string", "enum": ["procedural", "conceptual", "motivational", "none"] },
+        "prior_mastery":        { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "posterior_mastery":    { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "hint_count_used":      { "type": "integer", "minimum": 0 },
+        "was_skipped":          { "type": "boolean" },
+        "backspace_count":      { "type": "integer", "minimum": 0, "description": "Behavioral signal: hesitation/correction frequency." },
+        "answer_change_count":  { "type": "integer", "minimum": 0, "description": "Behavioral signal: answer revision frequency." },
+        "was_offline":          { "type": "boolean", "description": "Whether the attempt was recorded offline and synced later." }
+      },
+      "required": [
+        "event_type", "concept_id", "session_id", "is_correct", "response_time_ms",
+        "question_id", "question_type", "methodology_active", "error_type",
+        "prior_mastery", "posterior_mastery", "hint_count_used", "was_skipped",
+        "backspace_count", "answer_change_count", "was_offline"
+      ]
+    },
+
+    "mastery_change": {
+      "type": "object",
+      "title": "mastery_changes",
+      "description": "Union of ConceptMastered_V1 and MasteryDecayed_V1 events. Tracks mastery state transitions for retention modeling.",
+      "allOf": [{ "$ref": "#/$defs/export_metadata" }],
+      "properties": {
+        "event_type":           { "type": "string", "enum": ["concept_mastered", "mastery_decayed"] },
+        "concept_id":           { "type": "string" },
+        "session_id":           { "type": ["string", "null"], "description": "Present for concept_mastered; null for mastery_decayed (triggered by scheduler)." },
+        "mastery_level":        { "type": ["number", "null"], "minimum": 0.0, "maximum": 1.0, "description": "Final mastery level (concept_mastered only)." },
+        "predicted_recall":     { "type": ["number", "null"], "minimum": 0.0, "maximum": 1.0, "description": "Predicted recall probability (mastery_decayed only)." },
+        "half_life_hours":      { "type": "number", "minimum": 0.0, "description": "Memory half-life at time of event." },
+        "total_attempts":       { "type": ["integer", "null"], "minimum": 0, "description": "Cumulative attempts at mastery (concept_mastered only)." },
+        "total_sessions":       { "type": ["integer", "null"], "minimum": 0, "description": "Cumulative sessions to mastery (concept_mastered only)." },
+        "methodology_at_mastery": { "type": ["string", "null"], "description": "Which methodology was active when mastery was achieved." },
+        "hours_since_last_review": { "type": ["number", "null"], "minimum": 0.0, "description": "Decay interval (mastery_decayed only)." }
+      },
+      "required": ["event_type", "concept_id", "half_life_hours"]
+    },
+
+    "methodology_switch": {
+      "type": "object",
+      "title": "methodology_switches",
+      "description": "Projection of MethodologySwitched_V1. Primary training signal for MCM confidence recalculation.",
+      "allOf": [{ "$ref": "#/$defs/export_metadata" }],
+      "properties": {
+        "event_type":            { "type": "string", "const": "methodology_switch" },
+        "concept_id":            { "type": "string" },
+        "previous_methodology":  { "type": "string", "enum": ["socratic", "spaced_repetition", "feynman", "worked_examples", "gamified_drill"] },
+        "new_methodology":       { "type": "string", "enum": ["socratic", "spaced_repetition", "feynman", "worked_examples", "gamified_drill"] },
+        "trigger":               { "type": "string", "enum": ["stagnation_detected", "student_requested", "mcm_recommendation"], "description": "What caused the switch." },
+        "stagnation_score":      { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "dominant_error_type":   { "type": "string", "enum": ["procedural", "conceptual", "motivational", "none"] },
+        "mcm_confidence":        { "type": "number", "minimum": 0.0, "maximum": 1.0, "description": "MCM confidence score that informed the switch decision." }
+      },
+      "required": [
+        "event_type", "concept_id", "previous_methodology", "new_methodology",
+        "trigger", "stagnation_score", "dominant_error_type", "mcm_confidence"
+      ]
+    },
+
+    "session_summary": {
+      "type": "object",
+      "title": "session_summaries",
+      "description": "Derived from SessionStarted_V1 + SessionEnded_V1 pair. One record per completed session. Used for engagement modeling and fatigue prediction.",
+      "allOf": [{ "$ref": "#/$defs/export_metadata" }],
+      "properties": {
+        "event_type":            { "type": "string", "const": "session_summary" },
+        "session_id":            { "type": "string" },
+        "device_type":           { "type": "string" },
+        "app_version":           { "type": "string" },
+        "initial_methodology":   { "type": "string", "enum": ["socratic", "spaced_repetition", "feynman", "worked_examples", "gamified_drill"] },
+        "end_reason":            { "type": "string", "enum": ["completed", "fatigue", "abandoned", "timeout", "app_backgrounded"] },
+        "duration_minutes":      { "type": "integer", "minimum": 0 },
+        "questions_attempted":   { "type": "integer", "minimum": 0 },
+        "questions_correct":     { "type": "integer", "minimum": 0 },
+        "avg_response_time_ms":  { "type": "number", "minimum": 0.0 },
+        "fatigue_score_at_end":  { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "is_offline":            { "type": "boolean", "description": "Whether the session started in offline mode." },
+        "client_timestamp":      { "type": "string", "format": "date-time", "description": "Client-reported session start time (may differ from server event_timestamp)." }
+      },
+      "required": [
+        "event_type", "session_id", "device_type", "app_version", "initial_methodology",
+        "end_reason", "duration_minutes", "questions_attempted", "questions_correct",
+        "avg_response_time_ms", "fatigue_score_at_end", "is_offline", "client_timestamp"
+      ]
+    }
+  },
+
+  "type": "object",
+  "title": "S3 Export Manifest",
+  "description": "Top-level manifest written alongside each nightly Parquet export. Describes the export batch and record counts per event type.",
+  "properties": {
+    "manifest_version":    { "type": "integer", "const": 1 },
+    "export_id":           { "type": "string", "format": "uuid" },
+    "export_date":         { "type": "string", "format": "date" },
+    "s3_bucket":           { "type": "string", "description": "Target S3 bucket name." },
+    "s3_prefix":           { "type": "string", "description": "S3 key prefix. Convention: cena-exports/v1/{export_date}/" },
+    "parquet_files": {
+      "type": "array",
+      "description": "List of Parquet files produced in this export batch.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file_name":    { "type": "string", "description": "S3 object key relative to s3_prefix." },
+          "event_type":   { "type": "string", "enum": ["concept_attempt", "concept_mastered", "mastery_decayed", "methodology_switch", "session_summary"] },
+          "record_count": { "type": "integer", "minimum": 0 },
+          "size_bytes":   { "type": "integer", "minimum": 0 },
+          "sha256":       { "type": "string", "minLength": 64, "maxLength": 64, "description": "SHA-256 checksum of the Parquet file for integrity verification." }
+        },
+        "required": ["file_name", "event_type", "record_count", "size_bytes", "sha256"]
+      }
+    },
+    "total_records":       { "type": "integer", "minimum": 0 },
+    "anonymization": {
+      "type": "object",
+      "description": "Metadata about the anonymization process applied to this export.",
+      "properties": {
+        "method":         { "type": "string", "const": "hmac-sha256", "description": "Algorithm used to anonymize student IDs." },
+        "key_epoch":      { "type": "integer", "minimum": 1, "description": "Rotating key epoch. IDs are only linkable within the same epoch." },
+        "epoch_start":    { "type": "string", "format": "date", "description": "Start date of the current anonymization epoch." },
+        "fields_removed": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of PII fields stripped from the export (e.g., StudentId, AnswerHash, ContentHash)."
+        }
+      },
+      "required": ["method", "key_epoch", "epoch_start", "fields_removed"]
+    },
+    "pipeline": {
+      "type": "object",
+      "description": "Export pipeline execution metadata for observability.",
+      "properties": {
+        "started_at":     { "type": "string", "format": "date-time" },
+        "completed_at":   { "type": "string", "format": "date-time" },
+        "duration_seconds": { "type": "number", "minimum": 0 },
+        "marten_sequence_from": { "type": "integer", "minimum": 0, "description": "Marten global sequence number at export start (inclusive)." },
+        "marten_sequence_to":   { "type": "integer", "minimum": 0, "description": "Marten global sequence number at export end (exclusive)." }
+      },
+      "required": ["started_at", "completed_at", "duration_seconds", "marten_sequence_from", "marten_sequence_to"]
+    }
+  },
+  "required": ["manifest_version", "export_id", "export_date", "s3_bucket", "s3_prefix", "parquet_files", "total_records", "anonymization", "pipeline"]
+}

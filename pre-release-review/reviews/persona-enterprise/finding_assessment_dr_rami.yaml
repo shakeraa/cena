@@ -1,0 +1,59 @@
+doc_path: pre-release-review/finding_assessment_dr_rami.md
+reviewer: persona-enterprise
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr. Rami's honesty/evidence checklist used to evaluate each finding: effect-size justification,
+  competitive-claim accuracy, RDY-080 Bagrut-prediction claim integrity.
+system_purpose_fit: 2
+  rationale:
+    - Not a feature proposal; an evaluation rubric. Enterprise stake is minimal.
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "This doc makes no code claims; it's a research-integrity checklist."
+adr_alignment:
+  honored: []
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P2
+    finding: |
+      RDY-080 Bagrut-prediction concordance check applies to any system that claims "predicts Bagrut outcome".
+      If the engineering team ever surfaces a "predicted Bagrut score" to students/mentors, the claim needs a
+      calibrated concordance study. This is an enterprise concern because it gates an API surface.
+    evidence: finding_assessment_dr_rami.md:L~3 (RDY-080 line)
+    lens_note: Enterprise — external-facing predictions need calibration evidence before API exposure.
+already_built: []
+duplicates_of_other_docs:
+  - "cena_dr_nadia_pedagogical_review_20_findings.md: overlapping reviewer lens"
+  - "feature-discovery-2026-04-20.md: Dr. Rami cross-examination column"
+extracted_tasks:
+  - title: "API-gate: no 'predicted Bagrut score' endpoint without calibration"
+    priority: P2
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Add explicit note to api-contracts.md: no endpoint may return a "Bagrut-score prediction" field without a
+      referenced calibration study. If one ships, ADR must cite the study and concordance interval.
+
+      ## Files
+      - docs/api-contracts.md
+
+      ## Definition of Done
+      - Policy paragraph added.
+      - Ship-gate scanner rule flags any endpoint response field named ~bagrut*predict*.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L~3]
+verdict: retire
+verdict_reason: |
+  Research-integrity checklist; no feature work. Single small policy task extracted for the API surface.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: "Effect-size integrity evaluation."
+  - to: persona-ministry
+    about: "Bagrut-prediction API — what can we claim without Ministry pushback?"

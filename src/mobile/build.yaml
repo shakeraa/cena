@@ -1,0 +1,39 @@
+targets:
+  $default:
+    builders:
+      freezed:
+        generate_for:
+          include:
+            - lib/core/models/**
+            - lib/features/**/models/**
+        options:
+          from_json: true
+          to_json: true
+
+      json_serializable:
+        generate_for:
+          include:
+            - lib/core/models/**
+            - lib/features/**/models/**
+        options:
+          any_map: true
+          checked: true
+          explicit_to_json: true
+          field_rename: snake
+
+      riverpod_generator:
+        generate_for:
+          include:
+            - lib/core/state/**
+            - lib/features/**/state/**
+            - lib/features/**/providers/**
+
+      drift_dev:
+        generate_for:
+          include:
+            - lib/core/services/database/**
+
+      hive_ce_generator:
+        generate_for:
+          include:
+            - lib/core/models/**

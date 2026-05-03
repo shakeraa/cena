@@ -1,0 +1,60 @@
+# Bagrut Civics (אזרחות) — 1 Unit (compulsory baseline), Hebrew-stream.
+# PRR-241: humanities catalog extension, launch tier.
+# Standard Ministry civics syllabus: democracy, Israeli government,
+# law, rights, Israeli society. Mandatory for all tracks.
+
+exam_code: BAGRUT_CIVICS_1U
+family: BAGRUT
+track: "1U"
+units: 1
+region: IL-Bagrut-Hebrew
+regulator: ministry_of_education
+ministry_subject_code: "034"
+ministry_question_paper_codes:
+  - "034181"
+availability: launch
+item_bank_status: full
+passback_eligible: true
+default_lead_days: 120
+sittings:
+  - code: TASHPA_SUMMER_A
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: A
+    canonical_date: "2026-06-14"
+  - code: TASHPA_SUMMER_B
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: B
+    canonical_date: "2026-07-19"
+display:
+  en:
+    name: "Bagrut Civics (1 unit)"
+    short_description: "Israeli Bagrut civics, one-unit compulsory baseline."
+  he:
+    name: "בגרות באזרחות (יחידה 1)"
+    short_description: "בגרות באזרחות, יחידה אחת (חובה)."
+  ar:
+    name: "بجروت المدنيات (وحدة واحدة)"
+    short_description: "بجروت المدنيات، وحدة واحدة إلزامية."
+topics:
+  - topic_id: civics.democracy
+    display:
+      en: "Democracy and its principles"
+      he: "דמוקרטיה ועקרונותיה"
+      ar: "الديمقراطية ومبادئها"
+  - topic_id: civics.israeli_government
+    display:
+      en: "Israeli government and institutions"
+      he: "הממשלה והמוסדות בישראל"
+      ar: "الحكومة والمؤسسات في إسرائيل"
+  - topic_id: civics.law_rights
+    display:
+      en: "Rule of law and civil rights"
+      he: "שלטון החוק וזכויות האזרח"
+      ar: "سيادة القانون وحقوق المواطن"
+  - topic_id: civics.israeli_society
+    display:
+      en: "Israeli society and diversity"
+      he: "החברה הישראלית על גווניה"
+      ar: "المجتمع الإسرائيلي وتعدديته"
