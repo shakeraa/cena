@@ -25,7 +25,8 @@ Adopt the recommendation from the 001 research, validated by the 002 deep resear
 4. **Storage**: event-sourced + projected.
    * New event `QuestionConceptsExtracted_V1` (extractor output)
    * New event `QuestionConceptsConfirmed_V1` (curator-confirmed override)
-   * Projected onto `QuestionDocument.ConceptIds : List<string>` and `QuestionDocument.PrimaryConceptId : string` (mirrors today's `ConceptId` for back-compat).
+   * Projected by `QuestionListProjection.Apply(QuestionConceptsExtracted_V1)` and `Apply(QuestionConceptsConfirmed_V1)` onto `QuestionReadModel.Concepts : List<string>` (the list-view document Marten serves to the curator UI and downstream readers). The `QuestionState` aggregate rebuilds the same set on `AggregateStreamAsync<QuestionState>` into `QuestionState.ConceptIds`. Last-write-wins: a confirm event overwrites a prior extraction, and a later extraction (e.g. operator re-run) quietly overwrites a confirm — Phase 2 will add a "frozen" bit on confirm if telemetry shows curators want sticky confirms.
+   * The legacy single-string `QuestionDocument.ConceptId` is unchanged — it remains the BKT primary-key consumed by `ConceptAttempted_V3` and the existing student-session read path. Concept events do NOT update `QuestionDocument` directly.
 5. **Curator validation gate**:
    * First 200 Bagrut items extracted under the new pipeline: curator must confirm the concept set before publish (calibration corpus).
    * After 200: extraction stands by default; curator UI surfaces the set for one-click override.
@@ -50,7 +51,7 @@ Adopt the recommendation from the 001 research, validated by the 002 deep resear
 * **Phase 0** — foundation (this ADR)
   * BagrutTaxonomyCatalog (closed-set canonicalizer)
   * QuestionConceptsExtracted_V1, QuestionConceptsConfirmed_V1 event types + Marten registration
-  * QuestionDocument widened with ConceptIds + PrimaryConceptId
+  * QuestionListProjection writes the concept set onto `QuestionReadModel.Concepts`; `QuestionState` rebuilds `ConceptIds` on aggregate replay
   * Unit tests
 * **Phase 1** — extraction-only (no BKT change)
   * Variant-generation prompt extended to emit `concepts: [{skill, role, rationale}]`
@@ -97,3 +98,16 @@ Cost is a rounding error — not a deciding factor.
 * Should `unlinked` items be excluded from CAT/PSI scheduling entirely, or surfaced as "needs concept review"?
 * Should curator-edited concept sets emit a separate `QuestionConceptsCuratorOverride_V1` event for audit, or extend `QuestionConceptsConfirmed_V1` with an `editType` field? (currently planned: extend the existing event.)
 * Method-trace falsifier weight — additive, multiplicative, or veto?
+
+## Implementation drift (2026-05-03)
+
+Phase 0 originally planned to widen `QuestionDocument` with `PrimaryConceptId : string` and `ConceptIds : List<string>` (see commit `9a827ba1` and the original wording of §4 above). The fields were declared on the type but no production writer was wired — the projection landed on `QuestionReadModel.Concepts` instead, and the architect-review §gap-3 caught the gap. Rather than wire a second writer, the decision was to keep the projection on `QuestionReadModel` (the live list-view document Marten serves to consumers) and treat the `QuestionDocument` widening as superseded.
+
+Net effect:
+
+* `QuestionDocument.ConceptId` (single string, legacy) — still authoritative for BKT primary-key lookup; unchanged.
+* `QuestionDocument.PrimaryConceptId` and `QuestionDocument.ConceptIds` — declared but unused by any production writer; effectively dead. A future cleanup pass should either delete them or wire a writer; this ADR does not require either.
+* `QuestionReadModel.Concepts` — populated by `QuestionListProjection` from the V1 events; this is what `MartenQuestionPool` and the curator UI read.
+* `QuestionState.ConceptIds` — rebuilt on aggregate replay; this is what command handlers read.
+
+Future-self reading this ADR: the widening of `QuestionDocument` was planned but never shipped because the second writer is unnecessary. The single source of truth is the event stream; the projection writes one read model and the aggregate rebuilds the other.
