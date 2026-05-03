@@ -30,10 +30,36 @@ public static class LlmCostMetricRegistration
 {
     /// <summary>
     /// Default repo-relative path to the routing-config.yaml, used when a
-    /// caller doesn't supply one. Hosts typically resolve
-    /// <c>Path.Combine(contentRoot, DefaultRoutingConfigRelativePath)</c>.
+    /// caller doesn't supply one. Prefer <see cref="ResolveRoutingConfigPath"/>
+    /// over a raw <c>Path.Combine(contentRoot, …)</c> — ContentRoot inside the
+    /// dev hot-reload container is the project dir, NOT the repo root.
     /// </summary>
     public const string DefaultRoutingConfigRelativePath = "contracts/llm/routing-config.yaml";
+
+    /// <summary>
+    /// Walk up from <paramref name="searchStart"/> looking for
+    /// <c>contracts/llm/routing-config.yaml</c>. Matches the convention used
+    /// by <c>BagrutTaxonomyCatalog.ResolveDefaultPath</c> so every repo-root
+    /// data file resolves the same way regardless of how the host is started
+    /// (published binary in /app, dotnet run from project dir, dotnet watch
+    /// inside a hot-reload container with /src as the bind-mount root, …).
+    /// Throws <see cref="FileNotFoundException"/> when nothing is found,
+    /// preserving the fail-loud-on-missing-pricing contract.
+    /// </summary>
+    public static string ResolveRoutingConfigPath(string? searchStart = null)
+    {
+        var dir = new DirectoryInfo(searchStart ?? AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            var candidate = Path.Combine(dir.FullName, "contracts", "llm", "routing-config.yaml");
+            if (File.Exists(candidate)) return candidate;
+            dir = dir.Parent;
+        }
+        throw new FileNotFoundException(
+            "routing-config.yaml not found by walking up from "
+            + (searchStart ?? AppContext.BaseDirectory)
+            + ". Expected at <repo>/contracts/llm/routing-config.yaml.");
+    }
 
     /// <summary>
     /// Register the pricing table and cost metric services.

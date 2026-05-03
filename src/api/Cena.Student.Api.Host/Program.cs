@@ -510,9 +510,11 @@ public partial class Program
     }
 
     // prr-046: per-feature LLM cost metric. Fail-loud pricing from routing-config.yaml.
-    builder.Services.AddLlmCostMetric(Path.Combine(
-        builder.Environment.ContentRootPath,
-        Cena.Infrastructure.Llm.LlmCostMetricRegistration.DefaultRoutingConfigRelativePath));
+    // ResolveRoutingConfigPath walks up from ContentRoot to handle both the
+    // published-binary (/app) and dev hot-reload (/src/src/api/...Host) layouts.
+    builder.Services.AddLlmCostMetric(
+        Cena.Infrastructure.Llm.LlmCostMetricRegistration.ResolveRoutingConfigPath(
+            builder.Environment.ContentRootPath));
     // prr-022 / ADR-0047: PII prompt scrubber — injected by every [TaskRouting]
     // service that composes student free-text into its prompt.
     builder.Services.AddPiiPromptScrubber();

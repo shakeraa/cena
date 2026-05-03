@@ -298,9 +298,11 @@ builder.Services.AddSingleton<Cena.Actors.Infrastructure.IRedisCircuitBreaker, C
 builder.Services.AddSingleton<Cena.Infrastructure.Llm.IPromptCacheKeyContext, Cena.Infrastructure.Llm.AsyncLocalPromptCacheKeyContext>();
 builder.Services.AddSingleton<IExplanationCacheService, ExplanationCacheService>().AddSingleton<Cena.Infrastructure.Llm.IPromptCache, Cena.Infrastructure.Llm.RedisPromptCache>(); // prr-047 unified seam + prr-233 per-target labels
 // prr-046: per-feature cost metric. Pricing loaded fail-loud from routing-config.yaml.
-builder.Services.AddLlmCostMetric(Path.Combine(
-    builder.Environment.ContentRootPath,
-    Cena.Infrastructure.Llm.LlmCostMetricRegistration.DefaultRoutingConfigRelativePath));
+// ResolveRoutingConfigPath walks up from ContentRoot to handle both the
+// published-binary (/app) and dev hot-reload (/src/src/actors/...Host) layouts.
+builder.Services.AddLlmCostMetric(
+    Cena.Infrastructure.Llm.LlmCostMetricRegistration.ResolveRoutingConfigPath(
+        builder.Environment.ContentRootPath));
 // prr-143 + 2026-05-03 runtime upgrade: register IActivityPropagator on the
 // actor host too — AddCenaAdminServices below pulls AnthropicLlmRuntime which
 // resolves IActivityPropagator? optionally. Idempotent (TryAddSingleton) so

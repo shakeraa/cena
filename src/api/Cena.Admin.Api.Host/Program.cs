@@ -418,9 +418,11 @@ public partial class Program
 
     // prr-046: per-feature LLM cost metric (fail-loud pricing from routing-config.yaml).
     // AiGenerationService + QualityGateService + AiFigureGenerator depend on ILlmCostMetric.
-    builder.Services.AddLlmCostMetric(Path.Combine(
-        builder.Environment.ContentRootPath,
-        Cena.Infrastructure.Llm.LlmCostMetricRegistration.DefaultRoutingConfigRelativePath));
+    // ResolveRoutingConfigPath walks up from ContentRoot to handle both the
+    // published-binary (/app) and dev hot-reload (/src/src/api/...Host) layouts.
+    builder.Services.AddLlmCostMetric(
+        Cena.Infrastructure.Llm.LlmCostMetricRegistration.ResolveRoutingConfigPath(
+            builder.Environment.ContentRootPath));
 
     // prr-143 + 2026-05-03 runtime upgrade: register IActivityPropagator
     // so AnthropicLlmRuntime, AiGenerationService, OcrTextEnhancer,
