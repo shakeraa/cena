@@ -7,11 +7,9 @@
 // =============================================================================
 
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Anthropic;
-using Anthropic.Core;
 using Anthropic.Models.Messages;
 using Cena.Actors.Cas;
 using Cena.Admin.Api.AiSettings;
@@ -312,28 +310,16 @@ public sealed class AiGenerationService : IAiGenerationService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ICasGateModeProvider _casGateMode;
 
-    // Observability — routing-config.yaml section 9
-    private readonly Histogram<double> _requestDuration;
-    private readonly Counter<long> _tokensTotal;
-    private readonly Counter<double> _costUsd;
+    // Shared LLM runtime — owns the Anthropic client cache, the in-process
+    // circuit breaker (3 failures / 90s), and the legacy per-service meters
+    // (llm_request_duration_ms / llm_tokens_total / llm_cost_usd). Singleton
+    // so its state is shared with OcrTextEnhancer and any other Anthropic
+    // call site in this service.
+    private readonly IAnthropicLlmRuntime _runtime;
     // prr-046: canonical per-feature cost counter (cena_llm_call_cost_usd_total).
     private readonly ILlmCostMetric _featureCost;
     // prr-143: trace-id stamping site for question-generation LLM calls.
     private readonly IActivityPropagator? _activityPropagator;
-
-    // In-process circuit breaker state (mirrors LlmCircuitBreakerActor: Sonnet 3/90s)
-    private int _failureCount;
-    private DateTimeOffset _circuitOpenedAt;
-    private bool _circuitOpen;
-    private static readonly int MaxFailures = 3;
-    private static readonly TimeSpan OpenDuration = TimeSpan.FromSeconds(90);
-    private readonly object _cbLock = new();
-
-    // Anthropic SDK client — lazily created when API key is set. The client
-    // is keyed by the plaintext API key; cache hits when the persisted key
-    // hasn't changed since the last call.
-    private AnthropicClient? _anthropicClient;
-    private string? _lastApiKey;
 
     // ── Persistence + cipher (production: Marten-backed AiSettingsDocument) ──
     private readonly IDocumentStore _documentStore;
@@ -347,25 +333,15 @@ public sealed class AiGenerationService : IAiGenerationService
     private static readonly TimeSpan DocCacheTtl = TimeSpan.FromSeconds(5);
     private readonly SemaphoreSlim _docCacheLock = new(1, 1);
 
-    // JSON options for parsing tool_use output
-    private static readonly JsonSerializerOptions JsonOpts = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-    };
-
     // Routing config constants (from routing-config.yaml, task: question_generation ~ video_script)
     private const string SonnetModelId = "claude-sonnet-4-6";
     private const float DefaultTemperature = 0.5f;
     private const int DefaultMaxTokens = 4096;
-    // Cost per million tokens (routing-config.yaml section 1: claude_sonnet_4_6)
-    private const double CostPerInputMTok = 3.00;
-    private const double CostPerOutputMTok = 15.00;
 
     public AiGenerationService(
         ILogger<AiGenerationService> logger,
         IConfiguration configuration,
-        IMeterFactory meterFactory,
+        IAnthropicLlmRuntime runtime,
         IServiceScopeFactory scopeFactory,
         ICasGateModeProvider casGateMode,
         ILlmCostMetric featureCost,
@@ -376,6 +352,7 @@ public sealed class AiGenerationService : IAiGenerationService
     {
         _logger = logger;
         _configuration = configuration;
+        _runtime = runtime;
         _scopeFactory = scopeFactory;
         _casGateMode = casGateMode;
         _featureCost = featureCost;
@@ -383,19 +360,6 @@ public sealed class AiGenerationService : IAiGenerationService
         _cipher = cipher;
         _probe = probe;
         _activityPropagator = activityPropagator;
-
-        var meter = meterFactory.Create("Cena.Admin.LlmMetrics", "1.0.0");
-        _requestDuration = meter.CreateHistogram<double>(
-            "llm_request_duration_ms",
-            unit: "ms",
-            description: "LLM request duration in milliseconds");
-        _tokensTotal = meter.CreateCounter<long>(
-            "llm_tokens_total",
-            description: "Total LLM tokens consumed");
-        _costUsd = meter.CreateCounter<double>(
-            "llm_cost_usd",
-            unit: "USD",
-            description: "LLM cost in USD");
     }
 
     // ── Persistence helpers ───────────────────────────────────────────────
@@ -659,71 +623,8 @@ public sealed class AiGenerationService : IAiGenerationService
     // (BuildPrompt + BloomLabel + LangLabel). Behaviour-preserving extract;
     // see AiPromptBuilder.BuildPrompt for the prompt-string contract.
 
-    // ── Circuit Breaker (in-process, mirrors LlmCircuitBreakerActor thresholds) ──
-
-    private void RequestCircuitPermission(string modelName)
-    {
-        lock (_cbLock)
-        {
-            if (!_circuitOpen) return;
-
-            if (DateTimeOffset.UtcNow - _circuitOpenedAt >= OpenDuration)
-            {
-                _logger.LogInformation("Circuit breaker half-open for {Model}, allowing probe", modelName);
-                _circuitOpen = false;
-                _failureCount = 0;
-                return;
-            }
-
-            var retryAfter = OpenDuration - (DateTimeOffset.UtcNow - _circuitOpenedAt);
-            throw new CircuitOpenException(
-                $"Circuit breaker OPEN for model {modelName}. Retry after {retryAfter.TotalSeconds:F0}s.");
-        }
-    }
-
-    private void RecordSuccess(string modelName)
-    {
-        lock (_cbLock)
-        {
-            _failureCount = 0;
-            _circuitOpen = false;
-        }
-    }
-
-    private void RecordFailure(string modelName)
-    {
-        lock (_cbLock)
-        {
-            _failureCount++;
-            _logger.LogWarning("LLM failure for {Model}. Count={Count}/{Max}",
-                modelName, _failureCount, MaxFailures);
-
-            if (_failureCount >= MaxFailures)
-            {
-                _circuitOpen = true;
-                _circuitOpenedAt = DateTimeOffset.UtcNow;
-                _logger.LogWarning(
-                    "Circuit breaker OPENED for {Model}. Failures={Count}, OpenDuration={Duration}s",
-                    modelName, _failureCount, OpenDuration.TotalSeconds);
-            }
-        }
-    }
-
-    // ── Anthropic SDK Client ──
-
-    private AnthropicClient GetOrCreateClient(string apiKey)
-    {
-        if (_anthropicClient is not null && _lastApiKey == apiKey)
-            return _anthropicClient;
-
-        _anthropicClient = new AnthropicClient(new ClientOptions
-        {
-            ApiKey = apiKey,
-            MaxRetries = 0, // Circuit breaker handles retries
-        });
-        _lastApiKey = apiKey;
-        return _anthropicClient;
-    }
+    // ── Circuit breaker, client cache, and meters live in IAnthropicLlmRuntime
+    //    (see AiSettings/AnthropicLlmRuntime.cs). Shared with OcrTextEnhancer.
 
     // ── Tool schema for structured output ──
 
@@ -737,9 +638,9 @@ public sealed class AiGenerationService : IAiGenerationService
         AiProviderConfig config, string prompt, AiGenerateRequest req)
     {
         var modelName = config.ModelId;
-        RequestCircuitPermission(modelName);
+        _runtime.RequestCircuitPermission(modelName);
 
-        var client = GetOrCreateClient(config.ApiKey);
+        var client = _runtime.GetOrCreateClient(config.ApiKey);
         var sw = Stopwatch.StartNew();
 
         try
@@ -795,11 +696,20 @@ public sealed class AiGenerationService : IAiGenerationService
             var response = await client.Messages.Create(createParams);
             sw.Stop();
 
-            // Record metrics
+            // Record metrics — legacy per-service triple via the shared runtime.
             var inputTokens = response.Usage.InputTokens;
             var outputTokens = response.Usage.OutputTokens;
-            EmitMetrics(modelName, "question_generation", sw.ElapsedMilliseconds,
+            _runtime.EmitMetrics(modelName, "question_generation", sw.ElapsedMilliseconds,
                 inputTokens, outputTokens);
+            // prr-046: canonical per-feature cost counter — stays at the call
+            // site because the (feature, tier, task) tags are caller-owned.
+            _featureCost.Record(
+                feature: "question-generation",
+                tier: "tier3",
+                task: "question_generation",
+                modelId: modelName,
+                inputTokens: inputTokens,
+                outputTokens: outputTokens);
 
             activity?.SetTag("outcome", "success");
             activity?.SetTag("input_tokens", (long)inputTokens);
@@ -813,10 +723,10 @@ public sealed class AiGenerationService : IAiGenerationService
             {
                 if (block.TryPickToolUse(out var toolUse) && toolUse.Name == "generate_questions")
                 {
-                    var rawJson = JsonSerializer.Serialize(toolUse.Input, JsonOpts);
+                    var rawJson = JsonSerializer.Serialize(toolUse.Input, _runtime.JsonOpts);
                     var questions = ParseToolUseQuestions(toolUse.Input);
 
-                    RecordSuccess(modelName);
+                    _runtime.RecordSuccess(modelName);
                     return (rawJson, questions);
                 }
             }
@@ -827,7 +737,7 @@ public sealed class AiGenerationService : IAiGenerationService
                 if (block.TryPickText(out var textBlock))
                 {
                     var questions = ParseJsonQuestions(textBlock.Text);
-                    RecordSuccess(modelName);
+                    _runtime.RecordSuccess(modelName);
                     return (textBlock.Text, questions);
                 }
             }
@@ -841,7 +751,7 @@ public sealed class AiGenerationService : IAiGenerationService
         catch (Exception ex)
         {
             sw.Stop();
-            RecordFailure(modelName);
+            _runtime.RecordFailure(modelName);
             _logger.LogError(ex, "Anthropic API call failed after {ElapsedMs}ms", sw.ElapsedMilliseconds);
             throw;
         }
@@ -918,42 +828,6 @@ public sealed class AiGenerationService : IAiGenerationService
         }
 
         return questions;
-    }
-
-    // ── Observability ──
-
-    private void EmitMetrics(string model, string taskType, long durationMs,
-        long inputTokens, long outputTokens)
-    {
-        var modelTag = new KeyValuePair<string, object?>("model_id", model);
-        var taskTag = new KeyValuePair<string, object?>("task_type", taskType);
-
-        _requestDuration.Record(durationMs, modelTag, taskTag,
-            new KeyValuePair<string, object?>("status", "success"));
-
-        _tokensTotal.Add(inputTokens, modelTag, taskTag,
-            new KeyValuePair<string, object?>("direction", "input"));
-        _tokensTotal.Add(outputTokens, modelTag, taskTag,
-            new KeyValuePair<string, object?>("direction", "output"));
-
-        var cost = (inputTokens * CostPerInputMTok + outputTokens * CostPerOutputMTok) / 1_000_000.0;
-        _costUsd.Add(cost, modelTag, taskTag);
-
-        // prr-046: canonical per-feature cost counter. Pricing re-resolved
-        // from routing-config.yaml (may differ from local constants above if
-        // YAML has been updated — fail-loud vs. stale constants).
-        _featureCost.Record(
-            feature: "question-generation",
-            tier: "tier3",
-            task: "question_generation",
-            modelId: model,
-            inputTokens: inputTokens,
-            outputTokens: outputTokens);
-
-        _logger.LogInformation(
-            "LLM call completed: model={Model}, task={Task}, duration={DurationMs}ms, " +
-            "input_tokens={InputTokens}, output_tokens={OutputTokens}, cost_usd={Cost:F6}",
-            model, taskType, durationMs, inputTokens, outputTokens, cost);
     }
 
     // ── Batch Generation (CNT-002) ──
