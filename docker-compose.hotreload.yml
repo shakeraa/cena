@@ -63,6 +63,13 @@ services:
       - ./docker/ocr-sidecar/app:/src/docker/ocr-sidecar/app
       - ./config:/src/config
       - ./contracts:/src/contracts
+      # ADR-0062 — BagrutTaxonomyCatalog.LoadFromDisk() walks up from
+      # AppContext.BaseDirectory looking for scripts/bagrut-taxonomy.json.
+      # Without this single-file mount the ingestion runner throws
+      # FileNotFoundException at job-execute time and the kanban stays
+      # empty even though the upload returns 202. Read-only because the
+      # catalog is curated by hand and shouldn't be touched at runtime.
+      - ./scripts/bagrut-taxonomy.json:/src/scripts/bagrut-taxonomy.json:ro
       - /src/src/api/Cena.Admin.Api.Host/bin
       - /src/src/api/Cena.Admin.Api.Host/obj
       - nuget_admin_api:/root/.nuget/packages

@@ -181,6 +181,13 @@ services:
       # OCR figure crops written by Layer2cFigureExtraction. Curators
       # read these via the figure-stream endpoint surfaced on item detail.
       - cena_ocr_figures:/var/cena/ocr-figures
+      # ADR-0062 — BagrutTaxonomyCatalog.LoadFromDisk() walks up from
+      # AppContext.BaseDirectory looking for scripts/bagrut-taxonomy.json.
+      # Without this single-file mount the ingestion runner throws
+      # FileNotFoundException at job-execute time and the kanban stays
+      # empty even though the upload returns 202. Read-only because the
+      # catalog is curated by hand and shouldn't be touched at runtime.
+      - ./scripts/bagrut-taxonomy.json:/src/scripts/bagrut-taxonomy.json:ro
     restart: unless-stopped
     # CPU ceiling only. The admin-api hot-loop incident on 2026-05-01
     # (BagrutCorpusSeedData stalled on Postgres → Kestrel thread-pool
