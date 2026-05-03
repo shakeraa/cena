@@ -548,33 +548,57 @@ const approveItem = async () => {
 </script>
 
 <template>
-  <VNavigationDrawer
+  <!-- 2026-05-03: switched from VNavigationDrawer (480px right-side
+       drawer) to a fullscreen VDialog so the curator has horizontal
+       real estate to review the extracted question alongside the PDF
+       and figures inline. Math (LaTeX) is rendered inline via
+       renderMixedMathText; figures are co-located with the recreated
+       question text inside Question Content. -->
+  <VDialog
     data-allow-mismatch
-    temporary
-    :width="480"
-    location="end"
-    class="scrollable-content"
+    fullscreen
+    scrollable
+    transition="dialog-bottom-transition"
+    class="cena-item-detail-dialog"
     :model-value="props.isOpen"
     @update:model-value="(val: boolean) => emit('update:isOpen', val)"
   >
-    <AppDrawerHeaderSection
-      title="Item Detail"
-      @cancel="handleClose"
-    />
+    <VCard class="cena-item-detail-card">
+      <VToolbar
+        color="surface"
+        density="compact"
+        class="cena-item-detail-toolbar"
+      >
+        <VToolbarTitle class="text-h6">
+          Item Detail
+        </VToolbarTitle>
+        <VSpacer />
+        <VBtn
+          icon="tabler-x"
+          variant="text"
+          aria-label="Close"
+          data-test="item-detail-close"
+          @click="handleClose"
+        />
+      </VToolbar>
 
-    <VDivider />
+      <VDivider />
 
-    <VProgressLinear
-      v-if="loading"
-      indeterminate
-      color="primary"
-    />
+      <VProgressLinear
+        v-if="loading"
+        indeterminate
+        color="primary"
+      />
 
-    <PerfectScrollbar
-      v-if="item && !loading"
-      :options="{ wheelPropagation: false }"
-    >
-      <VCard flat>
+      <PerfectScrollbar
+        v-if="item && !loading"
+        :options="{ wheelPropagation: false }"
+        class="cena-item-detail-scroll"
+      >
+        <VCard
+          flat
+          class="cena-item-detail-content"
+        >
         <VCardText>
           <!-- File Info -->
           <div class="mb-4">
@@ -637,6 +661,14 @@ const approveItem = async () => {
                the curator approves on.
                Math LaTeX in `q.text` is KaTeX-rendered via
                renderMixedMathText (bdi dir=ltr per memory rule).
+               Fullscreen modal layout (2026-05-03): when figures exist
+               on the item, lay out the recreated questions on the left
+               and a sticky figures column on the right so the curator
+               can validate "this stem references THAT diagram" without
+               scrolling. Below 1100px the grid collapses to a single
+               column (figures stack under text). Items without figures
+               fall back to a full-width single-column layout —
+               unchanged behaviour for non-Bagrut sources.
                Optional chaining on `recreatedQuestions?.length` is
                load-bearing: Vite HMR can replace the template while the
                existing `item` ref still has the pre-2026-05-01 shape
@@ -645,9 +677,11 @@ const approveItem = async () => {
                to render. -->
           <div
             v-if="item.recreatedQuestions?.length"
-            class="mb-4"
+            class="mb-4 cena-content-grid"
+            :class="{ 'cena-content-grid--with-figures': item.figures.length > 0 }"
             data-test="item-detail-recreated"
           >
+            <div class="cena-content-text">
             <div class="text-body-2 text-medium-emphasis mb-2 d-flex align-center">
               <VIcon
                 icon="tabler-sparkles"
@@ -761,6 +795,66 @@ const approveItem = async () => {
                 </div>
               </VCardText>
             </VCard>
+            </div>
+
+            <!-- Inline figures column (2026-05-03 fullscreen layout).
+                 Co-located with the recreated text so the curator can
+                 verify "this stem references that diagram" without
+                 scrolling between sections. Each figure tile clicks
+                 through to the auth-fetched blob URL in a new tab for
+                 a closer look. Hidden when item.figures is empty —
+                 the parent grid drops back to a single column then. -->
+            <aside
+              v-if="item.figures.length > 0"
+              class="cena-content-figures"
+              data-test="item-detail-recreated-figures"
+            >
+              <div class="text-body-2 text-medium-emphasis mb-2 d-flex align-center">
+                <VIcon
+                  icon="tabler-photo"
+                  size="16"
+                  class="me-1"
+                />
+                Figures referenced
+                <VChip
+                  size="x-small"
+                  color="success"
+                  variant="outlined"
+                  label
+                  class="ms-2"
+                >
+                  {{ item.figures.length }}
+                </VChip>
+              </div>
+              <div class="cena-figure-grid cena-figure-grid--inline">
+                <a
+                  v-for="fig in item.figures"
+                  :key="`inline-${fig.index}`"
+                  :href="figureBlobUrls[fig.index] ?? '#'"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="cena-figure-tile"
+                  :title="fig.altText ?? `Figure on page ${fig.page}`"
+                  @click="(!figureBlobUrls[fig.index]) && $event.preventDefault()"
+                >
+                  <img
+                    v-if="figureBlobUrls[fig.index]"
+                    :src="figureBlobUrls[fig.index]"
+                    :alt="fig.altText ?? `Figure on page ${fig.page}`"
+                    loading="lazy"
+                  >
+                  <div
+                    v-else
+                    class="cena-figure-tile-loading text-caption text-disabled"
+                  >
+                    Loading…
+                  </div>
+                  <span class="cena-figure-caption text-caption">
+                    p{{ fig.page }}<span v-if="fig.kind"> · {{ fig.kind }}</span>
+                  </span>
+                </a>
+              </div>
+            </aside>
           </div>
 
           <!-- Original OCR text (raw) — collapsed by default; the
@@ -1425,19 +1519,78 @@ const approveItem = async () => {
       </VCard>
     </VDialog>
 
-    <div
-      v-if="!item && !loading"
-      class="d-flex align-center justify-center"
-      style="block-size: 100%;"
-    >
-      <p class="text-body-1 text-medium-emphasis">
-        Select an item to view details
-      </p>
-    </div>
-  </VNavigationDrawer>
+      <div
+        v-if="!item && !loading"
+        class="d-flex align-center justify-center"
+        style="block-size: 100%;"
+      >
+        <p class="text-body-1 text-medium-emphasis">
+          Select an item to view details
+        </p>
+      </div>
+    </VCard>
+  </VDialog>
 </template>
 
 <style scoped>
+/* 2026-05-03 fullscreen-modal layout — replaces the prior 480px right-
+   side VNavigationDrawer. The dialog itself fills the viewport; we use
+   the toolbar as the close-affordance (drawer-style header is gone)
+   and constrain the content to a comfortable reading width via
+   max-inline-size on the inner card so wide monitors don't stretch
+   prose to a single line. */
+.cena-item-detail-card {
+  block-size: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.cena-item-detail-toolbar {
+  flex: 0 0 auto;
+}
+.cena-item-detail-scroll {
+  flex: 1 1 auto;
+  min-block-size: 0;
+}
+.cena-item-detail-content {
+  max-inline-size: 1400px;
+  margin-inline: auto;
+}
+
+/* Question-content 2-column grid (text + figures) for fullscreen mode.
+   Below 1100px the figures column wraps under the text column so the
+   layout still reads on narrow displays. The text column gets the
+   wider track (3fr) — recreated stem + diff is the primary review
+   surface; figures are an inspector. */
+.cena-content-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (min-width: 1100px) {
+  .cena-content-grid.cena-content-grid--with-figures {
+    grid-template-columns: 3fr 2fr;
+  }
+}
+.cena-content-text {
+  min-inline-size: 0;
+  /* Prevents long math expressions from forcing a horizontal scroll on
+     the content column; KaTeX-rendered blocks already handle their
+     own overflow inside the rendered span. */
+}
+.cena-content-figures {
+  background: rgba(var(--v-theme-surface-variant), 0.4);
+  border-radius: 0.4rem;
+  padding: 0.75rem;
+  position: sticky;
+  inset-block-start: 0.5rem;
+  max-block-size: calc(100vh - 8rem);
+  overflow-y: auto;
+}
+.cena-figure-grid--inline {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
 /* cena-mmt-* classes — emitted by renderMixedMathText.
    Wraps prose + KaTeX math output into a single readable block. */
 .cena-mmt-block {
@@ -1550,13 +1703,14 @@ const approveItem = async () => {
 }
 .cena-visual-pdf-embed {
   inline-size: 100%;
-  /* 50vh keeps the recreated-question section visible above the fold
-     in a typical drawer view. Curators can still scroll inside the PDF
-     viewer to see all pages, and click the embed's own fullscreen icon
-     for a closer look. The previous 70vh swallowed the screen and
-     buried the recreated text below. */
-  block-size: 50vh;
-  min-block-size: 360px;
+  /* 70vh in fullscreen mode (2026-05-03) — Question Content is now
+     side-by-side with figures via cena-content-grid, so the visual-
+     review PDF section below it can claim more vertical space without
+     burying the recreated text. Curators can still scroll inside the
+     PDF viewer to see all pages and click the embed's own fullscreen
+     icon for a closer look. */
+  block-size: 70vh;
+  min-block-size: 480px;
   border: 1px solid rgba(var(--v-theme-outline-variant), 0.6);
   border-radius: 0.25rem;
   background: rgb(var(--v-theme-surface));
