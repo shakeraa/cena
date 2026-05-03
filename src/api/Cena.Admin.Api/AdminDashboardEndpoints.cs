@@ -29,9 +29,7 @@ public static class AdminDashboardEndpoints
             return Results.Ok(home);
         }).WithName("GetDashboardHome")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/dashboard/overview
         group.MapGet("/overview", async (ClaimsPrincipal user, IAdminDashboardService service) =>
@@ -40,9 +38,7 @@ public static class AdminDashboardEndpoints
             return Results.Ok(overview);
         }).WithName("GetDashboardOverview")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/dashboard/activity?period=30d
         group.MapGet("/activity", async (string? period, ClaimsPrincipal user, IAdminDashboardService service) =>
@@ -52,9 +48,7 @@ public static class AdminDashboardEndpoints
             return Results.Ok(activity);
         }).WithName("GetDashboardActivity")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/dashboard/content-pipeline?period=30d
         group.MapGet("/content-pipeline", async (string? period, IAdminDashboardService service) =>
@@ -64,9 +58,7 @@ public static class AdminDashboardEndpoints
             return Results.Ok(pipeline);
         }).WithName("GetContentPipeline")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/dashboard/focus-distribution
         group.MapGet("/focus-distribution", async (IAdminDashboardService service) =>
@@ -75,9 +67,7 @@ public static class AdminDashboardEndpoints
             return Results.Ok(distribution);
         }).WithName("GetFocusDistribution")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/dashboard/mastery-progress?period=30d
         group.MapGet("/mastery-progress", async (string? period, IAdminDashboardService service) =>
@@ -87,9 +77,7 @@ public static class AdminDashboardEndpoints
             return Results.Ok(progress);
         }).WithName("GetMasteryProgress")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/dashboard/alerts
         group.MapGet("/alerts", async (ClaimsPrincipal user, IAdminDashboardService service) =>
@@ -98,9 +86,7 @@ public static class AdminDashboardEndpoints
             return Results.Ok(alerts);
         }).WithName("GetDashboardAlerts")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/dashboard/recent-activity?limit=20
         group.MapGet("/recent-activity", async (int? limit, ClaimsPrincipal user, IAdminDashboardService service) =>
@@ -110,9 +96,7 @@ public static class AdminDashboardEndpoints
             return Results.Ok(activity);
         }).WithName("GetRecentAdminActivity")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/dashboard/pending-review
         group.MapGet("/pending-review", async (ClaimsPrincipal user, IAdminDashboardService service) =>
@@ -121,9 +105,7 @@ public static class AdminDashboardEndpoints
             return Results.Ok(summary);
         }).WithName("GetPendingReviewSummary")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         return app;
     }

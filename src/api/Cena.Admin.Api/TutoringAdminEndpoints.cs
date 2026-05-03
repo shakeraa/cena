@@ -37,9 +37,7 @@ public static class TutoringAdminEndpoints
             return Results.Ok(result);
         }).WithName("GetTutoringSessions")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         group.MapGet("/sessions/{sessionId}", async (
             string sessionId,
@@ -51,9 +49,7 @@ public static class TutoringAdminEndpoints
         }).WithName("GetTutoringSessionDetail")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         group.MapGet("/budget-status", async (
             string? classId,
@@ -64,9 +60,7 @@ public static class TutoringAdminEndpoints
             return Results.Ok(result);
         }).WithName("GetTutoringBudgetStatus")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         group.MapGet("/analytics", async (ClaimsPrincipal user, ITutoringAdminService service) =>
         {
@@ -74,9 +68,7 @@ public static class TutoringAdminEndpoints
             return Results.Ok(result);
         }).WithName("GetTutoringAnalytics")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         return app;
     }

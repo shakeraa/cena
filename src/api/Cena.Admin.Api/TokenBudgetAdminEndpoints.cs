@@ -26,9 +26,7 @@ public static class TokenBudgetAdminEndpoints
             return Results.Ok(result);
         }).WithName("GetTokenBudgetStatus")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         group.MapGet("/trend", async (
             int? days,
@@ -38,9 +36,7 @@ public static class TokenBudgetAdminEndpoints
             return Results.Ok(result);
         }).WithName("GetTokenBudgetTrend")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         group.MapPut("/limits", async (
             UpdateBudgetLimitsRequest request,
@@ -52,9 +48,7 @@ public static class TokenBudgetAdminEndpoints
                 : Results.Problem("Failed to update budget limits");
         }).WithName("UpdateTokenBudgetLimits")
     .Produces(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         return app;
     }

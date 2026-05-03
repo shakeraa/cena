@@ -47,9 +47,7 @@ public static class PrivacyEndpoints
         })
         .WithName("GetSubProcessorRegistry")
         .Produces<SubProcessorRegistryDto>(StatusCodes.Status200OK)
-        .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-        .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-        .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        .WithStandardErrorResponses();
 
         group.MapGet("/sub-processors/parent", (ISubProcessorRegistry registry) =>
         {
@@ -63,9 +61,7 @@ public static class PrivacyEndpoints
         })
         .WithName("GetParentVisibleSubProcessors")
         .Produces<SubProcessorRegistryDto>(StatusCodes.Status200OK)
-        .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-        .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-        .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        .WithStandardErrorResponses();
 
         return app;
     }

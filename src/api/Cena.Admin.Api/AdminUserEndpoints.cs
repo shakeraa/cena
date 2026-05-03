@@ -37,9 +37,7 @@ public static class AdminUserEndpoints
             return Results.Ok(result);
         }).WithName("ListUsers")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/users/stats (ModeratorOrAbove)
         group.MapGet("/stats", async (IAdminUserService service, HttpContext ctx) =>
@@ -50,9 +48,7 @@ public static class AdminUserEndpoints
         .WithName("GetUserStats")
         .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/users/{id}
         group.MapGet("/{id}", async (string id, IAdminUserService service, HttpContext ctx) =>
@@ -62,9 +58,7 @@ public static class AdminUserEndpoints
         }).WithName("GetUser")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST /api/admin/users
         group.MapPost("/", async (CreateUserRequest request, IAdminUserService service, HttpContext ctx) =>
@@ -81,9 +75,7 @@ public static class AdminUserEndpoints
         }).WithName("CreateUser")
     .Produces<object>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status400BadRequest)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // PUT /api/admin/users/{id}
         group.MapPut("/{id}", async (string id, UpdateUserRequest request, IAdminUserService service, HttpContext ctx) =>
@@ -100,9 +92,7 @@ public static class AdminUserEndpoints
         }).WithName("UpdateUser")
     .Produces<object>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // DELETE /api/admin/users/{id}
         group.MapDelete("/{id}", async (string id, IAdminUserService service, HttpContext ctx) =>
@@ -119,9 +109,7 @@ public static class AdminUserEndpoints
         }).WithName("DeleteUser")
     .Produces(StatusCodes.Status204NoContent)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST /api/admin/users/{id}/suspend
         group.MapPost("/{id}/suspend", async (string id, SuspendUserRequest request, IAdminUserService service, HttpContext ctx) =>
@@ -138,9 +126,7 @@ public static class AdminUserEndpoints
         }).WithName("SuspendUser")
     .Produces(StatusCodes.Status204NoContent)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST /api/admin/users/{id}/activate
         group.MapPost("/{id}/activate", async (string id, IAdminUserService service, HttpContext ctx) =>
@@ -157,9 +143,7 @@ public static class AdminUserEndpoints
         }).WithName("ActivateUser")
     .Produces(StatusCodes.Status204NoContent)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST /api/admin/users/invite
         group.MapPost("/invite", async (InviteUserRequest request, IAdminUserService service, HttpContext ctx) =>
@@ -180,9 +164,7 @@ public static class AdminUserEndpoints
         }).WithName("InviteUser")
     .Produces<object>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status400BadRequest)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST /api/admin/users/bulk-invite
         // prr-021: Hardened CSV roster import — size / CSV-injection / UTF-8 /
@@ -231,9 +213,7 @@ public static class AdminUserEndpoints
         .RequireRateLimiting("admin-roster-import")
     .Produces<object>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status400BadRequest)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/users/{id}/security
         group.MapGet("/{id}/security", async (string id, IAdminUserService service, HttpContext ctx) =>
@@ -249,9 +229,7 @@ public static class AdminUserEndpoints
         }).WithName("GetUserSecurity")
     .Produces<object>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/users/{id}/activity
         group.MapGet("/{id}/activity", async (string id, IAdminUserService service, HttpContext ctx) =>
@@ -260,9 +238,7 @@ public static class AdminUserEndpoints
             return Results.Ok(activity);
         }).WithName("GetUserActivity")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/users/{id}/sessions (BKD-002.9)
         group.MapGet("/{id}/sessions", async (string id, IAdminUserService service, HttpContext ctx) =>
@@ -271,9 +247,7 @@ public static class AdminUserEndpoints
             return Results.Ok(sessions);
         }).WithName("GetUserSessions")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // DELETE /api/admin/users/{id}/sessions/{sid} (BKD-002.9)
         group.MapDelete("/{id}/sessions/{sid}", async (string id, string sid, IAdminUserService service, HttpContext ctx) =>
@@ -290,9 +264,7 @@ public static class AdminUserEndpoints
         }).WithName("RevokeUserSession")
     .Produces(StatusCodes.Status204NoContent)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST /api/admin/users/{id}/force-reset
         group.MapPost("/{id}/force-reset", async (string id, IAdminUserService service, HttpContext ctx) =>
@@ -302,9 +274,7 @@ public static class AdminUserEndpoints
         }).WithName("ForcePasswordReset")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // DELETE /api/admin/users/{id}/api-keys/{keyId}
         group.MapDelete("/{id}/api-keys/{keyId}", async (string id, string keyId, IAdminUserService service, HttpContext ctx) =>
@@ -314,9 +284,7 @@ public static class AdminUserEndpoints
         }).WithName("RevokeApiKey")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         return app;
     }

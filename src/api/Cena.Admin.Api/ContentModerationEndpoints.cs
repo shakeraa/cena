@@ -44,9 +44,7 @@ public static class ContentModerationEndpoints
             return Results.Ok(result);
         }).WithName("GetModerationQueue")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/moderation/queue/summary - Queue summary stats
         group.MapGet("/queue/summary", async (IContentModerationService service) =>
@@ -55,9 +53,7 @@ public static class ContentModerationEndpoints
             return Results.Ok(summary);
         }).WithName("GetModerationQueueSummary")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/moderation/items/{id} - Get item detail
         group.MapGet("/items/{id}", async (string id, IContentModerationService service) =>
@@ -67,9 +63,7 @@ public static class ContentModerationEndpoints
         }).WithName("GetModerationItem")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST /api/admin/moderation/items/{id}/claim - Claim item for review
         group.MapPost("/items/{id}/claim", async (
@@ -83,9 +77,7 @@ public static class ContentModerationEndpoints
         }).WithName("ClaimModerationItem")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status409Conflict)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST /api/admin/moderation/items/{id}/approve - Approve item
         group.MapPost("/items/{id}/approve", async (
@@ -99,9 +91,7 @@ public static class ContentModerationEndpoints
         }).WithName("ApproveModerationItem")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST /api/admin/moderation/items/{id}/reject - Reject item
         group.MapPost("/items/{id}/reject", async (
@@ -116,9 +106,7 @@ public static class ContentModerationEndpoints
         }).WithName("RejectModerationItem")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST /api/admin/moderation/items/{id}/flag - Flag item
         group.MapPost("/items/{id}/flag", async (
@@ -133,9 +121,7 @@ public static class ContentModerationEndpoints
         }).WithName("FlagModerationItem")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST /api/admin/moderation/items/{id}/comments - Add comment
         group.MapPost("/items/{id}/comments", async (
@@ -150,9 +136,7 @@ public static class ContentModerationEndpoints
         }).WithName("AddModerationComment")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST /api/admin/moderation/bulk - Bulk actions
         group.MapPost("/bulk", async (
@@ -166,9 +150,7 @@ public static class ContentModerationEndpoints
         }).WithName("BulkModerationAction")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status400BadRequest)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/moderation/stats - Moderation statistics
         group.MapGet("/stats", async (IContentModerationService service) =>
@@ -177,9 +159,7 @@ public static class ContentModerationEndpoints
             return Results.Ok(stats);
         }).WithName("GetModerationStats")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // prr-034: GET /api/admin/moderation/cultural-context-dlq
         // Community review board ops queue. Tenant-scoped via TenantScope
@@ -204,9 +184,7 @@ public static class ContentModerationEndpoints
             return Results.Ok(result);
         }).WithName("GetCulturalContextDlq")
     .Produces<Cena.Api.Contracts.Admin.Cultural.CulturalContextDlqListResponse>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         return app;
     }
