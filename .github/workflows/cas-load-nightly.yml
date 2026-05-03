@@ -79,7 +79,7 @@ jobs:
 
       - name: Upload load summary
         if: always() && steps.admin.outputs.has_target == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cas-load-summary
           path: ops/reports/cas-load-summary.json
