@@ -37,17 +37,20 @@
 // The IQuestionConceptExtractor seam stays in Cena.Actors;
 // implementations live in the layer that owns their dependencies.
 //
-// Duplication trade-off: IAnthropicLlmRuntime had not been extracted at
-// the time this file was written (commit 7d7c845d, 2026-05-03), so we
-// follow OcrTextEnhancer's pattern — own circuit breaker, own meter
-// wiring on the SAME meter name "Cena.Admin.LlmMetrics", own Anthropic
-// client cache. When IAnthropicLlmRuntime lands, this class collapses
-// to a thin caller — see the file header on OcrTextEnhancer for the
-// long-term refactor plan.
+// Shared LLM runtime — Anthropic client cache, in-process circuit
+// breaker (3 failures / 90s), and the legacy per-service meters
+// (llm_request_duration_ms, llm_tokens_total, llm_cost_usd) live in
+// IAnthropicLlmRuntime. This extractor consumes the singleton runtime
+// so a flaky-model trip on question-generation also gates concept-
+// extraction and dashboards see one cohesive series per (model,
+// task_type). Per-feature cost (cena_llm_call_cost_usd_total via
+// ILlmCostMetric) stays at the call site because Haiku ($1/$5 per
+// Mtok) and Sonnet ($3/$15 per Mtok) need different price tags; the
+// runtime's single legacy llm_cost_usd is Sonnet-priced and is now
+// the lossy summary, not the source of truth for finance.
 // =============================================================================
 
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
 using System.Text.Json;
 using Cena.Actors.Events;
 using Cena.Actors.Mastery;
@@ -116,18 +119,6 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
     // is designed to prevent.
     private const string HaikuModelId = "claude-haiku-4-5-20260101";
 
-    // Output token cap. Tool input is small (one primary + up to 4
-    // supporting × ~30 tokens each ≈ 200 tokens). Generous cap of 512
-    // covers an over-explainer model + leaves room for the tool_use
-    // wrapper bytes.
-    private const int MaxOutputTokens = 512;
-
-    // Routing-config pricing for cena_llm_call_cost_usd_total — tracks
-    // the Haiku rate card. Mirrors AiGenerationService / OcrTextEnhancer
-    // patterns; see file header trade-off note.
-    private const double CostPerInputMTok = 1.00;
-    private const double CostPerOutputMTok = 5.00;
-
     private readonly RulesOnlyConceptExtractor _rulesTier;
     private readonly BagrutTaxonomyCatalog _catalog;
     private readonly ILogger<HybridConceptExtractor> _logger;
@@ -137,25 +128,10 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
     private readonly ILlmCostMetric? _featureCost;
     private readonly IActivityPropagator? _activityPropagator;
     private readonly IAnthropicConceptExtractionInvoker _invoker;
-
-    // Local in-process circuit breaker (parallel to AiGenerationService /
-    // OcrTextEnhancer — promotion to a shared IAnthropicLlmRuntime is the
-    // long-term fix). Mirrors the 3-failure / 90s open thresholds so a
-    // failing concept-extractor doesn't pile failed calls onto Anthropic.
-    private int _failureCount;
-    private DateTimeOffset _circuitOpenedAt;
-    private bool _circuitOpen;
-    private static readonly int MaxFailures = 3;
-    private static readonly TimeSpan OpenDuration = TimeSpan.FromSeconds(90);
-    private readonly object _cbLock = new();
-
-    // Legacy per-service meters preserved on the SAME meter name as
-    // AiGenerationService / OcrTextEnhancer so existing dashboards
-    // continue to receive concept_extraction task_type rows without a
-    // rename. Meter factories deduplicate by (name, version).
-    private readonly Histogram<double>? _requestDuration;
-    private readonly Counter<long>? _tokensTotal;
-    private readonly Counter<double>? _costUsd;
+    // Optional: tests construct without it; production DI provides the
+    // singleton. When null, breaker checks + legacy-meter emission no-op
+    // and the LLM tier behaves like the breaker is permanently closed.
+    private readonly IAnthropicLlmRuntime? _runtime;
 
     /// <summary>
     /// Full DI ctor used in production. The optional dependencies are
@@ -168,7 +144,7 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
         ILogger<HybridConceptExtractor> logger,
         IConfiguration configuration,
         IAnthropicConceptExtractionInvoker? invoker = null,
-        IMeterFactory? meterFactory = null,
+        IAnthropicLlmRuntime? runtime = null,
         IDocumentStore? documentStore = null,
         IApiKeyCipher? cipher = null,
         ILlmCostMetric? featureCost = null,
@@ -187,24 +163,15 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
         _cipher = cipher;
         _featureCost = featureCost;
         _activityPropagator = activityPropagator;
-        // No DI fallback to "null"; default to the real Anthropic-backed
-        // invoker so a host that registers HybridConceptExtractor without
-        // also registering the invoker still gets the real LLM call.
-        _invoker = invoker ?? new DefaultAnthropicConceptExtractionInvoker();
-
-        if (meterFactory is not null)
-        {
-            var meter = meterFactory.Create("Cena.Admin.LlmMetrics", "1.0.0");
-            _requestDuration = meter.CreateHistogram<double>(
-                "llm_request_duration_ms", unit: "ms",
-                description: "LLM request duration in milliseconds");
-            _tokensTotal = meter.CreateCounter<long>(
-                "llm_tokens_total",
-                description: "Total LLM tokens consumed");
-            _costUsd = meter.CreateCounter<double>(
-                "llm_cost_usd", unit: "USD",
-                description: "LLM cost in USD");
-        }
+        _runtime = runtime;
+        // Default to the real Anthropic-backed invoker only when a runtime
+        // is available (production DI supplies both). Test ctors pass a
+        // fake invoker explicitly and leave runtime null.
+        _invoker = invoker ?? (runtime is not null
+            ? new DefaultAnthropicConceptExtractionInvoker(runtime)
+            : throw new ArgumentException(
+                "Either an IAnthropicConceptExtractionInvoker or an IAnthropicLlmRuntime must be supplied.",
+                nameof(invoker)));
     }
 
     public async Task<ExtractionResult> ExtractAsync(
@@ -275,7 +242,7 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
             return Array.Empty<QuestionConcept>();
         }
 
-        try { RequestCircuitPermission(); }
+        try { _runtime?.RequestCircuitPermission(HaikuModelId); }
         catch (CircuitOpenException ex)
         {
             _logger.LogWarning(
@@ -315,7 +282,8 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
                 apiKey, HaikuModelId, systemPrompt, userPrompt, ct).ConfigureAwait(false);
             sw.Stop();
 
-            EmitMetrics(sw.ElapsedMilliseconds, inputTokens, outputTokens);
+            _runtime?.EmitMetrics(HaikuModelId, "concept_extraction", sw.ElapsedMilliseconds,
+                inputTokens, outputTokens);
 
             if (_featureCost is not null)
             {
@@ -337,7 +305,7 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
                 _logger.LogWarning(
                     "HybridConceptExtractor: Anthropic returned no tool_use block (trace_id={TraceId} qid={QuestionId}) — falling back to rules tier",
                     traceId, input.QuestionId);
-                RecordSuccess();
+                _runtime?.RecordSuccess(HaikuModelId);
                 return Array.Empty<QuestionConcept>();
             }
 
@@ -351,7 +319,7 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
                 "HybridConceptExtractor LLM OK (trace_id={TraceId} qid={QuestionId} input={Input} output={Output} duration={DurationMs}ms returned={Returned})",
                 traceId, input.QuestionId, inputTokens, outputTokens, sw.ElapsedMilliseconds, parsed.Count);
 
-            RecordSuccess();
+            _runtime?.RecordSuccess(HaikuModelId);
             return parsed;
         }
         catch (CircuitOpenException)
@@ -365,7 +333,7 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
         catch (Exception ex)
         {
             sw.Stop();
-            RecordFailure();
+            _runtime?.RecordFailure(HaikuModelId);
             activity?.SetTag("outcome", "error");
             // Use the trace id even on failure so the cost-of-zero call
             // can be tied to the failed Anthropic span downstream.
@@ -556,78 +524,6 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
         // the LLM. The LLM is still constrained by the schema +
         // canonicalize step downstream.
         return filtered.Count == 0 ? all : filtered;
-    }
-
-    // ── Circuit breaker (parallel — see file header) ─────────────────────
-
-    private void RequestCircuitPermission()
-    {
-        lock (_cbLock)
-        {
-            if (!_circuitOpen) return;
-
-            if (DateTimeOffset.UtcNow - _circuitOpenedAt >= OpenDuration)
-            {
-                _logger.LogInformation(
-                    "HybridConceptExtractor breaker half-open, allowing probe");
-                _circuitOpen = false;
-                _failureCount = 0;
-                return;
-            }
-
-            var retryAfter = OpenDuration - (DateTimeOffset.UtcNow - _circuitOpenedAt);
-            throw new CircuitOpenException(
-                $"HybridConceptExtractor circuit OPEN. Retry after {retryAfter.TotalSeconds:F0}s.");
-        }
-    }
-
-    private void RecordSuccess()
-    {
-        lock (_cbLock)
-        {
-            _failureCount = 0;
-            _circuitOpen = false;
-        }
-    }
-
-    private void RecordFailure()
-    {
-        lock (_cbLock)
-        {
-            _failureCount++;
-            _logger.LogWarning(
-                "HybridConceptExtractor LLM failure. Count={Count}/{Max}",
-                _failureCount, MaxFailures);
-
-            if (_failureCount >= MaxFailures)
-            {
-                _circuitOpen = true;
-                _circuitOpenedAt = DateTimeOffset.UtcNow;
-                _logger.LogWarning(
-                    "HybridConceptExtractor breaker OPENED. Failures={Count}, OpenDuration={Duration}s",
-                    _failureCount, OpenDuration.TotalSeconds);
-            }
-        }
-    }
-
-    // ── Metrics (mirrors AiGenerationService.EmitMetrics) ────────────────
-
-    private void EmitMetrics(long durationMs, long inputTokens, long outputTokens)
-    {
-        if (_requestDuration is null || _tokensTotal is null || _costUsd is null) return;
-
-        var modelTag = new KeyValuePair<string, object?>("model_id", HaikuModelId);
-        var taskTag = new KeyValuePair<string, object?>("task_type", "concept_extraction");
-
-        _requestDuration.Record(durationMs, modelTag, taskTag,
-            new KeyValuePair<string, object?>("status", "success"));
-        _tokensTotal.Add(inputTokens, modelTag, taskTag,
-            new KeyValuePair<string, object?>("direction", "input"));
-        _tokensTotal.Add(outputTokens, modelTag, taskTag,
-            new KeyValuePair<string, object?>("direction", "output"));
-
-        var cost = (inputTokens * CostPerInputMTok + outputTokens * CostPerOutputMTok) / 1_000_000.0;
-        _costUsd.Add(cost, modelTag, taskTag);
     }
 
     // ── API key resolution (admin-tier secrets) ──────────────────────────

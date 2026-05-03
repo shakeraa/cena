@@ -2,11 +2,13 @@
 // Cena Platform — DefaultAnthropicConceptExtractionInvoker (ADR-0062 Phase 1)
 //
 // The real Anthropic-side glue for HybridConceptExtractor. Owns:
-//   - the Anthropic SDK call (client cache, MaxRetries=0 → caller's
-//     circuit breaker is the retry surface),
 //   - the tool definition (closed-set schema for tag_question_concepts),
 //   - the cache_control: ephemeral on the system block per ADR-0026 §6,
 //   - the response → (toolInput, tokens) projection.
+//
+// The Anthropic SDK client cache lives in IAnthropicLlmRuntime — this
+// invoker just borrows the client per call so a flaky-model trip on
+// question-generation also gates concept-extraction (and vice versa).
 //
 // Why split out: HybridConceptExtractor is sealed (DI singleton lifetime),
 // and a `virtual` test seam on a sealed class breaks the build (CS0549).
@@ -18,18 +20,21 @@ using System.Text.Json;
 using Anthropic;
 using Anthropic.Core;
 using Anthropic.Models.Messages;
+using Cena.Admin.Api.AiSettings;
 
 namespace Cena.Admin.Api.Mastery.Extraction;
 
 public sealed class DefaultAnthropicConceptExtractionInvoker : IAnthropicConceptExtractionInvoker
 {
-    // Anthropic client cache — keyed on plaintext key, refreshed when the
-    // operator rotates the persisted cipher.
-    private AnthropicClient? _anthropicClient;
-    private string? _lastApiKey;
-    private readonly object _clientLock = new();
-
     private const int MaxOutputTokens = 512;
+
+    private readonly IAnthropicLlmRuntime _runtime;
+
+    public DefaultAnthropicConceptExtractionInvoker(IAnthropicLlmRuntime runtime)
+    {
+        ArgumentNullException.ThrowIfNull(runtime);
+        _runtime = runtime;
+    }
 
     public async Task<(IReadOnlyDictionary<string, JsonElement>? ToolInput, long InputTokens, long OutputTokens)>
         InvokeAsync(
@@ -39,7 +44,7 @@ public sealed class DefaultAnthropicConceptExtractionInvoker : IAnthropicConcept
             string userPrompt,
             CancellationToken ct)
     {
-        var client = GetOrCreateClient(apiKey);
+        var client = _runtime.GetOrCreateClient(apiKey);
 
         // System block carries the closed-set catalog with ephemeral
         // cache_control so per-call cost is dominated by the small
@@ -92,23 +97,6 @@ public sealed class DefaultAnthropicConceptExtractionInvoker : IAnthropicConcept
         }
 
         return (null, inputTokens, outputTokens);
-    }
-
-    private AnthropicClient GetOrCreateClient(string apiKey)
-    {
-        lock (_clientLock)
-        {
-            if (_anthropicClient is not null && _lastApiKey == apiKey)
-                return _anthropicClient;
-
-            _anthropicClient = new AnthropicClient(new ClientOptions
-            {
-                ApiKey = apiKey,
-                MaxRetries = 0,
-            });
-            _lastApiKey = apiKey;
-            return _anthropicClient;
-        }
     }
 
     // ── Tool schema (closed-set discipline encoded in the schema) ────────
