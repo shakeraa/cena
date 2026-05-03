@@ -210,8 +210,11 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
 
             var inputTokens = response.Usage.InputTokens;
             var outputTokens = response.Usage.OutputTokens;
+            // Gap 30 fix: pricing per-call. OcrTextEnhancer reuses the persisted
+            // AnthropicModelId or the SonnetModelId default. Match on family so
+            // an admin selecting Haiku in the SPA dropdown is priced correctly.
             _runtime.EmitMetrics(modelName, "ocr_text_enhance", sw.ElapsedMilliseconds,
-                inputTokens, outputTokens);
+                inputTokens, outputTokens, ResolvePricingFor(modelName));
 
             // prr-046: canonical per-feature cost counter (cena_llm_call_cost_usd_total)
             _featureCost.Record(
@@ -332,4 +335,25 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         return string.IsNullOrWhiteSpace(fromConfig) ? null : fromConfig;
     }
 
+    /// <summary>
+    /// Resolve per-call pricing for the configured Anthropic model. Mirrors
+    /// AiGenerationService.ResolvePricingFor — kept local because the
+    /// runtime intentionally accepts no default and forces every consumer
+    /// to be explicit. Family-substring match keeps the SPA-dropdown values
+    /// (claude-haiku-4-5-20251001, claude-sonnet-4-6, etc.) priced correctly.
+    /// </summary>
+    private LlmCallPricing ResolvePricingFor(string modelId)
+    {
+        if (string.IsNullOrWhiteSpace(modelId)) return LlmCallPricing.AnthropicSonnet4_6;
+        if (modelId.Contains("haiku", StringComparison.OrdinalIgnoreCase))
+            return LlmCallPricing.AnthropicHaiku4_5;
+        if (modelId.Contains("sonnet", StringComparison.OrdinalIgnoreCase))
+            return LlmCallPricing.AnthropicSonnet4_6;
+        if (modelId.Contains("opus", StringComparison.OrdinalIgnoreCase))
+            return new LlmCallPricing(15.00m, 75.00m);
+        _logger.LogWarning(
+            "OcrTextEnhancer: unknown model_id={Model} for pricing resolution — defaulting to Sonnet 4.6 rates.",
+            modelId);
+        return LlmCallPricing.AnthropicSonnet4_6;
+    }
 }

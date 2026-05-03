@@ -699,8 +699,13 @@ public sealed class AiGenerationService : IAiGenerationService
             // Record metrics — legacy per-service triple via the shared runtime.
             var inputTokens = response.Usage.InputTokens;
             var outputTokens = response.Usage.OutputTokens;
+            // Gap 30 fix: pricing is per-call. AiGenerationService routes through
+            // either Sonnet (default + admin's persisted modelId) or any
+            // Anthropic model the admin selects in the SPA dropdown. We resolve
+            // the per-call pricing from the model name so the legacy
+            // llm_cost_usd meter matches the per-feature counter.
             _runtime.EmitMetrics(modelName, "question_generation", sw.ElapsedMilliseconds,
-                inputTokens, outputTokens);
+                inputTokens, outputTokens, ResolvePricingFor(modelName));
             // prr-046: canonical per-feature cost counter — stays at the call
             // site because the (feature, tier, task) tags are caller-owned.
             _featureCost.Record(
@@ -755,6 +760,37 @@ public sealed class AiGenerationService : IAiGenerationService
             _logger.LogError(ex, "Anthropic API call failed after {ElapsedMs}ms", sw.ElapsedMilliseconds);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Resolve the per-call pricing for a configurable Anthropic model.
+    /// AiGenerationService allows the admin to pick any Anthropic model
+    /// from the SPA dropdown — Sonnet today, anything else tomorrow. We
+    /// match on the well-known model-family substrings the SPA dropdown
+    /// emits; an unknown model falls back to Sonnet (the historic default
+    /// the legacy meter used). When the unknown branch fires we log a
+    /// warning so finops sees the dropped-into-default behaviour.
+    /// </summary>
+    private LlmCallPricing ResolvePricingFor(string modelId)
+    {
+        if (string.IsNullOrWhiteSpace(modelId)) return LlmCallPricing.AnthropicSonnet4_6;
+        if (modelId.Contains("haiku", StringComparison.OrdinalIgnoreCase))
+            return LlmCallPricing.AnthropicHaiku4_5;
+        if (modelId.Contains("sonnet", StringComparison.OrdinalIgnoreCase))
+            return LlmCallPricing.AnthropicSonnet4_6;
+        if (modelId.Contains("opus", StringComparison.OrdinalIgnoreCase))
+        {
+            // Opus 4 list price ~ $15 in / $75 out per Mtok. Inline rather
+            // than a third static helper because Opus is not currently
+            // wired in the SPA dropdown — keep the surface narrow until it
+            // is, but compute correctly when an admin picks it manually.
+            return new LlmCallPricing(15.00m, 75.00m);
+        }
+        _logger.LogWarning(
+            "AiGenerationService: unknown model_id={Model} for pricing resolution — defaulting to Sonnet 4.6 rates. " +
+            "Add an explicit branch in ResolvePricingFor when this model lands in the SPA dropdown.",
+            modelId);
+        return LlmCallPricing.AnthropicSonnet4_6;
     }
 
     // ── Response Parsing ──
