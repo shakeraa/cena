@@ -33,9 +33,7 @@ public static class AdminApiEndpoints
             return Results.Ok(overview);
         }).WithName("GetFocusOverview")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         group.MapGet("/students/{studentId}", async (string studentId, ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
@@ -44,9 +42,7 @@ public static class AdminApiEndpoints
         }).WithName("GetStudentFocus")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         group.MapGet("/classes/{classId}", async (string classId, ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
