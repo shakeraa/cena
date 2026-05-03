@@ -62,7 +62,7 @@ jobs:
           version: v3.14.0
 
       - name: Configure kubectl
-        uses: azure/k8s-set-context@v4
+        uses: azure/k8s-set-context@v5
         with:
           kubeconfig: ${{ secrets.KUBECONFIG }}
 
@@ -118,7 +118,7 @@ jobs:
           version: v3.14.0
 
       - name: Configure kubectl
-        uses: azure/k8s-set-context@v4
+        uses: azure/k8s-set-context@v5
         with:
           kubeconfig: ${{ secrets.KUBECONFIG }}
 
