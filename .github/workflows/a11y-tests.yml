@@ -76,7 +76,7 @@ jobs:
         run: npx playwright test tests/e2e/a11y-full-page-scan.spec.ts
       - name: Upload Playwright report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: a11y-playwright-report
           path: src/student/full-version/playwright-report/

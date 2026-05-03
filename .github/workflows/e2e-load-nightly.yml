@@ -71,7 +71,7 @@ jobs:
 
       - name: Upload student-journey summary
         if: env.CENA_STUDENT_URL != '' && env.CENA_STUDENT_TOKEN != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: student-journey-summary
           path: /tmp/student-summary.json
@@ -83,7 +83,7 @@ jobs:
 
       - name: Upload admin-corpus summary
         if: env.CENA_ADMIN_URL != '' && env.CENA_ADMIN_TOKEN != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: admin-corpus-summary
           path: /tmp/admin-summary.json
