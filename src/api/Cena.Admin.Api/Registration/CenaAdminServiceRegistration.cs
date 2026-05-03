@@ -366,6 +366,26 @@ public static class CenaAdminServiceRegistration
         // the real OCR cascade (IOcrCascadeService, ADR-0033). No stubs.
         services.AddScoped<Ingestion.IBagrutPdfIngestionService, Ingestion.BagrutPdfIngestionService>();
 
+        // vision-extractor branch (2026-05-04): single-call Gemini Vision
+        // page extractor that replaces the multi-layer cascade for non-
+        // encrypted PDFs. Wired alongside (not replacing) the cascade — when
+        // the Cena:Ingestion:BagrutVisionExtractorEnabled flag is OFF or the
+        // vision call fails, BagrutPdfIngestionService falls back to the
+        // legacy cascade unchanged (fail-open by construction).
+        services.AddOptions<Ingestion.Vision.SourcePageStorageOptions>()
+            .BindConfiguration("Ingestion:SourcePageStorage");
+        services.TryAddSingleton<
+            Ingestion.Vision.IPdfPageRasterizer,
+            Ingestion.Vision.PdfPageRasterizer>();
+        services.TryAddSingleton<
+            Ingestion.Vision.IFigureCropper,
+            Ingestion.Vision.FigureCropper>();
+        services.AddOptions<Ingestion.Vision.GeminiVisionPageExtractorOptions>()
+            .BindConfiguration("Ocr:GeminiVision");
+        services.AddHttpClient<
+                Ingestion.Vision.IBagrutPageVisionExtractor,
+                Ingestion.Vision.GeminiVisionPageExtractor>();
+
         // prr-242: Bagrut reference-corpus service. Produces BagrutCorpusItem
         // rows downstream of the PDF ingest, and also serves as the production
         // IMinistryReferenceCorpus feed for the MinistrySimilarityChecker

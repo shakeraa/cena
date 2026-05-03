@@ -29,6 +29,7 @@
 // =============================================================================
 
 using System.Text.Json;
+using Cena.Admin.Api.Ingestion.Vision;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Errors;
@@ -170,7 +171,106 @@ public static class VisualReviewEndpoints
             .Produces<CenaError>(StatusCodes.Status403Forbidden)
             .Produces<CenaError>(StatusCodes.Status429TooManyRequests);
 
+        // vision-extractor branch (2026-05-04): serve rasterised page PNGs
+        // so the SPA can replace the brittle <embed src=source.pdf#page=N>
+        // surface with <img src=.../page/N.png>. Endpoint exists even when
+        // the vision flag is OFF — the legacy cascade does not produce
+        // these PNGs, so the endpoint 404s for those items, and the SPA
+        // can fall back to the existing source.pdf surface.
+        group.MapGet("/{id}/page/{pageNumber:int}.png", async (
+            string id,
+            int pageNumber,
+            IDocumentStore store,
+            IOptions<SourcePageStorageOptions> pageOpts,
+            CancellationToken ct) =>
+        {
+            if (pageNumber < 1)
+                return Results.BadRequest(new CenaError(
+                    "invalid_page_number", "pageNumber must be >= 1.",
+                    ErrorCategory.Validation, null, null));
+
+            await using var session = store.QuerySession();
+            var payload = await session.LoadAsync<BagrutDraftPayloadDocument>(id, ct);
+            if (payload is null || string.IsNullOrWhiteSpace(payload.SourcePdfId))
+                return Results.NotFound(new CenaError(
+                    "source_page_unavailable",
+                    "This item has no associated source PDF (uploaded before persistent storage was added).",
+                    ErrorCategory.NotFound, null, null));
+
+            // Sandbox the resolved path: must stay under the configured
+            // SourcePageStorageOptions root. Prevents directory-traversal
+            // through a tampered SourcePdfId.
+            var rootFull = Path.GetFullPath(pageOpts.Value.RootDirectory);
+            var pdfDir = Path.Combine(rootFull, SafeIdSegment(payload.SourcePdfId!));
+            var fileName = $"page-{pageNumber:D3}.png";
+            // pdftoppm may also pad to fewer digits depending on page count.
+            // Try the canonical D3 padding first, then fall back to D2/D1
+            // for older renders.
+            string? resolvedPath = null;
+            foreach (var candidate in new[]
+            {
+                Path.Combine(pdfDir, fileName),
+                Path.Combine(pdfDir, $"page-{pageNumber:D2}.png"),
+                Path.Combine(pdfDir, $"page-{pageNumber}.png"),
+            })
+            {
+                var fileFull = Path.GetFullPath(candidate);
+                if (!fileFull.StartsWith(
+                        rootFull.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                if (File.Exists(fileFull))
+                {
+                    resolvedPath = fileFull;
+                    break;
+                }
+            }
+            if (resolvedPath is null)
+                return Results.NotFound(new CenaError(
+                    "source_page_not_rendered",
+                    $"No rasterised page {pageNumber} for this item. The vision-extractor pipeline persists pages on ingestion; older items use the source.pdf surface.",
+                    ErrorCategory.NotFound, null, null));
+
+            Stream stream = new FileStream(
+                resolvedPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 4096,
+                options: FileOptions.Asynchronous | FileOptions.SequentialScan);
+            return Results.File(stream, "image/png", enableRangeProcessing: true);
+        }).WithName("GetIngestionItemSourcePagePng")
+            .Produces(StatusCodes.Status200OK, contentType: "image/png")
+            .Produces<CenaError>(StatusCodes.Status400BadRequest)
+            .Produces<CenaError>(StatusCodes.Status404NotFound)
+            .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+            .Produces<CenaError>(StatusCodes.Status403Forbidden)
+            .Produces<CenaError>(StatusCodes.Status429TooManyRequests);
+
         return app;
+    }
+
+    /// <summary>
+    /// Strict whitelist for path-segment use of pdfId. Mirrors
+    /// PdfPageRasterizer.SafeId so the rasteriser's directory and the
+    /// endpoint resolver agree on the path.
+    /// </summary>
+    private static string SafeIdSegment(string id)
+    {
+        var span = id.AsSpan();
+        var buf = new char[span.Length];
+        int j = 0;
+        foreach (var ch in span)
+        {
+            var ok = (ch >= '0' && ch <= '9')
+                  || (ch >= 'a' && ch <= 'z')
+                  || (ch >= 'A' && ch <= 'Z')
+                  || ch == '-' || ch == '_';
+            if (ok) buf[j++] = ch;
+        }
+        return j == 0 ? "_" : new string(buf, 0, j).ToLowerInvariant();
     }
 
     private static string ResolveImageContentType(string path)

@@ -30,10 +30,12 @@
 // =============================================================================
 
 using Cena.Admin.Api.Ingestion.Segmenter;
+using Cena.Admin.Api.Ingestion.Vision;
 using Cena.Infrastructure.Ocr;
 using Cena.Infrastructure.Ocr.Contracts;
 using Cena.Infrastructure.Ocr.PdfTriage;
 using Cena.Infrastructure.Security;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Admin.Api.Ingestion;
@@ -112,10 +114,25 @@ public interface IBagrutPdfIngestionService
 /// </summary>
 public sealed class BagrutPdfIngestionService : IBagrutPdfIngestionService
 {
+    /// <summary>
+    /// Feature flag: when true, the per-page vision-LLM extractor replaces
+    /// the multi-layer cascade for non-encrypted PDFs. Default OFF in prod;
+    /// hot-reload overlay defaults ON so curators can validate output.
+    /// Mirrors <see cref="GeminiVisionPageExtractor.EnabledFlagKey"/>.
+    /// </summary>
+    public const string VisionExtractorFlagKey = "Cena:Ingestion:BagrutVisionExtractorEnabled";
+
     private readonly IOcrCascadeService _cascade;
     private readonly IBagrutPdfStore _pdfStore;
     private readonly IBagrutQuestionSegmenter _segmenter;
     private readonly ILogger<BagrutPdfIngestionService> _logger;
+
+    // Vision-extractor seam (optional — when any of these are missing or
+    // the flag is off, the legacy cascade runs unchanged).
+    private readonly IConfiguration? _configuration;
+    private readonly IPdfPageRasterizer? _rasterizer;
+    private readonly IBagrutPageVisionExtractor? _visionExtractor;
+    private readonly IFigureCropper? _figureCropper;
 
     /// <summary>
     /// Production ctor. <paramref name="segmenter"/> is REQUIRED and is the
@@ -123,12 +140,24 @@ public sealed class BagrutPdfIngestionService : IBagrutPdfIngestionService
     /// inline one-draft-per-page heuristic 2026-05-03 — user-reported defect
     /// 35581-q.pdf produced 6 drafts where pages 1-2 were exam cover and
     /// "answer 5 of 8" preamble).
+    /// <para>
+    /// Vision-extractor parameters (rasterizer, visionExtractor, figureCropper,
+    /// configuration) are optional. When all four are wired AND the
+    /// <see cref="VisionExtractorFlagKey"/> flag is true, IngestAsync runs
+    /// rasterize → vision → crop instead of the multi-layer cascade. When any
+    /// one is missing OR the flag is false OR any vision step fails, the
+    /// legacy cascade runs unchanged (fail-open by construction).
+    /// </para>
     /// </summary>
     public BagrutPdfIngestionService(
         IOcrCascadeService cascade,
         IBagrutPdfStore pdfStore,
         IBagrutQuestionSegmenter segmenter,
-        ILogger<BagrutPdfIngestionService> logger)
+        ILogger<BagrutPdfIngestionService> logger,
+        IConfiguration? configuration = null,
+        IPdfPageRasterizer? rasterizer = null,
+        IBagrutPageVisionExtractor? visionExtractor = null,
+        IFigureCropper? figureCropper = null)
     {
         ArgumentNullException.ThrowIfNull(cascade);
         ArgumentNullException.ThrowIfNull(pdfStore);
@@ -139,6 +168,10 @@ public sealed class BagrutPdfIngestionService : IBagrutPdfIngestionService
         _pdfStore  = pdfStore;
         _segmenter = segmenter;
         _logger    = logger;
+        _configuration = configuration;
+        _rasterizer = rasterizer;
+        _visionExtractor = visionExtractor;
+        _figureCropper = figureCropper;
     }
 
     public async Task<PdfIngestionResult> IngestAsync(
@@ -171,6 +204,24 @@ public sealed class BagrutPdfIngestionService : IBagrutPdfIngestionService
         {
             _logger.LogError(ex,
                 "Bagrut PDF persistence failed (continuing ingestion): pdf={PdfId}", pdfId);
+        }
+
+        // Vision-extractor branch (vision-extractor task, 2026-05-04). When
+        // all seams are wired AND the flag is on, replace the multi-layer
+        // cascade with rasterize → vision-LLM → crop. Output shape into the
+        // segmenter is byte-identical so the downstream code path is
+        // unchanged.
+        if (IsVisionExtractorEnabled())
+        {
+            var visionResult = await TryRunVisionExtractorAsync(
+                pdfBytes, pdfId, examCode, ct).ConfigureAwait(false);
+            if (visionResult is not null)
+            {
+                return visionResult;
+            }
+            // visionResult==null is the fail-open path — log already
+            // emitted by TryRunVisionExtractorAsync; legacy cascade picks up
+            // below.
         }
 
         var hints = new OcrContextHints(
@@ -245,6 +296,181 @@ public sealed class BagrutPdfIngestionService : IBagrutPdfIngestionService
             FiguresExtracted: figureCount,
             Drafts: drafts,
             Warnings: warnings);
+    }
+
+    // --------------------------------------------------------------------
+    // Vision-extractor path (vision-extractor branch, 2026-05-04)
+    //
+    // Returns null when the vision path was not viable (any seam missing,
+    // any per-page extraction failed, encrypted PDF). Caller falls back to
+    // the legacy cascade.
+    // --------------------------------------------------------------------
+    private bool IsVisionExtractorEnabled()
+    {
+        if (_configuration is null) return false;
+        if (_rasterizer is null) return false;
+        if (_visionExtractor is null) return false;
+        if (_figureCropper is null) return false;
+        var raw = _configuration[VisionExtractorFlagKey];
+        return bool.TryParse(raw, out var enabled) && enabled;
+    }
+
+    private async Task<PdfIngestionResult?> TryRunVisionExtractorAsync(
+        byte[] pdfBytes,
+        string pdfId,
+        string examCode,
+        CancellationToken ct)
+    {
+        // 1. Rasterize. Throws InvalidOperationException for encrypted /
+        //    missing-binary; we map encrypted to the structured warning
+        //    and any other failure to fall-back-to-cascade.
+        IReadOnlyList<string> pagePaths;
+        try
+        {
+            pagePaths = await _rasterizer!.RasterizeAsync(pdfBytes, pdfId, ct).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException ex) when (IsEncryptedRenderError(ex.Message))
+        {
+            _logger.LogWarning(
+                "Bagrut vision-path: PDF encrypted, no drafts extracted: pdf={PdfId} error={Err}",
+                pdfId, ex.Message);
+            return new PdfIngestionResult(
+                PdfId: pdfId,
+                ExamCode: examCode,
+                TotalPages: 0,
+                QuestionsExtracted: 0,
+                FiguresExtracted: 0,
+                Drafts: Array.Empty<IngestionDraftQuestion>(),
+                Warnings: new[] { "encrypted_pdf:cannot_read_without_password" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Bagrut vision-path: rasterizer failed pdf={PdfId} — falling back to legacy cascade",
+                pdfId);
+            return null;
+        }
+
+        if (pagePaths.Count == 0)
+        {
+            _logger.LogWarning(
+                "Bagrut vision-path: rasterizer produced 0 pages pdf={PdfId} — falling back to legacy cascade",
+                pdfId);
+            return null;
+        }
+
+        // 2. Per-page vision extract. Any null result → fall back. Empty
+        //    extraction (whitespace promptText with 0 figures and no
+        //    LaTeX) on a page fails the same way — we trust the cascade
+        //    over an empty vision result.
+        var pages = new List<ExtractedPage>(pagePaths.Count);
+        for (var i = 0; i < pagePaths.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var pageNumber = i + 1;
+            byte[] pageBytes;
+            try
+            {
+                pageBytes = await File.ReadAllBytesAsync(pagePaths[i], ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Bagrut vision-path: page PNG read failed pdf={PdfId} page={Page} — falling back to legacy cascade",
+                    pdfId, pageNumber);
+                return null;
+            }
+
+            BagrutPageExtraction? extraction;
+            try
+            {
+                extraction = await _visionExtractor!.ExtractAsync(
+                    pageBytes, pageNumber, pdfId, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Bagrut vision-path: vision extractor threw pdf={PdfId} page={Page} — falling back to legacy cascade",
+                    pdfId, pageNumber);
+                return null;
+            }
+
+            if (extraction is null)
+            {
+                _logger.LogWarning(
+                    "Bagrut vision-path: vision extractor returned null pdf={PdfId} page={Page} — falling back to legacy cascade",
+                    pdfId, pageNumber);
+                return null;
+            }
+
+            // 3. Crop figures. Persists under FigureStorageOptions.OutputDirectory
+            //    so the existing VisualReviewEndpoints figure-stream resolves
+            //    without changes.
+            IReadOnlyList<CroppedFigureRecord> cropped;
+            try
+            {
+                cropped = await _figureCropper!.CropAsync(
+                    pagePaths[i], pageNumber, pdfId, extraction.Figures, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Bagrut vision-path: figure cropper threw pdf={PdfId} page={Page} — keeping page text but dropping figures",
+                    pdfId, pageNumber);
+                cropped = Array.Empty<CroppedFigureRecord>();
+            }
+
+            var figures = cropped
+                .Select(c => new ExtractedFigure(
+                    PageNumber: c.PageNumber,
+                    X: c.X, Y: c.Y, Width: c.Width, Height: c.Height,
+                    CroppedPath: c.CroppedPath,
+                    Kind: c.Kind,
+                    AltText: c.AltText))
+                .ToList();
+
+            pages.Add(new ExtractedPage(
+                PageNumber: pageNumber,
+                RawText: extraction.PromptText,
+                ExtractedLatex: extraction.Latex,
+                Figures: figures,
+                OcrConfidence: extraction.Confidence));
+        }
+
+        // 4. Run segmenter on the vision-built pages — same code path as
+        //    cascade output. The segmenter doesn't care which extractor
+        //    produced the ExtractedPage records.
+        var segments = await _segmenter.SegmentAsync(pages, examCode, pdfId, ct).ConfigureAwait(false);
+        var drafts = MaterialiseDrafts(pages, segments, examCode, out var figureCount);
+
+        var warnings = new List<string>();
+        if (drafts.Any(d => d.ExtractionConfidence < 0.70))
+            warnings.Add("some_drafts_low_confidence");
+
+        _logger.LogInformation(
+            "Bagrut ingestion complete (vision-path): pdf={PdfId} pages={Pages} segments={Segments} drafts={Drafts} figures={Figures}",
+            pdfId, pages.Count, segments.Count, drafts.Count, figureCount);
+
+        return new PdfIngestionResult(
+            PdfId: pdfId,
+            ExamCode: examCode,
+            TotalPages: pages.Count,
+            QuestionsExtracted: drafts.Count,
+            FiguresExtracted: figureCount,
+            Drafts: drafts,
+            Warnings: warnings.ToArray());
+    }
+
+    private static bool IsEncryptedRenderError(string? message)
+    {
+        if (string.IsNullOrEmpty(message)) return false;
+        // pdftoppm surfaces encrypted/locked PDFs with messages like
+        // "Command Line Error: Incorrect password" / "Document not unlocked".
+        // We match the literal cues; anything else is treated as a
+        // non-encryption render failure.
+        return message.Contains("password", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("unlocked", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("encrypted", StringComparison.OrdinalIgnoreCase);
     }
 
     // --------------------------------------------------------------------

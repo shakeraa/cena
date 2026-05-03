@@ -63,6 +63,12 @@ services:
       # default-OFF until the curator-validation gate passes. Local dev
       # override: set CENA_BAGRUT_LLM_SEGMENTER_ENABLED=false to disable.
       - Cena__Ingestion__BagrutLlmSegmenterEnabled=${CENA_BAGRUT_LLM_SEGMENTER_ENABLED:-true}
+      # vision-extractor branch (2026-05-04) — same pattern. Default ON in
+      # the hot-reload overlay so curators can validate single-call vision
+      # output on real Bagrut PDFs; default OFF in prod compose. Fail-open:
+      # if Gemini fails, BagrutPdfIngestionService falls back to the legacy
+      # cascade unchanged.
+      - Cena__Ingestion__BagrutVisionExtractorEnabled=${CENA_BAGRUT_VISION_EXTRACTOR_ENABLED:-true}
     volumes:
       - ./src:/src/src
       - ./db/migrations:/src/db/migrations

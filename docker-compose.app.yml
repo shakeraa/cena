@@ -173,6 +173,17 @@ services:
       # .env to flip on. Prod stays default-off until the legal-delta + curator
       # validation pass complete.
       - Cena__Ingestion__BagrutLlmSegmenterEnabled=${CENA_BAGRUT_LLM_SEGMENTER_ENABLED:-false}
+      # vision-extractor branch (2026-05-04): single Gemini Vision call per
+      # rendered Bagrut page replacing the multi-layer cascade. Default OFF
+      # in prod compose; the hot-reload overlay flips to true so the curator
+      # can validate output without editing .env. Fail-open: if the flag is
+      # ON but Gemini fails, BagrutPdfIngestionService falls back to the
+      # legacy cascade unchanged.
+      - Cena__Ingestion__BagrutVisionExtractorEnabled=${CENA_BAGRUT_VISION_EXTRACTOR_ENABLED:-false}
+      # Vision extractor uses its own Gemini API key + model (separate from
+      # Ocr:Gemini which the legacy cascade's Layer-4b rescue runner uses).
+      # When unset, falls back to Ocr:Gemini:ApiKey (single-key dev setup).
+      - Ocr__GeminiVision__ApiKey=${OCR_GEMINI_VISION_API_KEY:-${OCR_GEMINI_API_KEY:-}}
       # Visual-review (2026-05-01): persist Bagrut source PDFs + OCR figure
       # crops to disk so curators can render them side-by-side with the
       # extracted output. Both directories are container-internal paths; the
@@ -182,6 +193,10 @@ services:
       # /var/cena and use the matching named volumes.
       - Ingestion__BagrutPdfStorage__RootDirectory=/var/cena/source-pdfs
       - Ocr__FigureStorage__OutputDirectory=/var/cena/ocr-figures
+      # vision-extractor branch: rasterised page PNGs land under
+      # /var/cena/source-pages (named volume below). The new endpoint
+      # GET /api/admin/ingestion/items/{id}/page/{N}.png streams these.
+      - Ingestion__SourcePageStorage__RootDirectory=/var/cena/source-pages
     volumes:
       # Source PDFs (sha256-keyed). Curators read these via
       # GET /api/admin/ingestion/items/{id}/source.pdf.
@@ -189,6 +204,9 @@ services:
       # OCR figure crops written by Layer2cFigureExtraction. Curators
       # read these via the figure-stream endpoint surfaced on item detail.
       - cena_ocr_figures:/var/cena/ocr-figures
+      # Rasterised source-page PNGs (vision-extractor branch). Bind-mount
+      # so curators can render them as <img src=.../page/N.png>.
+      - cena_source_pages:/var/cena/source-pages
       # ADR-0062 — BagrutTaxonomyCatalog.LoadFromDisk() walks up from
       # AppContext.BaseDirectory looking for scripts/bagrut-taxonomy.json.
       # Without this single-file mount the ingestion runner throws

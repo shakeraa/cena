@@ -150,6 +150,40 @@ models:
     is_trusted_provider: true
     notes: "Alias matching SPA dropdown's claude-haiku-4-5-20251001 — same pricing as claude-haiku-4-5-20260101"
 
+  # ─── Google Gemini (vision-extractor branch, 2026-05-04) ─────────────
+  # Used by GeminiVisionPageExtractor for the bagrut_page_extraction task
+  # (single tool-use call per rendered PDF page). Pricing rates per
+  # generativelanguage.googleapis.com public list rates as of 2026-04-30:
+  # Gemini 2.0 Flash = $0.10/Mtok input, $0.40/Mtok output. Curators can
+  # override to a Claude vision model via the per-task override panel; the
+  # alias rows below give the override path a pricing target so the cost
+  # meter stays accurate (LlmPricingTable.Resolve fail-louds otherwise).
+  gemini_2_0_flash:
+    model_id: "gemini-2.0-flash"
+    provider: "google"
+    api_base_url: "https://generativelanguage.googleapis.com/v1beta"
+    tier: "flash"
+    context_window: 1000000
+    max_output_tokens: 8192
+    cost_per_input_mtok: 0.10
+    cost_per_output_mtok: 0.40
+    cost_per_cached_input_mtok: 0.025
+    is_trusted_provider: false   # PII pre-scrubbed via PiiPreScrubbed; Bagrut input is Ministry public
+    notes: "Multimodal vision; cheap; tool-use schema enforced. Default for bagrut_page_extraction."
+
+  gemini_1_5_flash:
+    model_id: "gemini-1.5-flash"
+    provider: "google"
+    api_base_url: "https://generativelanguage.googleapis.com/v1beta"
+    tier: "flash"
+    context_window: 1000000
+    max_output_tokens: 8192
+    cost_per_input_mtok: 0.075
+    cost_per_output_mtok: 0.30
+    cost_per_cached_input_mtok: 0.01875
+    is_trusted_provider: false
+    notes: "Legacy fallback model — used by Layer-4b cascade rescue runner; kept here so its pricing row is present when the cost meter records a fallback call."
+
   # Multi-model alias rows (2026-05-03) — add the AnthropicSupportedModels
   # closed-set members that don't already have a row above so
   # LlmPricingTable.Resolve() succeeds for every option the per-task
@@ -350,6 +384,23 @@ task_routing:
     max_tokens: 2048
     notes: "Hebrew Bagrut math exam question-boundary detection. One call per PDF (cache_control: ephemeral on system rubric). Tier 2; per-call ceiling assumes Haiku rates."
 
+  # vision-extractor branch (2026-05-04): single vision-LLM call per
+  # rendered Bagrut page replacing the multi-layer OCR cascade. Closed-set
+  # tool schema returns {promptText, latex, figures[]}. Tier 3 because the
+  # output is the canonical text for curator-review drafts (an extraction
+  # error here surfaces as a published-question typo if the curator
+  # rubber-stamps). Default model is Gemini 2.0 Flash for cost; curators
+  # can override per-task to Claude Sonnet 4.6 / Opus 4.7 if Gemini quality
+  # regresses on a specific PDF subset.
+  bagrut_page_extraction:
+    primary: gemini_2_0_flash
+    fallback_chain:
+      - gemini_1_5_flash
+      - claude_sonnet_4_6
+    temperature: 0.0
+    max_tokens: 4096
+    notes: "Single vision-LLM call per page; tool-use schema enforces JSON shape. Bagrut PDFs are Ministry-public so PII pre-scrubbing is trivially satisfied (no student data ever reaches the model)."
+
 
 # ─────────────────────────────────────────────────────────────────────
 # 2B. PER-TASK DEFAULT MODEL (Cena.Admin.Api.AiSettings.ModelResolver)
@@ -372,11 +423,12 @@ task_routing:
 # ─────────────────────────────────────────────────────────────────────
 
 default_model_by_task:
-  question_generation:  "claude-sonnet-4-6"
-  ocr_text_enhance:     "claude-sonnet-4-6"
-  concept_extraction:   "claude-haiku-4-5-20251001"
-  quality_gate:         "claude-haiku-4-5-20251001"
-  bagrut_segmentation:  "claude-haiku-4-5-20251001"
+  question_generation:    "claude-sonnet-4-6"
+  ocr_text_enhance:       "claude-sonnet-4-6"
+  concept_extraction:     "claude-haiku-4-5-20251001"
+  quality_gate:           "claude-haiku-4-5-20251001"
+  bagrut_segmentation:    "claude-haiku-4-5-20251001"
+  bagrut_page_extraction: "gemini-2.0-flash"
 
 global_default_model_id: "claude-sonnet-4-6"
 
