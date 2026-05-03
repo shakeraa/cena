@@ -203,16 +203,31 @@ if [[ ${#SVCS[@]} -eq 0 ]]; then
 fi
 
 # Per-service path
+#
+# Source-changing rebuilds use stop → build → up -d (NOT `up -d --build`).
+# Reason: on Apple Silicon Docker Desktop, running `up -d --build <svc>`
+# while the existing <svc> is still up has the running app + virtiofs +
+# healthcheck timers competing with BuildKit + dotnet restore for CPU.
+# That's the pattern that wedged the daemon 4× on 2026-05-01. Stopping
+# the container first frees CPU for the build and avoids the wedge.
+# See ~/.claude/projects/-Users-shaker-edu-apps-cena/memory/feedback_stop_before_rebuild.md.
+rebuild_with_stop_first() {
+  local svc="$1"
+  docker compose "${COMPOSE_ARGS[@]}" stop "$svc"
+  docker compose "${COMPOSE_ARGS[@]}" build "$svc"
+  docker compose "${COMPOSE_ARGS[@]}" up -d "$svc"
+}
+
 for svc in "${SVCS[@]}"; do
   if [[ $RESTART_ONLY -eq 1 ]]; then
     echo "[cena-up] $svc → restart (--restart)"
     docker compose "${COMPOSE_ARGS[@]}" restart "$svc"
   elif [[ $FORCE_BUILD -eq 1 ]]; then
-    echo "[cena-up] $svc → rebuild (--force-build)"
-    docker compose "${COMPOSE_ARGS[@]}" up -d --build "$svc"
+    echo "[cena-up] $svc → rebuild (--force-build): stop → build → up -d"
+    rebuild_with_stop_first "$svc"
   elif needs_build "$svc"; then
-    echo "[cena-up] $svc → source changed, rebuilding"
-    docker compose "${COMPOSE_ARGS[@]}" up -d --build "$svc"
+    echo "[cena-up] $svc → source changed, rebuilding: stop → build → up -d"
+    rebuild_with_stop_first "$svc"
   else
     echo "[cena-up] $svc → no source change, restart only (use --force-build to override)"
     docker compose "${COMPOSE_ARGS[@]}" restart "$svc"
