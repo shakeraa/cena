@@ -507,6 +507,12 @@ public static class MartenConfiguration
         opts.Events.AddEventType<Cena.Actors.QuestionBank.Templates.ParametricTemplateDeleted_V1>();
         opts.Events.AddEventType<Cena.Actors.QuestionBank.Templates.ParametricTemplatePreviewExecuted_V1>();
 
+        // ADR-0062 Phase 0 — concept extraction events. Stream-keyed on
+        // QuestionId; the QuestionConceptsProjection folds them onto
+        // QuestionDocument.PrimaryConceptId / ConceptIds.
+        opts.Events.AddEventType<Cena.Actors.Events.QuestionConceptsExtracted_V1>();
+        opts.Events.AddEventType<Cena.Actors.Events.QuestionConceptsConfirmed_V1>();
+
         // ── Learning Objective Document (FIND-pedagogy-008) ──
         opts.Schema.For<LearningObjectiveDocument>()
             .Identity(x => x.Id)

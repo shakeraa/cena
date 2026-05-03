@@ -69,12 +69,20 @@ public sealed class BagrutDraftPersistence : IBagrutDraftPersistence
     // inference rules change (e.g. moving from path-based to OCR-driven).
     public const string ExtractionStrategy = "bagrut_path_inference_v1";
 
+    // ADR-0062 Phase 1 — concept extractor seam. Optional (nullable)
+    // so existing host compositions that don't yet bind it stay
+    // buildable; when null, draft persistence skips the extracted-
+    // concepts side effect (graceful degradation, never crash).
+    private readonly Cena.Actors.Mastery.Extraction.IQuestionConceptExtractor? _conceptExtractor;
+
     public BagrutDraftPersistence(
         IDocumentStore store,
-        ILogger<BagrutDraftPersistence> logger)
+        ILogger<BagrutDraftPersistence> logger,
+        Cena.Actors.Mastery.Extraction.IQuestionConceptExtractor? conceptExtractor = null)
     {
         _store = store;
         _logger = logger;
+        _conceptExtractor = conceptExtractor;
     }
 
     public async Task<IReadOnlyList<string>> PersistAsync(
@@ -178,6 +186,34 @@ public sealed class BagrutDraftPersistence : IBagrutDraftPersistence
             };
 
             session.Store(doc);
+
+            // ADR-0062 Phase 1 — emit QuestionConceptsExtracted_V1 for the
+            // draft. Stream-keyed on the draft id, which is also the
+            // QuestionId once a curator publishes a recreated variant.
+            // Rules-tier only this turn: the existing keyword classifier
+            // already produced (taxonomyNode, taxonomyConfidence) above;
+            // the extractor canonicalizes it via BagrutTaxonomyCatalog
+            // and rejects unmappable hints (closed-set discipline).
+            // Curator can still override at /confirm time. When no rule
+            // fires, the event carries an empty concept list and the
+            // item stays "unlinked" until curator picks.
+            if (_conceptExtractor is not null)
+            {
+                var extractionInput = new Cena.Actors.Mastery.Extraction.ExtractionInput(
+                    QuestionId:          id,
+                    Prompt:              d.Prompt,
+                    Latex:               d.LatexContent,
+                    TrackHint:           track is null ? null : $"math_{track}",
+                    RuleTierHint:        taxonomyNode,
+                    RuleTierConfidence:  taxonomyConfidence);
+                var extraction = await _conceptExtractor.ExtractAsync(extractionInput, ct);
+                session.Events.Append(id, new Cena.Actors.Events.QuestionConceptsExtracted_V1(
+                    QuestionId:          id,
+                    Concepts:            extraction.Concepts,
+                    ExtractionStrategy:  extraction.Strategy,
+                    ExtractedBy:         "BagrutDraftPersistence",
+                    Timestamp:           now));
+            }
 
             // Sibling payload row — actual prompt+LaTeX content keyed by
             // the same id, read by GenerateVariantsJobStrategy when the

@@ -385,6 +385,39 @@ public sealed class QuestionState
         EventVersion++;
     }
 
+    // ── ADR-0062 Phase 0/1 — multi-concept extraction events ──
+    //
+    // Honors the comment in `ConceptExtractionEvents.cs:28-31` that
+    // "AggregateStreamAsync rebuilds a coherent QuestionState including
+    // concepts" — without these handlers, the architect-review FAIL
+    // (persona 2) was correct that the comment was lying.
+    //
+    // Last-write-wins semantics: a confirm event always overwrites the
+    // most-recent extracted set, and a *later* extracted set quietly
+    // overwrites a confirm. Matches QuestionListProjection's behaviour
+    // so the read model and the aggregate stay consistent.
+
+    public void Apply(QuestionConceptsExtracted_V1 e)
+    {
+        // Skip empty extractions (rule tier produced nothing) so a
+        // re-extraction with no rules-tier hit doesn't blank a curator's
+        // confirmed concept set.
+        if (e.Concepts.Count == 0) { UpdatedAt = e.Timestamp; EventVersion++; return; }
+        ConceptIds = e.Concepts.Select(c => c.SkillCode.Value).ToList();
+        UpdatedAt = e.Timestamp;
+        EventVersion++;
+    }
+
+    public void Apply(QuestionConceptsConfirmed_V1 e)
+    {
+        // Curator override always wins, even if the list is empty —
+        // that's a deliberate "no concepts apply" signal we don't
+        // second-guess.
+        ConceptIds = e.Concepts.Select(c => c.SkillCode.Value).ToList();
+        UpdatedAt = e.Timestamp;
+        EventVersion++;
+    }
+
     private static QuestionOptionState MapOption(QuestionOptionData d) =>
         new(d.Label, d.Text, d.TextHtml, d.IsCorrect, d.DistractorRationale);
 }

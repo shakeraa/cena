@@ -82,6 +82,51 @@ public class QuestionListProjection : SingleStreamProjection<QuestionReadModel, 
         model.UpdatedAt = e.Timestamp;
     }
 
+    // ── ADR-0062 Phase 0/1 — multi-concept extraction events ──
+    //
+    // QuestionConceptsExtracted_V1 is the extractor's output. We mirror
+    // the concept SkillCodes onto QuestionReadModel.Concepts so the
+    // downstream consumers (CAT scheduler, analytics, parent dashboard)
+    // see the full set without re-aggregating the event stream.
+    //
+    // QuestionConceptsConfirmed_V1 is the curator's final word; it
+    // overwrites Concepts with the confirmed set. Last-write-wins —
+    // events arrive in order on the same stream, so the confirmed set
+    // always wins over an older extracted set, and a NEW extraction
+    // event after a confirm (e.g. extractor re-runs) will quietly
+    // overwrite the curator's choice. That's intentional for Phase 1 —
+    // re-extraction is a deliberate operator action and the curator UI
+    // will surface "extractor disagrees with your prior confirm" so the
+    // curator can re-confirm or override. Phase 2 will add a "frozen"
+    // bit on the confirm event to make confirm sticky if telemetry
+    // shows curators want it.
+
+    public void Apply(Cena.Actors.Events.QuestionConceptsExtracted_V1 e, QuestionReadModel model)
+    {
+        // Skip the no-rule-fired case so we don't blank an existing
+        // confirmed concept set just because the rule tier returned
+        // nothing on a re-extraction pass.
+        if (e.Concepts.Count == 0) return;
+
+        model.Concepts = e.Concepts
+            .Select(c => c.SkillCode.Value)
+            .ToList();
+        model.ConceptNames = model.Concepts.Select(SlugToName).ToList();
+        model.UpdatedAt = e.Timestamp;
+    }
+
+    public void Apply(Cena.Actors.Events.QuestionConceptsConfirmed_V1 e, QuestionReadModel model)
+    {
+        // Curator override always wins — even an empty list (curator
+        // marked "no concepts apply"). That's a deliberate operator
+        // signal we don't second-guess.
+        model.Concepts = e.Concepts
+            .Select(c => c.SkillCode.Value)
+            .ToList();
+        model.ConceptNames = model.Concepts.Select(SlugToName).ToList();
+        model.UpdatedAt = e.Timestamp;
+    }
+
     // ── Explanation Events ──
 
     public void Apply(ExplanationEdited_V1 e, QuestionReadModel model)

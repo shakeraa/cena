@@ -274,6 +274,23 @@ public static class CenaAdminServiceRegistration
                 SingleWriter = false,
             }));
         services.AddScoped<Ingestion.IIngestionJobService, Ingestion.IngestionJobService>();
+
+        // ADR-0062 Phase 0/1 — concept extraction infrastructure.
+        // BagrutTaxonomyCatalog is the closed-set canonicalizer; load once
+        // from scripts/bagrut-taxonomy.json so every consumer (extractor,
+        // curator endpoint, future projection) reads the same catalog.
+        // RulesOnlyConceptExtractor is the Phase 1 Tier-1 extractor;
+        // future Hybrid extractor swaps in here without changing call
+        // sites. NullConceptItemPublicationCounter keeps the Phase 2
+        // ≥10-items/leaf gate CLOSED until a Marten-backed counter
+        // replaces it (gate fails closed by design).
+        services.TryAddSingleton<Cena.Actors.Mastery.BagrutTaxonomyCatalog>(_ =>
+            Cena.Actors.Mastery.BagrutTaxonomyCatalog.LoadFromDisk());
+        services.TryAddSingleton<Cena.Actors.Mastery.Extraction.IQuestionConceptExtractor,
+            Cena.Actors.Mastery.Extraction.RulesOnlyConceptExtractor>();
+        services.TryAddSingleton<Cena.Actors.Mastery.Extraction.IConceptItemPublicationCounter,
+            Cena.Actors.Mastery.Extraction.NullConceptItemPublicationCounter>();
+
         services.AddScoped<Ingestion.IBagrutDraftPersistence, Ingestion.BagrutDraftPersistence>();
         services.AddScoped<Ingestion.IIngestionJobStrategy, Ingestion.BagrutIngestionJobStrategy>();
         services.AddScoped<Ingestion.IIngestionJobStrategy, Ingestion.CloudDirIngestionJobStrategy>();
@@ -511,6 +528,12 @@ public static class CenaAdminServiceRegistration
         // and GET .../items/{id}/figures/{figureIndex}. ModeratorOrAbove
         // gated; back the curator's side-by-side review panel.
         app.MapVisualReviewEndpoints();
+
+        // ADR-0062 Phase 1: GET/POST /api/admin/ingestion/items/{id}/concepts.
+        // Curator review panel for the multi-concept tagger. GET returns
+        // extractor output + curator confirmation + the canonical
+        // catalog; POST appends QuestionConceptsConfirmed_V1.
+        app.MapQuestionConceptsEndpoints();
 
         // Async tracking surface for long-running ingestion ops (Bagrut +
         // cloud-dir). Drives the IngestionJobsDrawer in the admin SPA.
