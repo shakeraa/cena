@@ -77,24 +77,6 @@ public class QuestionDocument
     /// </summary>
     public string ConceptId { get; set; } = "";
 
-    /// <summary>
-    /// ADR-0062 Phase 0 (declared but unwired). The concept-extraction
-    /// projection landed on QuestionReadModel.Concepts instead of widening
-    /// QuestionDocument; no production writer assigns to this field. See
-    /// ADR-0062 "Implementation drift" — a future cleanup pass will
-    /// either remove the field or wire a writer.
-    /// </summary>
-    public string PrimaryConceptId { get; set; } = "";
-
-    /// <summary>
-    /// ADR-0062 Phase 0 (declared but unwired). The full concept set lives
-    /// on the event stream and is projected onto QuestionReadModel.Concepts;
-    /// no production writer assigns to this field on QuestionDocument. See
-    /// ADR-0062 "Implementation drift". Future cleanup will either remove
-    /// the field or wire a writer.
-    /// </summary>
-    public List<string> ConceptIds { get; set; } = new();
-
     public string Prompt { get; set; } = "";
     public string QuestionType { get; set; } = "multiple-choice"; // multiple-choice, free-text, etc.
     public string[]? Choices { get; set; }
