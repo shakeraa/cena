@@ -19,38 +19,19 @@
 // (QuestionConceptsEndpoints), not here — the enhancer doesn't know
 // about drafts. See OcrEnhancementCache.cs for the choice rationale.
 //
-// Extracted from AiGenerationService 2026-05-03. Trade-offs:
-//
-// 1) ~30 LOC duplication. Anthropic client + API-key resolution + meter
-//    construction are duplicated here rather than promoted to a shared
-//    IAnthropicLlmRuntime — the runtime extraction is the right long-term
-//    refactor (option (a) in the brief) but widens scope across
-//    question-generation, settings, and connection-test seams. Picked
-//    option (c) for blast-radius containment.
-//
-// 2) Parallel circuit breakers. The original method shared
-//    AiGenerationService's in-process breaker, so a flaky-model trip on
-//    question-generation also gated OCR-enhance. The extracted service
-//    runs its OWN breaker — independent state, less effective coverage.
-//    Acceptable trade because OCR-enhance is rare-call (curator-driven,
-//    not student-traffic) and the breaker still protects the per-service
-//    failure path. Promoting the breaker to IAnthropicLlmRuntime is the
-//    correct fix and is explicitly out of scope this turn.
-//
-// 3) Parallel meters. The original method emitted both the per-feature
-//    cost counter (cena_llm_call_cost_usd_total via ILlmCostMetric) and
-//    the legacy per-service meters (llm_request_duration_ms,
-//    llm_tokens_total, llm_cost_usd on Cena.Admin.LlmMetrics). To keep
-//    operational dashboards working without a meter rename, this service
-//    emits to the SAME meter name ("Cena.Admin.LlmMetrics") — meter
-//    factories deduplicate by name + version, so dashboards see the same
-//    series.
+// Shared LLM runtime (2026-05-03 — completes the original extraction)
+// -------------------------------------------------------------------
+// Anthropic client cache, in-process circuit breaker (3 failures / 90s),
+// and the legacy per-service meters (llm_request_duration_ms,
+// llm_tokens_total, llm_cost_usd) live in IAnthropicLlmRuntime. This
+// service consumes the singleton runtime so a flaky-model trip on
+// question-generation also gates OCR-enhance and dashboards see one
+// cohesive series per (model, task_type). Cache-hit observability
+// (llm_cache_hits_total) stays here because it is OCR-enhance-specific.
 // =============================================================================
 
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
-using Anthropic;
-using Anthropic.Core;
 using Anthropic.Models.Messages;
 using Cena.Admin.Api.AiSettings;
 using Cena.Infrastructure.Documents;
@@ -99,43 +80,20 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
     private readonly IApiKeyCipher _cipher;
     private readonly ILlmCostMetric _featureCost;
     private readonly IOcrEnhancementCache _cache;
+    private readonly IAnthropicLlmRuntime _runtime;
     private readonly IActivityPropagator? _activityPropagator;
 
-    // Legacy per-service meters preserved on the SAME meter name as
-    // AiGenerationService so existing dashboards continue to receive
-    // ocr_text_enhance task_type rows without a rename.
-    private readonly Histogram<double> _requestDuration;
-    private readonly Counter<long> _tokensTotal;
-    private readonly Counter<double> _costUsd;
     // Cache observability — separated from token counters so finops
     // dashboards see "$ saved by cache hit" distinct from "$ spent on
     // LLM call". Tagged by task_type so this meter shape can host other
     // task types in the future (currently just ocr_text_enhance).
+    // Kept here because it's OCR-enhance-specific; the legacy per-service
+    // triple lives in IAnthropicLlmRuntime now.
     private readonly Counter<long> _cacheHits;
 
-    // Anthropic client cache — keyed on plaintext key, refreshed when the
-    // operator rotates the persisted cipher.
-    private AnthropicClient? _anthropicClient;
-    private string? _lastApiKey;
-    private readonly object _clientLock = new();
-
-    // Local in-process circuit breaker (parallel to the one in
-    // AiGenerationService — see file header trade-off #2). Mirrors the
-    // 3-failure / 90s open thresholds so OCR-enhance failure storms gate
-    // themselves cleanly without piling failed calls onto Anthropic.
-    private int _failureCount;
-    private DateTimeOffset _circuitOpenedAt;
-    private bool _circuitOpen;
-    private static readonly int MaxFailures = 3;
-    private static readonly TimeSpan OpenDuration = TimeSpan.FromSeconds(90);
-    private readonly object _cbLock = new();
-
-    // Routing config constants (mirror the values in AiGenerationService;
-    // intentionally local copies — see file header for the trade-off).
+    // Routing config constants
     private const string SonnetModelId = "claude-sonnet-4-6";
     private const int MaxEnhanceTokens = 2048;
-    private const double CostPerInputMTok = 3.00;
-    private const double CostPerOutputMTok = 15.00;
 
     public OcrTextEnhancer(
         ILogger<OcrTextEnhancer> logger,
@@ -145,6 +103,7 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         IApiKeyCipher cipher,
         ILlmCostMetric featureCost,
         IOcrEnhancementCache cache,
+        IAnthropicLlmRuntime runtime,
         IActivityPropagator? activityPropagator = null)
     {
         _logger = logger;
@@ -153,22 +112,13 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         _cipher = cipher;
         _featureCost = featureCost;
         _cache = cache;
+        _runtime = runtime;
         _activityPropagator = activityPropagator;
 
-        // Same meter name as AiGenerationService — meter factories
-        // deduplicate by (name, version) so dashboard queries on
-        // llm_request_duration_ms / llm_tokens_total / llm_cost_usd see
-        // both services' rows under their respective task_type tag.
+        // Cache-hit counter on the same meter name as the runtime emits —
+        // meter factories deduplicate by (name, version) so all the
+        // Cena.Admin.LlmMetrics series stay together in the dashboard.
         var meter = meterFactory.Create("Cena.Admin.LlmMetrics", "1.0.0");
-        _requestDuration = meter.CreateHistogram<double>(
-            "llm_request_duration_ms", unit: "ms",
-            description: "LLM request duration in milliseconds");
-        _tokensTotal = meter.CreateCounter<long>(
-            "llm_tokens_total",
-            description: "Total LLM tokens consumed");
-        _costUsd = meter.CreateCounter<double>(
-            "llm_cost_usd", unit: "USD",
-            description: "LLM cost in USD");
         _cacheHits = meter.CreateCounter<long>(
             "llm_cache_hits_total",
             description: "Number of cache hits that avoided an LLM call");
@@ -214,7 +164,7 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
             ? SonnetModelId
             : doc.AnthropicModelId;
 
-        try { RequestCircuitPermission(modelName); }
+        try { _runtime.RequestCircuitPermission(modelName); }
         catch (CircuitOpenException ex)
         {
             return new EnhanceOcrTextResponse(false, "", modelName, ex.Message);
@@ -223,7 +173,7 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         var sw = Stopwatch.StartNew();
         try
         {
-            var client = GetOrCreateClient(apiKey);
+            var client = _runtime.GetOrCreateClient(apiKey);
             var systemPrompt =
                 "You are an OCR-cleanup assistant for Israeli Bagrut math papers. " +
                 "Input: raw OCR text from a Bagrut question (Hebrew/Arabic with embedded math). " +
@@ -260,7 +210,7 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
 
             var inputTokens = response.Usage.InputTokens;
             var outputTokens = response.Usage.OutputTokens;
-            EmitMetrics(modelName, "ocr_text_enhance", sw.ElapsedMilliseconds,
+            _runtime.EmitMetrics(modelName, "ocr_text_enhance", sw.ElapsedMilliseconds,
                 inputTokens, outputTokens);
 
             // prr-046: canonical per-feature cost counter (cena_llm_call_cost_usd_total)
@@ -300,7 +250,7 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
                 "OcrTextEnhancer OK (trace_id={TraceId} model={Model} input={Input} output={Output} duration={DurationMs}ms hash={Hash})",
                 traceId, modelName, inputTokens, outputTokens, sw.ElapsedMilliseconds, inputHash);
 
-            RecordSuccess(modelName);
+            _runtime.RecordSuccess(modelName);
             var enhanced = text!.Trim();
 
             // Best-effort cache write. A failure here must not turn a
@@ -338,84 +288,13 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         catch (Exception ex)
         {
             sw.Stop();
-            RecordFailure(modelName);
+            _runtime.RecordFailure(modelName);
             _logger.LogError(ex, "OCR text enhancement failed for Anthropic");
             return new EnhanceOcrTextResponse(false, "", modelName, ex.Message);
         }
     }
 
-    // ── Circuit breaker (parallel to AiGenerationService — see file header) ──
-
-    private void RequestCircuitPermission(string modelName)
-    {
-        lock (_cbLock)
-        {
-            if (!_circuitOpen) return;
-
-            if (DateTimeOffset.UtcNow - _circuitOpenedAt >= OpenDuration)
-            {
-                _logger.LogInformation(
-                    "OcrTextEnhancer breaker half-open for {Model}, allowing probe", modelName);
-                _circuitOpen = false;
-                _failureCount = 0;
-                return;
-            }
-
-            var retryAfter = OpenDuration - (DateTimeOffset.UtcNow - _circuitOpenedAt);
-            throw new CircuitOpenException(
-                $"Circuit breaker OPEN for model {modelName}. Retry after {retryAfter.TotalSeconds:F0}s.");
-        }
-    }
-
-    private void RecordSuccess(string _)
-    {
-        lock (_cbLock)
-        {
-            _failureCount = 0;
-            _circuitOpen = false;
-        }
-    }
-
-    private void RecordFailure(string modelName)
-    {
-        lock (_cbLock)
-        {
-            _failureCount++;
-            _logger.LogWarning(
-                "OcrTextEnhancer LLM failure for {Model}. Count={Count}/{Max}",
-                modelName, _failureCount, MaxFailures);
-
-            if (_failureCount >= MaxFailures)
-            {
-                _circuitOpen = true;
-                _circuitOpenedAt = DateTimeOffset.UtcNow;
-                _logger.LogWarning(
-                    "OcrTextEnhancer breaker OPENED for {Model}. Failures={Count}, OpenDuration={Duration}s",
-                    modelName, _failureCount, OpenDuration.TotalSeconds);
-            }
-        }
-    }
-
-    // ── Metrics (mirrors AiGenerationService.EmitMetrics) ────────────────
-
-    private void EmitMetrics(string model, string taskType, long durationMs,
-        long inputTokens, long outputTokens)
-    {
-        var modelTag = new KeyValuePair<string, object?>("model_id", model);
-        var taskTag = new KeyValuePair<string, object?>("task_type", taskType);
-
-        _requestDuration.Record(durationMs, modelTag, taskTag,
-            new KeyValuePair<string, object?>("status", "success"));
-        _tokensTotal.Add(inputTokens, modelTag, taskTag,
-            new KeyValuePair<string, object?>("direction", "input"));
-        _tokensTotal.Add(outputTokens, modelTag, taskTag,
-            new KeyValuePair<string, object?>("direction", "output"));
-
-        var cost = (inputTokens * CostPerInputMTok + outputTokens * CostPerOutputMTok) / 1_000_000.0;
-        _costUsd.Add(cost, modelTag, taskTag);
-    }
-
-    // ── API-key resolution (local copy; see file header) ─────────────────
+    // ── API-key resolution ───────────────────────────────────────────────
 
     private async Task<AiSettingsDocument> LoadDocAsync(CancellationToken ct)
     {
@@ -453,20 +332,4 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         return string.IsNullOrWhiteSpace(fromConfig) ? null : fromConfig;
     }
 
-    private AnthropicClient GetOrCreateClient(string apiKey)
-    {
-        lock (_clientLock)
-        {
-            if (_anthropicClient is not null && _lastApiKey == apiKey)
-                return _anthropicClient;
-
-            _anthropicClient = new AnthropicClient(new ClientOptions
-            {
-                ApiKey = apiKey,
-                MaxRetries = 0,
-            });
-            _lastApiKey = apiKey;
-            return _anthropicClient;
-        }
-    }
 }
