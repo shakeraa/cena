@@ -167,3 +167,93 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
 }
+
+// =============================================================================
+// Figure-anchor splitter (ADR-0062 Phase 1.5, gap B 2026-05-03)
+//
+// The OCR-cleanup LLM emits markers shaped like [[FIGURE:p<page>]] (or bare
+// [[FIGURE]] when no page is known) at positions where the cleaned text
+// references a diagram. The SPA needs to interleave inline thumbnails of the
+// source PDF anchored to that page rather than dump the literal marker as
+// text.
+//
+// Design choice: split BEFORE the math renderer instead of extending
+// renderMixedMathText to emit a placeholder span and post-processing the
+// HTML. Two reasons:
+//
+//   1. Vue's v-html is one-shot. Once the string lands on the DOM there is
+//      no clean per-fragment binding for an embed element that needs a
+//      reactive pdfBlobUrl ref. v-bind only works on template elements.
+//   2. The marker grammar is fixed and orthogonal to the math grammar.
+//      Mixing the two state machines invites edge cases (e.g. a marker
+//      embedded inside a math segment) that are simpler to handle by
+//      tokenising figure markers first.
+//
+// Returned shape is a flat array of fragments. Each fragment is either:
+//   - { kind: 'html', html: string }    — already KaTeX-rendered, v-html'd
+//                                          on the consumer side.
+//   - { kind: 'figure', page: number | null } — placeholder; consumer renders
+//                                                an embed bound to its own
+//                                                pdfBlobUrl ref.
+//
+// Marker grammar:
+//   [[FIGURE:p<digits>]]    — page-anchored
+//   [[FIGURE]]              — page-unknown
+// =============================================================================
+
+export interface RenderedFragment {
+  kind: 'html' | 'figure'
+  /** Set when kind === 'html'. Already KaTeX-rendered HTML, safe to v-html. */
+  html?: string
+  /** Set when kind === 'figure'. Page number from the marker; null for bare [[FIGURE]]. */
+  page?: number | null
+}
+
+const FIGURE_MARKER_RE = /\[\[FIGURE(?::p(\d+))?\]\]/g
+
+/**
+ * Split a string into html (KaTeX-rendered) and figure (placeholder)
+ * fragments. The consumer (Vue template) iterates the list and renders
+ * each kind appropriately.
+ *
+ * Pure function — no DOM, no Vue reactivity. Exposed for unit tests.
+ */
+export function renderTextWithFigures(input: string | null | undefined): RenderedFragment[] {
+  if (!input)
+    return []
+
+  const fragments: RenderedFragment[] = []
+  let cursor = 0
+
+  // Reset lastIndex defensively — module-scoped /g regexes carry state
+  // across calls, which silently breaks on the second invocation.
+  FIGURE_MARKER_RE.lastIndex = 0
+
+  let match: RegExpExecArray | null = null
+
+  // eslint-disable-next-line no-cond-assign
+  while ((match = FIGURE_MARKER_RE.exec(input)) !== null) {
+    if (match.index > cursor) {
+      const chunk = input.slice(cursor, match.index)
+      const html = renderMixedMathText(chunk)
+      if (html.length > 0)
+        fragments.push({ kind: 'html', html })
+    }
+    const pageStr = match[1]
+    const page = pageStr != null ? Number.parseInt(pageStr, 10) : null
+    fragments.push({
+      kind: 'figure',
+      page: Number.isFinite(page) ? page : null,
+    })
+    cursor = match.index + match[0].length
+  }
+
+  if (cursor < input.length) {
+    const tail = input.slice(cursor)
+    const html = renderMixedMathText(tail)
+    if (html.length > 0)
+      fragments.push({ kind: 'html', html })
+  }
+
+  return fragments
+}

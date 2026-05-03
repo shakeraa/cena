@@ -2,7 +2,7 @@
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 import { $api } from '@/utils/api'
 import { useIngestionJobs } from '@/composables/useIngestionJobs'
-import { renderMixedMathText } from '@/utils/renderMixedMathText'
+import { renderMixedMathText, renderTextWithFigures } from '@/utils/renderMixedMathText'
 import { renderTextDiff } from '@/utils/renderTextDiff'
 import ConceptReviewPanel from './ConceptReviewPanel.vue'
 import CuratorMetadataPanel from './CuratorMetadataPanel.vue'
@@ -1020,21 +1020,92 @@ const approveItem = async () => {
                   class="cena-recreated-card"
                   :class="{ 'cena-recreated-card--with-page': q.sourcePage && pdfBlobUrl }"
                 >
-                  <!-- Default view: KaTeX-formatted recreated question, OR
-                       enhanced version when toggled. Same renderer for
-                       both — enhanced text uses the SAME LaTeX delimiters
-                       renderMixedMathText already understands, so no new
-                       render path. v-html safe per the renderer's
-                       escape + bdi-LTR + KaTeX-fallback chain. -->
+                  <!-- Default view: KaTeX-formatted recreated question,
+                       OR enhanced version when toggled. The enhanced
+                       text from the OCR-cleanup LLM contains
+                       [[FIGURE:p<page>]] markers; we split on those and
+                       render an inline PDF-page embed for each marker
+                       (Gap B, 2026-05-03). The text fragments still go
+                       through the same KaTeX-aware renderMixedMathText
+                       path. v-html on text fragments is safe per the
+                       renderer's escape + bdi-LTR + KaTeX-fallback chain.
+                       Toggling between enhanced/original re-runs the
+                       splitter — markers only appear in enhanced text,
+                       so the original recreated form skips the figure
+                       fragments and renders as a single html block. -->
                   <div
                     class="cena-mmt-block cena-recreated-text"
                     data-test="item-detail-recreated-text"
-                    v-html="renderMixedMathText(
-                      showEnhanced[q.index] && enhancedTexts[q.index]
-                        ? enhancedTexts[q.index]
-                        : q.text
-                    )"
-                  />
+                  >
+                    <template
+                      v-for="(frag, fi) in renderTextWithFigures(
+                        showEnhanced[q.index] && enhancedTexts[q.index]
+                          ? enhancedTexts[q.index]
+                          : q.text,
+                      )"
+                      :key="`f-${q.index}-${fi}`"
+                    >
+                      <span
+                        v-if="frag.kind === 'html'"
+                        v-html="frag.html"
+                      />
+                      <!-- Figure anchor (Gap B): inline PDF-page embed.
+                           When pdfBlobUrl is loaded the embed renders
+                           a compact ~180×180 thumbnail anchored to
+                           #page=N. While the blob is in flight the
+                           skeleton placeholder shows. Bare [[FIGURE]]
+                           with no page renders a generic placeholder
+                           and the "page unknown" hint so the curator
+                           can verify against the visual-review PDF
+                           below. data-test on every variant for e2e. -->
+                      <span
+                        v-else
+                        class="cena-figure-anchor-wrapper"
+                      >
+                        <span
+                          v-if="frag.page && pdfBlobUrl"
+                          class="cena-figure-anchor"
+                          data-test="figure-anchor-embed"
+                        >
+                          <embed
+                            :src="`${pdfBlobUrl}#page=${frag.page}&toolbar=0&navpanes=0`"
+                            type="application/pdf"
+                            class="cena-figure-anchor-embed"
+                            :title="`Figure (page ${frag.page})`"
+                          >
+                          <span class="cena-figure-anchor-caption text-caption text-medium-emphasis">
+                            Figure (page {{ frag.page }})
+                          </span>
+                        </span>
+                        <span
+                          v-else-if="frag.page && !pdfBlobUrl"
+                          class="cena-figure-anchor cena-figure-anchor--loading"
+                          data-test="figure-anchor-loading"
+                        >
+                          <span class="cena-figure-anchor-loading-body text-caption text-disabled">
+                            Loading figure…
+                          </span>
+                          <span class="cena-figure-anchor-caption text-caption text-medium-emphasis">
+                            Figure (page {{ frag.page }})
+                          </span>
+                        </span>
+                        <span
+                          v-else
+                          class="cena-figure-anchor cena-figure-anchor--unknown"
+                          data-test="figure-anchor-unknown"
+                        >
+                          <VIcon
+                            icon="tabler-photo-question"
+                            size="20"
+                            class="text-medium-emphasis"
+                          />
+                          <span class="cena-figure-anchor-caption text-caption text-medium-emphasis">
+                            Figure (page unknown — verify against the PDF below)
+                          </span>
+                        </span>
+                      </span>
+                    </template>
+                  </div>
                   <!-- PDF page thumbnail anchored to the source page.
                        The browser's PDF viewer honours #page=N so we
                        jump to the exact page without rendering it
@@ -1931,6 +2002,57 @@ const approveItem = async () => {
 }
 .cena-figure-grid--inline {
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+/* cena-figure-anchor — inline figure thumbnail rendered between text
+   fragments split out of [[FIGURE:p<page>]] markers. Stays compact
+   (~180×180) so it doesn't dominate the recreated text; the curator
+   can still click through to the visual-review PDF below for a closer
+   look. The wrapper is inline-block so multiple anchors can sit on
+   the same paragraph; each anchor is its own visual block on a new
+   line for legibility. */
+.cena-figure-anchor-wrapper {
+  display: inline-block;
+  margin: 0.5rem 0;
+}
+.cena-figure-anchor {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.25rem;
+  inline-size: 180px;
+  vertical-align: top;
+  padding: 0.35rem;
+  background: rgba(var(--v-theme-surface-variant), 0.5);
+  border: 1px solid rgba(var(--v-theme-outline-variant), 0.6);
+  border-radius: 0.25rem;
+}
+.cena-figure-anchor--loading,
+.cena-figure-anchor--unknown {
+  align-items: center;
+  justify-content: center;
+  min-block-size: 120px;
+  text-align: center;
+}
+.cena-figure-anchor-embed {
+  inline-size: 100%;
+  block-size: 180px;
+  border: 1px solid rgba(var(--v-theme-outline-variant), 0.6);
+  border-radius: 0.2rem;
+  background: rgb(var(--v-theme-surface));
+}
+.cena-figure-anchor-loading-body {
+  inline-size: 100%;
+  min-block-size: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--v-theme-surface-variant), 0.6);
+  border-radius: 0.2rem;
+}
+.cena-figure-anchor-caption {
+  text-align: center;
+  word-break: break-word;
 }
 
 /* cena-mmt-* classes — emitted by renderMixedMathText.
