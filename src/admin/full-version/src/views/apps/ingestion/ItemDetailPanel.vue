@@ -76,6 +76,20 @@ interface ItemDetail {
   // the original text-only review experience.
   hasSourcePdf: boolean
   figures: Array<{ index: number, page: number, kind: string | null, altText: string | null, url: string }>
+  // 2026-05-03: surfaced from PipelineItemDocument so the 0-figures
+  // banner can refine its copy by topic. Geometry / calculus /
+  // vectors / trig nearly always carry diagrams (warning stays
+  // loud); algebra / probability / functions can legitimately have
+  // none (warning softens to "verify"). Null when the taxonomy
+  // classifier produced no match — banner falls back to the generic
+  // copy. Format: dotted path like "calculus.derivative_rules" (the
+  // first segment is the topic; we only inspect that prefix).
+  taxonomyNode: string | null
+  // "pending" | "auto_extracted" | "confirmed". Curator-confirmed
+  // taxonomy is more authoritative than the heuristic seed; both
+  // paths share the same bucketing logic but the banner could
+  // visually distinguish them in a future iteration.
+  metadataState: string | null
 }
 
 interface Props {
@@ -124,6 +138,54 @@ const enhancedAt = ref<string | null>(null)
 // A Set (not Record<bool>) so we never have to worry about pruning
 // false entries — presence is the truth.
 const enhanceTriggeredFor = ref<Set<string>>(new Set())
+
+// 2026-05-03 — refine the 0-figures banner by topic. The default copy
+// (this is from a Bagrut math paper, almost always there's a diagram)
+// is correct for geometry / calculus / vectors / trigonometry, but
+// pure-algebra and probability questions can legitimately have NO
+// figure. We bucket the auto-classified taxonomyNode prefix and
+// pick a softer "verify diagrams aren't missed; this topic may
+// legitimately have none" copy for the no-diagram-typical buckets.
+//
+// taxonomyNode is a dotted path like "calculus.derivative_rules" —
+// only the first segment (the topic) drives bucketing.
+//
+// The three buckets:
+//   - DIAGRAM_HEAVY      → loud warning (default)
+//   - DIAGRAM_OPTIONAL   → softened verify-prompt (algebra et al.)
+//   - UNKNOWN (null)     → fallback to the original generic copy
+//
+// Hard rule: DIAGRAM_HEAVY is the SAFE default — when in doubt,
+// ask the curator to verify. Softening is reserved for topics where
+// the false-positive rate of the loud warning is high enough to
+// train curators to tune it out (alarm fatigue).
+const DIAGRAM_HEAVY_TOPICS = new Set([
+  'geometry',
+  'calculus',
+  'vectors',
+  'trigonometry',
+])
+
+const DIAGRAM_OPTIONAL_TOPICS = new Set([
+  'algebra',
+  'probability',
+  'functions',
+])
+
+type FiguresBanner = 'diagram-heavy' | 'diagram-optional' | 'unknown'
+
+function bucketFromTaxonomyNode(node: string | null): FiguresBanner {
+  if (!node) return 'unknown'
+  const topic = node.split('.', 1)[0]?.toLowerCase().trim()
+  if (!topic) return 'unknown'
+  if (DIAGRAM_HEAVY_TOPICS.has(topic)) return 'diagram-heavy'
+  if (DIAGRAM_OPTIONAL_TOPICS.has(topic)) return 'diagram-optional'
+  return 'unknown'
+}
+
+const figuresBannerBucket = computed<FiguresBanner>(() =>
+  bucketFromTaxonomyNode(item.value?.taxonomyNode ?? null),
+)
 
 interface EnhanceTextResponse {
   itemId: string
@@ -485,6 +547,11 @@ interface BackendDetailResponse {
   enhancedText?: string | null
   enhancedAt?: string | null
   enhancedBy?: string | null
+  // 2026-05-03 — auto-classified taxonomy seed + curator-confirmed
+  // override. The 0-figures banner reads the topic prefix to decide
+  // whether 0 figures is suspicious or normal.
+  taxonomyNode?: string | null
+  metadataState?: string | null
 }
 
 const stageStatusMap: Record<string, ProcessingStage['status']> = {
@@ -547,6 +614,8 @@ const fetchDetail = async () => {
       recreatedQuestions: resp.extractedQuestions ?? [],
       hasSourcePdf: resp.hasSourcePdf ?? false,
       figures: (resp.figures ?? []) as ItemDetail['figures'],
+      taxonomyNode: resp.taxonomyNode ?? null,
+      metadataState: resp.metadataState ?? null,
     }
 
     // ADR-0062 Phase 1.5 (2026-05-03) — if the backend persisted the
@@ -1072,19 +1141,51 @@ const approveItem = async () => {
             @confirmed="() => emit('item-updated')"
           />
 
-          <!-- 0-figures banner: when source type says "expected figures
-               present" (per CuratorMetadata.ExpectedFigures = true) but
-               the OCR layer extracted none, surface the limitation so
-               the curator doesn't approve a stem that's missing its
-               diagram. Hard rule for Bagrut math papers: most have at
-               least one figure. -->
+          <!-- 0-figures banner — copy varies by auto-classified topic.
+               Geometry / calculus / vectors / trigonometry nearly always
+               carry diagrams (warning stays loud — type=warning).
+               Algebra / probability / functions can legitimately have
+               none (softer info-tone "verify, not block" prompt).
+               Unknown taxonomy → keep the original generic copy.
+
+               Why we don't suppress the banner entirely for the soft
+               case: even an algebra question can lose a referenced
+               number-line diagram in OCR; we're trading "loud false
+               positive" for "soft true reminder". Banner is never
+               a publish-blocker — it's a verify-prompt regardless of
+               taxonomy. -->
           <VAlert
-            v-if="item.sourceType === 'bagrut' && item.figures.length === 0"
+            v-if="item.sourceType === 'bagrut' && item.figures.length === 0 && figuresBannerBucket === 'diagram-heavy'"
             type="warning"
             density="compact"
             variant="tonal"
             class="mb-4"
             data-test="item-detail-no-figures-warning"
+            data-test-bucket="diagram-heavy"
+          >
+            <strong>OCR figure extraction returned 0 figures.</strong>
+            Bagrut {{ item.taxonomyNode?.split('.', 1)[0] || 'math' }} questions almost always include diagrams. Verify against the original PDF below — if a diagram is visibly present but missing here, flag the item for re-OCR rather than approving.
+          </VAlert>
+          <VAlert
+            v-else-if="item.sourceType === 'bagrut' && item.figures.length === 0 && figuresBannerBucket === 'diagram-optional'"
+            type="info"
+            density="compact"
+            variant="tonal"
+            class="mb-4"
+            data-test="item-detail-no-figures-warning"
+            data-test-bucket="diagram-optional"
+          >
+            <strong>OCR figure extraction returned 0 figures.</strong>
+            This {{ item.taxonomyNode?.split('.', 1)[0] || 'algebra' }} question may legitimately have no diagram — verify against the original PDF below, but a missing figure is not necessarily an OCR defect.
+          </VAlert>
+          <VAlert
+            v-else-if="item.sourceType === 'bagrut' && item.figures.length === 0"
+            type="warning"
+            density="compact"
+            variant="tonal"
+            class="mb-4"
+            data-test="item-detail-no-figures-warning"
+            data-test-bucket="unknown"
           >
             <strong>OCR figure extraction returned 0 figures.</strong>
             Bagrut math papers almost always include diagrams. Verify against the original PDF below — if a diagram is visibly present but missing here, flag the item for re-OCR rather than approving.
