@@ -98,23 +98,58 @@ const loading = ref(false)
 // question index. Curator clicks "Enhance with LLM" on a card; we POST
 // /enhance-text and stash the result in enhancedTexts[index]. The card
 // then offers a toggle between original and enhanced views.
+//
+// Auto-enhance on first open (2026-05-03, gap A): when the curator
+// opens an InReview Bagrut item we fire one enhance-text POST for the
+// whole item and apply the result to every recreated-question card.
+// `enhanceTriggeredFor` is a per-itemId guard so the auto-fire happens
+// exactly once per item open even when Vite HMR / Vue strict mounts
+// the component twice. The backend response is item-wide (one POST
+// returns one cleaned blob — the prompt + LaTeX content concatenated),
+// so we mirror it across every recreated index; per-question
+// re-enhance is still available via the toggle.
 const enhancedTexts = ref<Record<number, string>>({})
 const enhanceLoading = ref<Record<number, boolean>>({})
 const enhanceErrors = ref<Record<number, string>>({})
 const showEnhanced = ref<Record<number, boolean>>({})
 
+// Per-item auto-enhance metadata. modelUsed surfaces in the badge next
+// to the confidence chip ("Enhanced via LLM (claude-3-5-haiku-...)");
+// enhancedAt is captured for parity with the backend payload but not
+// rendered yet (curator audit trail surface, not a UX surface).
+const enhancedModelUsed = ref<string | null>(null)
+const enhancedAt = ref<string | null>(null)
+
+// Per-itemId guard so the auto-fire happens exactly once per item open.
+// A Set (not Record<bool>) so we never have to worry about pruning
+// false entries — presence is the truth.
+const enhanceTriggeredFor = ref<Set<string>>(new Set())
+
+interface EnhanceTextResponse {
+  itemId: string
+  originalText: string
+  enhancedText: string
+  modelUsed: string | null
+  enhancedAt: string
+}
+
 async function enhanceQuestion(index: number) {
   if (!item.value)
     return
+  const targetId = item.value.id
   enhanceLoading.value = { ...enhanceLoading.value, [index]: true }
   enhanceErrors.value = { ...enhanceErrors.value, [index]: '' }
   try {
-    const resp = await $api<{ enhancedText: string }>(
-      `/admin/ingestion/items/${item.value.id}/enhance-text`,
+    const resp = await $api<EnhanceTextResponse>(
+      `/admin/ingestion/items/${targetId}/enhance-text`,
       { method: 'POST' },
     )
-    enhancedTexts.value = { ...enhancedTexts.value, [index]: resp.enhancedText }
-    showEnhanced.value = { ...showEnhanced.value, [index]: true }
+    // Watcher may have swapped the item between dispatch and resolve
+    // (e.g. curator clicked through to a sibling card). Only apply if
+    // we're still on the item we fired for.
+    if (item.value?.id !== targetId)
+      return
+    applyEnhancedToAllQuestions(resp)
   }
   catch (e: any) {
     enhanceErrors.value = {
@@ -124,6 +159,82 @@ async function enhanceQuestion(index: number) {
   }
   finally {
     enhanceLoading.value = { ...enhanceLoading.value, [index]: false }
+  }
+}
+
+/**
+ * Apply an item-wide enhance response to every recreated-question
+ * card and capture model metadata for the badge. The auto-fire path
+ * and the manual "Re-run enhance" button both funnel through here so
+ * the card UI stays consistent. showEnhanced is flipped on for every
+ * index so the curator sees the cleaned view by default; the per-card
+ * toggle lets them flip back to the raw recreated text on demand.
+ */
+function applyEnhancedToAllQuestions(resp: EnhanceTextResponse) {
+  if (!item.value)
+    return
+  const next: Record<number, string> = { ...enhancedTexts.value }
+  const nextShow: Record<number, boolean> = { ...showEnhanced.value }
+  for (const q of item.value.recreatedQuestions) {
+    next[q.index] = resp.enhancedText
+    nextShow[q.index] = true
+  }
+  enhancedTexts.value = next
+  showEnhanced.value = nextShow
+  enhancedModelUsed.value = resp.modelUsed
+  enhancedAt.value = resp.enhancedAt
+}
+
+/**
+ * Auto-enhance once per item open. Fired from fetchDetail when the
+ * item is an InReview Bagrut draft; idempotent across Vite HMR
+ * remounts via the enhanceTriggeredFor Set.
+ *
+ * Honesty caveat: in Vue dev mode with strict-mode-style component
+ * remounts (HMR), the watcher may fire twice in quick succession.
+ * The Set guard prevents the second POST from going out — but if it
+ * somehow does, the backend is idempotent (no side-effects) so the
+ * worst case is a duplicate $0.0002 Anthropic call, not a data bug.
+ */
+async function autoEnhanceIfNeeded(d: ItemDetail) {
+  const isAutoEnhanceTarget =
+    d.sourceType === 'bagrut'
+    && d.currentStage === 'InReview'
+    && (d.recreatedQuestions?.length ?? 0) > 0
+
+  if (!isAutoEnhanceTarget)
+    return
+  if (enhanceTriggeredFor.value.has(d.id))
+    return
+
+  // Mark BEFORE the await so a second concurrent caller (HMR remount,
+  // double watcher) bails out — race-safe in single-threaded JS event
+  // loop because the mutation happens before the microtask yield.
+  enhanceTriggeredFor.value.add(d.id)
+
+  try {
+    const resp = await $api<EnhanceTextResponse>(
+      `/admin/ingestion/items/${d.id}/enhance-text`,
+      { method: 'POST' },
+    )
+    if (item.value?.id !== d.id)
+      return
+    applyEnhancedToAllQuestions(resp)
+  }
+  catch (e: any) {
+    // Auto-enhance failure must NOT block the rest of the panel.
+    // Surface inline via the existing enhanceErrors[0] plumbing so
+    // curators see "why is the cleaned view missing?" without losing
+    // the panel. If the curator hits "Enhance with LLM" manually
+    // afterwards we re-run with the same itemId guard removed below.
+    enhanceErrors.value = {
+      ...enhanceErrors.value,
+      0: e?.data?.message ?? e?.message ?? 'Auto-enhance failed — fall back to raw OCR text.',
+    }
+    // Allow manual retry by un-marking the guard. Without this the
+    // "Re-run enhance" button would silently no-op for the rest of
+    // the session after a single transient network blip.
+    enhanceTriggeredFor.value.delete(d.id)
   }
 }
 
@@ -378,6 +489,18 @@ const fetchDetail = async () => {
   if (!props.itemId)
     return
 
+  // Per-item state reset. Without this, switching from item A (which
+  // has been enhanced) to item B leaks A's enhanced text into B's
+  // recreated cards via the index-keyed enhancedTexts map. The
+  // enhanceTriggeredFor Set is keyed by id and is intentionally NOT
+  // reset — it's the cross-item idempotency guard.
+  enhancedTexts.value = {}
+  enhanceLoading.value = {}
+  enhanceErrors.value = {}
+  showEnhanced.value = {}
+  enhancedModelUsed.value = null
+  enhancedAt.value = null
+
   loading.value = true
   try {
     const resp = await $api<BackendDetailResponse>(
@@ -422,8 +545,13 @@ const fetchDetail = async () => {
     // figure list without us threading them through. Awaiting would
     // make the panel block on PDF-blob latency for no reason — the
     // text-side of the panel renders immediately while embeds fade in.
-    if (item.value)
+    if (item.value) {
       loadVisualReviewBlobs(item.value)
+      // Gap A — auto-enhance on first open. Fire-and-forget; the
+      // panel renders immediately and the badge + cleaned text fade
+      // in when the response lands.
+      autoEnhanceIfNeeded(item.value)
+    }
   }
   catch (error) {
     console.error('Failed to fetch item detail:', error)
@@ -782,12 +910,46 @@ const approveItem = async () => {
                     >
                       {{ Math.round(q.confidence * 100) }}% confidence
                     </VChip>
+                    <!-- "Enhanced via LLM" badge (Gap A, 2026-05-03).
+                         Surfaces the model that produced the cleaned
+                         text next to the confidence chip so curators
+                         know what they're reviewing without digging
+                         into the network tab. Hidden until enhance
+                         lands; auto-enhance fires on item open for
+                         InReview Bagrut items so this badge is the
+                         default state, not the exception. -->
+                    <VChip
+                      v-if="enhancedTexts[q.index] && showEnhanced[q.index]"
+                      size="x-small"
+                      color="primary"
+                      variant="tonal"
+                      label
+                      data-test="item-detail-auto-enhanced-badge"
+                    >
+                      <VIcon
+                        icon="tabler-sparkles"
+                        size="12"
+                        start
+                      />
+                      Enhanced via LLM<span
+                        v-if="enhancedModelUsed"
+                        class="ms-1"
+                      >({{ enhancedModelUsed }})</span>
+                    </VChip>
                     <!-- ADR-0062 Phase 1.5 — LLM cleanup pass. Wraps math
                          in LaTeX delimiters, restores paragraph breaks,
                          marks figure anchors. Real Anthropic call (cost
                          metered via the question-generation cost path).
-                         Toggle hides/shows the enhanced view; original is
-                         always reachable. -->
+                         Three-state button:
+                           - never enhanced: "Enhance with LLM" → fires.
+                           - enhanced + showing: "Show original" → toggle.
+                           - enhanced + hiding: "Show enhanced" → toggle.
+                         Re-run path: when the curator wants a fresh
+                         enhance (e.g. after editing the source text),
+                         shift-click would be ideal but we don't have
+                         the modifier UX yet — instead, "Re-run enhance"
+                         appears as the action label after the first
+                         run lands so it's discoverable. -->
                     <VBtn
                       v-if="item.sourceType === 'bagrut'"
                       size="x-small"
@@ -801,6 +963,22 @@ const approveItem = async () => {
                       {{ enhancedTexts[q.index]
                         ? (showEnhanced[q.index] ? 'Show original' : 'Show enhanced')
                         : 'Enhance with LLM' }}
+                    </VBtn>
+                    <!-- Re-run enhance — only after first run, separate
+                         from the toggle so the curator never accidentally
+                         spends another LLM call when they meant to flip
+                         the view. Loading indicator is shared with the
+                         toggle (both bind to enhanceLoading[index]). -->
+                    <VBtn
+                      v-if="item.sourceType === 'bagrut' && enhancedTexts[q.index]"
+                      size="x-small"
+                      variant="text"
+                      :loading="enhanceLoading[q.index]"
+                      prepend-icon="tabler-refresh"
+                      data-test="item-detail-enhance-rerun"
+                      @click="enhanceQuestion(q.index)"
+                    >
+                      Re-run enhance
                     </VBtn>
                     <!-- Diff toggle. Curator clicks to compare recreated
                          vs OCR raw side-by-side with word-level
