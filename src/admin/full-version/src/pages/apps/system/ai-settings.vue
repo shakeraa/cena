@@ -475,8 +475,13 @@ onMounted(fetchSettings)
                an empty providers array (e.g. fresh install / mis-seed).
                Without this guard the page throws "Cannot read
                properties of undefined (reading 'modelId')" on mount. -->
+          <!-- 2026-05-03: anchor for IntegrationStatusBanner's "Configure
+               API key" CTA. The banner appends #anthropic-api-key to the
+               settings route so loading the page scrolls past the lead-in
+               and lands the API-Key field above the fold. -->
           <VCard
             v-if="activeProviderConfig"
+            id="anthropic-api-key"
             class="mb-6"
           >
             <VCardItem>

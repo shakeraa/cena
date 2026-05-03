@@ -108,7 +108,13 @@ function walkCs(dir, acc = []) {
     let st;
     try { st = statSync(full); } catch { continue; }
     if (st.isDirectory()) {
+      // Skip build outputs, vendored code, VCS metadata, and worktree copies.
+      // .claude/worktrees and .agentdb/worktrees hold stale subagent branches;
+      // scanning them double-counts every violation in the active worktree
+      // PLUS its mirrored copies — and false-positives any abandoned branch
+      // even after it's been deleted from origin.
       if (item === "bin" || item === "obj" || item === "node_modules" || item === ".git") continue;
+      if (item === "worktrees" && (dir.endsWith(".claude") || dir.endsWith(".agentdb"))) continue;
       walkCs(full, acc);
     } else if (item.endsWith(".cs")) {
       acc.push(full);

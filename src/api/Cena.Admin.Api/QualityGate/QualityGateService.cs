@@ -76,11 +76,12 @@ public sealed class QualityGateService : IQualityGateService
     // supplies the resolver.
     private readonly IModelResolver? _modelResolver;
 
-    /// <summary>
-    /// Last-resort model id used ONLY when no <see cref="IModelResolver"/>
-    /// is wired (test-construction path). Production never reaches this.
-    /// </summary>
-    private const string FallbackHaikuModelId = "claude-haiku-4-5-20260101";
+    // Removed FallbackHaikuModelId const (gap-1 cleanup, 2026-05-03):
+    // when no IModelResolver is wired (pure unit-test path) the quality
+    // gate refuses to call the LLM and returns the default scores
+    // (80/80/75) rather than substituting a hardcoded model id. Same
+    // shape as HybridConceptExtractor, OcrTextEnhancer, and
+    // LlmBagrutQuestionSegmenter cleanup.
 
     // Lazily created Anthropic client for LLM-based scoring
     private AnthropicClient? _client;
@@ -206,25 +207,25 @@ public sealed class QualityGateService : IQualityGateService
 
         // Resolve per-task model id via ModelResolver (curator override
         // takes precedence; falls through to routing-config default Haiku
-        // for quality_gate). Test-construction paths that omit the resolver
-        // pin to Haiku to preserve existing scoring behaviour.
-        string modelId;
-        if (_modelResolver is not null)
+        // for quality_gate). When no resolver is wired (pure unit-test
+        // path) the gate refuses to call the LLM and returns the default
+        // scores — resolver IS the seam, no hardcoded model-id substitute.
+        if (_modelResolver is null)
         {
-            try
-            {
-                modelId = await _modelResolver.ResolveModelForTaskAsync(TaskName).ConfigureAwait(false);
-            }
-            catch (ModelNotConfiguredException ex)
-            {
-                _logger?.LogWarning(ex,
-                    "QualityGate: ModelResolver could not resolve task='{Task}'; using Haiku fallback", TaskName);
-                modelId = FallbackHaikuModelId;
-            }
+            _logger?.LogDebug(
+                "QualityGate: no IModelResolver wired (test scaffolding) — using default quality gate scores");
+            return (80, 80, 75);
         }
-        else
+        string modelId;
+        try
         {
-            modelId = FallbackHaikuModelId;
+            modelId = await _modelResolver.ResolveModelForTaskAsync(TaskName).ConfigureAwait(false);
+        }
+        catch (ModelNotConfiguredException ex)
+        {
+            _logger?.LogWarning(ex,
+                "QualityGate: ModelResolver could not resolve task='{Task}'; using default quality gate scores", TaskName);
+            return (80, 80, 75);
         }
 
         try

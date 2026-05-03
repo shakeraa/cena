@@ -66,11 +66,20 @@ public sealed class LlmBagrutQuestionSegmenterTests
         return pages;
     }
 
+    /// <summary>
+    /// Pinned model id used by these tests when the resolver is wired
+    /// to a fake. Mirrors the routing-config default for bagrut_segmentation
+    /// (Haiku 4.5) so cost-meter assertions and prompt assertions in this
+    /// test class remain meaningful.
+    /// </summary>
+    private const string TestModelId = "claude-haiku-4-5-20251001";
+
     private static LlmBagrutQuestionSegmenter BuildSegmenter(
         FakeInvoker invoker,
         IConfiguration config,
         FakeCostMetric? cost = null,
-        FakeActivityPropagator? propagator = null)
+        FakeActivityPropagator? propagator = null,
+        IModelResolver? modelResolver = null)
     {
         return new LlmBagrutQuestionSegmenter(
             fallback:           new OneDraftPerPageSegmenter(),
@@ -81,7 +90,23 @@ public sealed class LlmBagrutQuestionSegmenterTests
             documentStore:      null,
             cipher:             null,
             featureCost:        cost,
-            activityPropagator: propagator);
+            activityPropagator: propagator,
+            modelResolver:      modelResolver ?? new FixedModelResolver(TestModelId));
+    }
+
+    /// <summary>
+    /// Test seam: pin the resolver to a known model id so prompt/pricing
+    /// assertions stay deterministic. Production wires the real resolver.
+    /// </summary>
+    private sealed class FixedModelResolver : IModelResolver
+    {
+        private readonly string _modelId;
+        public FixedModelResolver(string modelId) => _modelId = modelId;
+        public Task<string> ResolveModelForTaskAsync(string taskName, CancellationToken ct = default)
+            => Task.FromResult(_modelId);
+        public Task<IReadOnlyList<TaskModelResolution>> SnapshotAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<TaskModelResolution>>(Array.Empty<TaskModelResolution>());
+        public void Invalidate() { }
     }
 
     // --------------------------------------------------------------------
@@ -118,7 +143,7 @@ public sealed class LlmBagrutQuestionSegmenterTests
         // Sanity: prompt content reached the invoker correctly.
         var captured = invoker.LastCall;
         Assert.NotNull(captured);
-        Assert.Equal(LlmBagrutQuestionSegmenter.FallbackHaikuModelId, captured!.ModelId);
+        Assert.Equal(TestModelId, captured!.ModelId);
         Assert.Contains("Bagrut", captured.SystemPrompt);
         Assert.Contains("--- PAGE 1 ---", captured.UserPrompt);
         Assert.Contains("--- PAGE 6 ---", captured.UserPrompt);
@@ -137,7 +162,8 @@ public sealed class LlmBagrutQuestionSegmenterTests
             invoker:            invoker,
             configuration:      BuildConfig(flagEnabled: true),
             logger:             capturingLogger,
-            activityPropagator: new FakeActivityPropagator("trace-empty"));
+            activityPropagator: new FakeActivityPropagator("trace-empty"),
+            modelResolver:      new FixedModelResolver(TestModelId));
 
         var pages = SamplePages(count: 4);
         var segments = await seg.SegmentAsync(pages, TestExamCode, TestPdfId);
@@ -182,7 +208,8 @@ public sealed class LlmBagrutQuestionSegmenterTests
             invoker:            invoker,
             configuration:      BuildConfig(flagEnabled: true),
             logger:             capturingLogger,
-            activityPropagator: new FakeActivityPropagator("trace-throw"));
+            activityPropagator: new FakeActivityPropagator("trace-throw"),
+            modelResolver:      new FixedModelResolver(TestModelId));
 
         var segments = await seg.SegmentAsync(SamplePages(count: 5), TestExamCode, TestPdfId);
 
@@ -284,7 +311,7 @@ public sealed class LlmBagrutQuestionSegmenterTests
         Assert.Equal("content-segmentation", rec.Feature);
         Assert.Equal("tier2", rec.Tier);
         Assert.Equal("bagrut_segmentation", rec.Task);
-        Assert.Equal(LlmBagrutQuestionSegmenter.FallbackHaikuModelId, rec.ModelId);
+        Assert.Equal(TestModelId, rec.ModelId);
         Assert.Equal(1234L, rec.InputTokens);
         Assert.Equal(56L, rec.OutputTokens);
     }
@@ -302,7 +329,8 @@ public sealed class LlmBagrutQuestionSegmenterTests
             invoker:            invoker,
             configuration:      BuildConfig(flagEnabled: true),
             logger:             capturingLogger,
-            activityPropagator: new FakeActivityPropagator("trace-ok-12345"));
+            activityPropagator: new FakeActivityPropagator("trace-ok-12345"),
+            modelResolver:      new FixedModelResolver(TestModelId));
 
         await seg.SegmentAsync(SamplePages(count: 3), TestExamCode, TestPdfId);
 

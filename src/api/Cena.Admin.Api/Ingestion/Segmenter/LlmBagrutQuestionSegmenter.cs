@@ -59,15 +59,13 @@ public sealed class LlmBagrutQuestionSegmenter : IBagrutQuestionSegmenter
 
     /// <summary>
     /// Last-resort model id used ONLY when no <see cref="IModelResolver"/>
-    /// is wired (test-construction path). Production routes via the resolver
-    /// which honours curator overrides + routing-config defaults.
-    /// <para>
-    /// Matches the dated alias row in routing-config.yaml
-    /// (claude_haiku_4_5_alias / 20251001) so LlmPricingTable lookups
-    /// resolve cleanly when the resolver is bypassed.
-    /// </para>
-    /// </summary>
-    public const string FallbackHaikuModelId = "claude-haiku-4-5-20251001";
+    // Removed FallbackHaikuModelId const (gap-1 cleanup, 2026-05-03):
+    // when no IModelResolver is wired (pure unit-test path), the segmenter
+    // refuses to call the LLM and falls back to OneDraftPerPageSegmenter
+    // rather than substituting a hardcoded model id. Same shape as the
+    // HybridConceptExtractor + OcrTextEnhancer cleanup. Tests that want
+    // the LLM tier wire a fake IModelResolver; tests that want the
+    // legacy per-page output skip the resolver entirely.
 
     private const string FeatureName = "content-segmentation";
     private const string TaskName = "bagrut_segmentation";
@@ -153,26 +151,27 @@ public sealed class LlmBagrutQuestionSegmenter : IBagrutQuestionSegmenter
 
         // Resolve model id via ModelResolver (curator override or
         // routing-config default — Haiku for bagrut_segmentation). When
-        // no resolver is wired (test-construction path) we use the
-        // FallbackHaikuModelId pin so existing tests keep passing.
-        string modelId;
-        if (_modelResolver is not null)
+        // no resolver is wired (pure unit-test path) the LLM tier
+        // refuses to call and we fall back to one-draft-per-page —
+        // resolver IS the seam, no hardcoded model-id substitute.
+        if (_modelResolver is null)
         {
-            try
-            {
-                modelId = await _modelResolver.ResolveModelForTaskAsync(TaskName, ct).ConfigureAwait(false);
-            }
-            catch (ModelNotConfiguredException ex)
-            {
-                _logger.LogError(ex,
-                    "LlmBagrutQuestionSegmenter: ModelResolver could not resolve task='{Task}' (trace_id={TraceId} pdf={PdfId}) — falling back to one-draft-per-page",
-                    TaskName, SafeTraceId(), pdfId);
-                return _fallback.Segment(pages);
-            }
+            _logger.LogDebug(
+                "LlmBagrutQuestionSegmenter: no IModelResolver wired (test scaffolding) — falling back to one-draft-per-page (trace_id={TraceId} pdf={PdfId})",
+                SafeTraceId(), pdfId);
+            return _fallback.Segment(pages);
         }
-        else
+        string modelId;
+        try
         {
-            modelId = FallbackHaikuModelId;
+            modelId = await _modelResolver.ResolveModelForTaskAsync(TaskName, ct).ConfigureAwait(false);
+        }
+        catch (ModelNotConfiguredException ex)
+        {
+            _logger.LogError(ex,
+                "LlmBagrutQuestionSegmenter: ModelResolver could not resolve task='{Task}' (trace_id={TraceId} pdf={PdfId}) — falling back to one-draft-per-page",
+                TaskName, SafeTraceId(), pdfId);
+            return _fallback.Segment(pages);
         }
 
         // Gate 3: per-model breaker. A Haiku trip from concept-extraction

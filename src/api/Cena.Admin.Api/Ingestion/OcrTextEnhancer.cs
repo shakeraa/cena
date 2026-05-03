@@ -92,11 +92,11 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
 
     /// <summary>
     /// Last-resort model id used ONLY when no <see cref="IModelResolver"/>
-    /// is wired (test-construction path). Production routes via the resolver
-    /// which honours curator overrides + routing-config defaults (Sonnet
-    /// for ocr_text_enhance per § default_model_by_task:).
-    /// </summary>
-    private const string FallbackSonnetModelId = "claude-sonnet-4-6";
+    // Removed FallbackSonnetModelId const (gap-1 cleanup, 2026-05-03):
+    // when no IModelResolver is wired (pure unit-test path), the LLM tier
+    // refuses to call rather than substituting a hardcoded id. The resolver
+    // IS the seam, and tests that bypass it intentionally exercise the
+    // "no LLM available" path. Same shape as HybridConceptExtractor.
 
     // Cache observability — separated from token counters so finops
     // dashboards see "$ saved by cache hit" distinct from "$ spent on
@@ -185,23 +185,23 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         // doc.AnthropicModelId is intentionally NOT consulted here because
         // it is the "default model for ad-hoc question generation" knob,
         // not the OCR-enhance-specific knob.
-        string modelName;
-        if (_modelResolver is not null)
+        if (_modelResolver is null)
         {
-            try
-            {
-                modelName = await _modelResolver.ResolveModelForTaskAsync(TaskName, ct).ConfigureAwait(false);
-            }
-            catch (ModelNotConfiguredException ex)
-            {
-                _logger.LogError(ex,
-                    "OcrTextEnhancer: ModelResolver could not resolve task='{Task}'", TaskName);
-                return new EnhanceOcrTextResponse(false, "", null, ex.Message);
-            }
+            _logger.LogDebug(
+                "OcrTextEnhancer: no IModelResolver wired (test scaffolding) — skipping LLM enhance");
+            return new EnhanceOcrTextResponse(false, "", null,
+                "LLM enhance unavailable: IModelResolver not wired into this composition.");
         }
-        else
+        string modelName;
+        try
         {
-            modelName = FallbackSonnetModelId;
+            modelName = await _modelResolver.ResolveModelForTaskAsync(TaskName, ct).ConfigureAwait(false);
+        }
+        catch (ModelNotConfiguredException ex)
+        {
+            _logger.LogError(ex,
+                "OcrTextEnhancer: ModelResolver could not resolve task='{Task}'", TaskName);
+            return new EnhanceOcrTextResponse(false, "", null, ex.Message);
         }
 
         try { _runtime.RequestCircuitPermission(modelName); }

@@ -74,6 +74,31 @@ allowlist:
   - path: "src/api/Cena.Admin.Api/Ingestion/Segmenter/DefaultAnthropicSegmenterInvoker.cs"
     reason: "Thin Anthropic SDK adapter for the segmenter — owns the tool schema + cache_control wiring only. Tier lives on the consumer LlmBagrutQuestionSegmenter (already tagged tier2/bagrut_segmentation). Mirrors the existing DefaultAnthropicConceptExtractionInvoker arrangement."
 
+  - path: "src/api/Cena.Admin.Api/Mastery/Extraction/DefaultAnthropicConceptExtractionInvoker.cs"
+    reason: "Thin Anthropic SDK adapter for concept extraction — owns the tool schema + cache_control wiring only. Tier lives on the consumer HybridConceptExtractor (already tagged tier2/concept_extraction). Same shape as DefaultAnthropicSegmenterInvoker."
+
+  # --- shared LLM runtime infrastructure ------------------------------------
+
+  - path: "src/api/Cena.Admin.Api/AiSettings/AnthropicLlmRuntime.cs"
+    reason: "Shared infrastructure: Anthropic client cache + per-model circuit breaker + cost-meter emit. Consumed by every [TaskRouting]-tagged caller; the runtime itself is tier-agnostic. Each call site brings its own tier+task name via EmitMetrics."
+
+  - path: "src/api/Cena.Admin.Api/AiSettings/IAnthropicLlmRuntime.cs"
+    reason: "Interface for AnthropicLlmRuntime — same tier-agnostic rationale; LLM_SIGNALS heuristic triggers on the SDK type-name mention in the contract."
+
+  - path: "src/api/Cena.Admin.Api/AiSettings/AnthropicConnectionProbe.cs"
+    reason: "Connection-test endpoint — pinned to the cheapest model intentionally (the probe is not a production tier; it just verifies the API key resolves). Tier would mislead by implying this caller routes through tier-1/2/3 selection."
+
+  - path: "src/actors/Cena.Actors/Gateway/RecordingLlmClient.cs"
+    reason: "Decorator that records LlmRequest/LlmResponse pairs for observability — wraps any ILlmClient regardless of tier. Tier lives on the consumer that constructed the underlying client (LlmClientRouter dispatches by ModelId)."
+
+  # --- DI registration helpers + pure-template (non-LLM) generators ---------
+
+  - path: "src/actors/Cena.Actors/Hints/HintLadderRegistration.cs"
+    reason: "DI registration helper for the hint ladder. Wires multiple [TaskRouting]-tagged generators (L2 Haiku, L3 Worked-Example) but is itself a registration root, not a call site."
+
+  - path: "src/actors/Cena.Actors/Hints/L1TemplateHintGenerator.cs"
+    reason: "L1 template-tier hint generator — DOES NOT call any LLM (pure deterministic template substitution). Lives alongside L2/L3 LLM-backed generators which carry their own [TaskRouting] tags. The scanner heuristic trips on the file path proximity to LLM tiers, but this caller is intentionally no-LLM by ADR-0045."
+
   # --- architecture tests + negative fixtures --------------------------------
 
   - path: "src/actors/Cena.Actors.Tests/Architecture/"

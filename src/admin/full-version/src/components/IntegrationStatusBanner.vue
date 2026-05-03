@@ -113,7 +113,11 @@ const detail = computed(() => {
 })
 
 const ctaTo = computed(() => {
-  if (!status.value?.apiKeyConfigured) return '/apps/ai-settings'
+  // Anchor links to the "Anthropic Configuration" card on the AI Settings
+  // page so the curator lands directly on the API Key input. The card has
+  // id="anthropic-api-key" — keep these in lockstep when the page is
+  // restructured.
+  if (!status.value?.apiKeyConfigured) return '/apps/system/ai-settings#anthropic-api-key'
   return '/apps/system/architecture'
 })
 
