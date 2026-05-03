@@ -1477,8 +1477,15 @@ const approveItem = async () => {
                     <div class="text-caption text-medium-emphasis mb-1">
                       Source page {{ q.sourcePage }}
                     </div>
+                    <!-- 2026-05-04: added zoom=page-fit so Chromium's PDF
+                         viewer scales the page to the embed's visible area
+                         instead of rendering at natural DPI and cropping
+                         everything below the first ~280px. The fragment
+                         params (page, toolbar, navpanes, zoom) are honored
+                         by every browser's native PDF viewer; pdfium /
+                         Firefox PDF.js / WebKit all accept the same set. -->
                     <embed
-                      :src="`${pdfBlobUrl}#page=${q.sourcePage}&toolbar=0&navpanes=0`"
+                      :src="`${pdfBlobUrl}#page=${q.sourcePage}&toolbar=0&navpanes=0&zoom=page-fit`"
                       type="application/pdf"
                       class="cena-recreated-page-embed"
                     >
@@ -2336,7 +2343,15 @@ const approveItem = async () => {
 }
 @media (min-width: 900px) {
   .cena-recreated-card.cena-recreated-card--with-page {
-    grid-template-columns: 1fr 240px;
+    /* 2026-05-04: bumped right column 240px → 360px so the source-page
+       thumbnail has enough horizontal real estate for the browser's
+       PDF viewer to render the page at a usable scale. At 240px the
+       Chromium viewer aggressively crops to whatever fits the visible
+       client area. The user-reported "real snapshot" defect was
+       symptomatic of this: the embed showed only a 1-line strip of
+       the page (e.g. just "1.6") because the page was tall but the
+       embed was short and the browser zoomed to fit width. */
+    grid-template-columns: 1fr 360px;
   }
 }
 .cena-recreated-text {
@@ -2344,7 +2359,13 @@ const approveItem = async () => {
 }
 .cena-recreated-page-embed {
   inline-size: 100%;
-  block-size: 280px;
+  /* 2026-05-04: 280px → 460px so a portrait A4 PDF page renders at a
+     usable height. Chromium's PDF viewer honours #zoom=page-fit and
+     scales the page to fit the embed; with 280px height it ended up
+     showing just a sliver of the page. 460px is roughly 2/3 of A4
+     portrait at default DPI, which keeps the side-by-side card
+     readable without dominating the panel. */
+  block-size: 460px;
   border: 1px solid rgba(var(--v-theme-outline-variant), 0.6);
   border-radius: 0.25rem;
   background: rgb(var(--v-theme-surface));
