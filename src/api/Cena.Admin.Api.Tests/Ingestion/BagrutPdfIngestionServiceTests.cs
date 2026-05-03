@@ -30,8 +30,13 @@ public sealed class BagrutPdfIngestionServiceTests
 
     public BagrutPdfIngestionServiceTests()
     {
+        // Use the real OneDraftPerPageSegmenter — keeps these tests pinning
+        // the legacy flag-OFF contract (one draft per populated page) so a
+        // regression in that path surfaces here, not just in the new
+        // segmenter test file.
+        var segmenter = new Cena.Admin.Api.Ingestion.Segmenter.OneDraftPerPageSegmenter();
         _service = new BagrutPdfIngestionService(
-            _cascade, _pdfStore, NullLogger<BagrutPdfIngestionService>.Instance);
+            _cascade, _pdfStore, segmenter, NullLogger<BagrutPdfIngestionService>.Instance);
     }
 
     private static OcrCascadeResult MakeResult(

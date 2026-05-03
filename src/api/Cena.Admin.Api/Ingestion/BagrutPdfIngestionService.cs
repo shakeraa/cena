@@ -29,6 +29,7 @@
 // NO STUBS, NO MOCKS. Real cascade, real figure storage, real sanitizer.
 // =============================================================================
 
+using Cena.Admin.Api.Ingestion.Segmenter;
 using Cena.Infrastructure.Ocr;
 using Cena.Infrastructure.Ocr.Contracts;
 using Cena.Infrastructure.Ocr.PdfTriage;
@@ -113,16 +114,31 @@ public sealed class BagrutPdfIngestionService : IBagrutPdfIngestionService
 {
     private readonly IOcrCascadeService _cascade;
     private readonly IBagrutPdfStore _pdfStore;
+    private readonly IBagrutQuestionSegmenter _segmenter;
     private readonly ILogger<BagrutPdfIngestionService> _logger;
 
+    /// <summary>
+    /// Production ctor. <paramref name="segmenter"/> is REQUIRED and is the
+    /// single point of policy for question-boundary detection (replaced the
+    /// inline one-draft-per-page heuristic 2026-05-03 — user-reported defect
+    /// 35581-q.pdf produced 6 drafts where pages 1-2 were exam cover and
+    /// "answer 5 of 8" preamble).
+    /// </summary>
     public BagrutPdfIngestionService(
         IOcrCascadeService cascade,
         IBagrutPdfStore pdfStore,
+        IBagrutQuestionSegmenter segmenter,
         ILogger<BagrutPdfIngestionService> logger)
     {
-        _cascade  = cascade;
-        _pdfStore = pdfStore;
-        _logger   = logger;
+        ArgumentNullException.ThrowIfNull(cascade);
+        ArgumentNullException.ThrowIfNull(pdfStore);
+        ArgumentNullException.ThrowIfNull(segmenter);
+        ArgumentNullException.ThrowIfNull(logger);
+
+        _cascade   = cascade;
+        _pdfStore  = pdfStore;
+        _segmenter = segmenter;
+        _logger    = logger;
     }
 
     public async Task<PdfIngestionResult> IngestAsync(
@@ -206,13 +222,19 @@ public sealed class BagrutPdfIngestionService : IBagrutPdfIngestionService
         }
 
         var pages = BuildExtractedPages(result);
-        var drafts = ExtractQuestions(pages, examCode, out var figureCount);
+
+        // Segmenter owns question-boundary detection. The default impl in
+        // production (LlmBagrutQuestionSegmenter when the flag is on) calls
+        // Haiku once per PDF and falls back to OneDraftPerPageSegmenter on
+        // every failure path — segmentation NEVER blocks ingestion.
+        var segments = await _segmenter.SegmentAsync(pages, examCode, pdfId, ct).ConfigureAwait(false);
+        var drafts = MaterialiseDrafts(pages, segments, examCode, out var figureCount);
 
         var warnings = BuildWarnings(result, drafts);
 
         _logger.LogInformation(
-            "Bagrut ingestion complete: pdf={PdfId} pages={Pages} drafts={Drafts} figures={Figures} review={Review} fallbacks=[{Fallbacks}]",
-            pdfId, pages.Count, drafts.Count, figureCount,
+            "Bagrut ingestion complete: pdf={PdfId} pages={Pages} segments={Segments} drafts={Drafts} figures={Figures} review={Review} fallbacks=[{Fallbacks}]",
+            pdfId, pages.Count, segments.Count, drafts.Count, figureCount,
             result.HumanReviewRequired, string.Join(",", result.FallbacksFired));
 
         return new PdfIngestionResult(
@@ -311,43 +333,124 @@ public sealed class BagrutPdfIngestionService : IBagrutPdfIngestionService
         return pages;
     }
 
-    private static List<IngestionDraftQuestion> ExtractQuestions(
+    /// <summary>
+    /// Project segmenter output into IngestionDraftQuestion records. The
+    /// segmenter owns boundary detection ONLY; this method owns:
+    ///   - LaTeX sanitisation per page,
+    ///   - per-segment figureSpec JSON aggregation,
+    ///   - draft-id idempotency (stable across re-uploads),
+    ///   - review-note tagging (low confidence, figures, multi-page span,
+    ///     LLM-supplied label),
+    ///   - confidence reduction across constituent pages (max OCR confidence
+    ///     wins — a multi-page question's signal-strength is its strongest
+    ///     page, not its weakest).
+    ///
+    /// Pages referenced by a segment that are not populated (no text + no
+    /// LaTeX) are silently included in the multi-page concatenation — the
+    /// segmenter is the authority on which pages belong together; if it
+    /// thinks a blank page is part of the question, it stays.
+    /// </summary>
+    private static List<IngestionDraftQuestion> MaterialiseDrafts(
         IReadOnlyList<ExtractedPage> pages,
+        IReadOnlyList<Segmenter.BagrutQuestionSegment> segments,
         string examCode,
         out int figureCount)
     {
+        // Figures are counted across the WHOLE document (matches the prior
+        // contract — figureCount on PdfIngestionResult is "figures extracted
+        // from the PDF", not "figures attached to drafts"). Pages skipped by
+        // the segmenter (cover, instructions) still contributed figures to
+        // the OCR layer; counting them keeps the warning surface honest.
         figureCount = pages.Sum(p => p.Figures.Count);
-        // Heuristics-based question boundary detection:
-        //   - "שאלה X" (Hebrew: "Question X")
-        //   - "Problem X" / "Question X" / numbered "1." | "1)" at line start
-        // For the first pass we keep it simple: one draft per page. The
-        // curator trims/splits during the review handshake (RDY-019e) once
-        // CuratorMetadata lands. A smarter LLM-backed segmenter is a
-        // Phase-3 enhancement (RDY-019c coverage report feeds back).
-        var drafts = new List<IngestionDraftQuestion>();
 
-        foreach (var page in pages)
+        var drafts = new List<IngestionDraftQuestion>(segments.Count);
+        var pageByNumber = pages.ToDictionary(p => p.PageNumber);
+
+        foreach (var segment in segments)
         {
-            if (string.IsNullOrWhiteSpace(page.RawText) && string.IsNullOrWhiteSpace(page.ExtractedLatex))
+            // Defense in depth: a segmenter that violates its own contract
+            // would otherwise silently emit a draft for a non-existent page.
+            // Validate throws ArgumentOutOfRangeException; let it bubble so
+            // the bug is visible in test output rather than producing a
+            // mis-shaped draft.
+            segment.Validate();
+
+            // Collect the constituent pages that the segmenter bundled.
+            var constituent = new List<ExtractedPage>(segment.EndPage - segment.StartPage + 1);
+            for (var p = segment.StartPage; p <= segment.EndPage; p++)
+            {
+                if (pageByNumber.TryGetValue(p, out var page))
+                    constituent.Add(page);
+            }
+
+            if (constituent.Count == 0)
+            {
+                // Segmenter pointed at pages that are not in the OCR result.
+                // The LLM segmenter validates this and falls back; the
+                // OneDraftPerPage segmenter cannot produce this case.
+                // Skip rather than emit a phantom draft.
                 continue;
+            }
 
-            var sanitizedLatex = string.IsNullOrWhiteSpace(page.ExtractedLatex)
-                ? null
-                : LaTeXSanitizer.Sanitize(page.ExtractedLatex);
+            // Skip a fully-empty segment (every constituent page has no
+            // text and no LaTeX) — matches the prior heuristic's behavior.
+            var anyPopulated = constituent.Any(p =>
+                !string.IsNullOrWhiteSpace(p.RawText) ||
+                !string.IsNullOrWhiteSpace(p.ExtractedLatex));
+            if (!anyPopulated) continue;
 
-            var promptPreview = string.IsNullOrWhiteSpace(page.RawText)
+            // Concatenate raw text across constituent pages (page break is
+            // a single newline). Truncate the prompt preview to 400 chars
+            // to match the prior contract — curator panel truncates the
+            // same way and a longer Prompt would overflow the read model.
+            var rawTextJoined = string.Join(
+                "\n",
+                constituent
+                    .Select(p => p.RawText ?? string.Empty)
+                    .Where(t => !string.IsNullOrWhiteSpace(t)));
+
+            // Concatenate LaTeX too — multi-page derivations have their
+            // equations split across pages; sanitising each page's LaTeX
+            // independently then joining preserves layer-2c canonical form.
+            var sanitizedLatex = SanitizeAndJoinLatex(constituent);
+
+            var promptPreview = string.IsNullOrWhiteSpace(rawTextJoined)
                 ? (sanitizedLatex ?? string.Empty)
-                : (page.RawText.Length > 400 ? page.RawText[..400] + "…" : page.RawText);
+                : (rawTextJoined.Length > 400 ? rawTextJoined[..400] + "…" : rawTextJoined);
 
             var reviewNotes = new List<string> { "bagrut-reference:auto-extracted;requires-curator-recreation" };
-            if (page.OcrConfidence < 0.70) reviewNotes.Add("low-ocr-confidence");
-            if (page.Figures.Count > 0) reviewNotes.Add($"figures:{page.Figures.Count}");
 
-            var figureSpec = page.Figures.Count == 0
+            // Confidence is the strongest signal across the segment's
+            // pages. Multi-page questions where one page is high-quality
+            // and another is messy should not be flagged low-confidence
+            // because of the messy page alone; the curator trusts the
+            // strong page and uses the messy one as auxiliary context.
+            var maxOcrConfidence = constituent.Max(p => p.OcrConfidence);
+            if (maxOcrConfidence < 0.70) reviewNotes.Add("low-ocr-confidence");
+
+            var totalFigures = constituent.Sum(p => p.Figures.Count);
+            if (totalFigures > 0) reviewNotes.Add($"figures:{totalFigures}");
+
+            if (constituent.Count > 1)
+            {
+                reviewNotes.Add(
+                    $"multi-page-segment:{segment.StartPage}-{segment.EndPage}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(segment.QuestionLabel))
+            {
+                reviewNotes.Add($"segmenter-label:{segment.QuestionLabel}");
+            }
+
+            // Aggregate figureSpec across constituent pages so the curator's
+            // visual review surface attaches every figure that belongs to
+            // the question, not just the first page's figures.
+            var allFigures = constituent.SelectMany(p => p.Figures).ToList();
+            var figureSpec = allFigures.Count == 0
                 ? null
                 : System.Text.Json.JsonSerializer.Serialize(new
                 {
-                    figures = page.Figures.Select(f => new
+                    figures = allFigures.Select(f => new
                     {
                         page = f.PageNumber,
                         kind = f.Kind,
@@ -359,24 +462,37 @@ public sealed class BagrutPdfIngestionService : IBagrutPdfIngestionService
 
             drafts.Add(new IngestionDraftQuestion(
                 // Idempotent draft id: stable across re-uploads of the
-                // same (examCode, page). Marten upserts on Id collision,
-                // so re-running the same Bagrut PDF refreshes the draft
-                // in place rather than creating new rows. Was previously
-                // suffixed with Guid[..6] which produced a fresh row per
-                // run (user reported 17 rows for one upload, 2026-04-29).
-                DraftId: $"draft-{examCode}-p{page.PageNumber}",
-                SourcePage: page.PageNumber,
+                // same (examCode, startPage). Marten upserts on Id
+                // collision, so re-running the same Bagrut PDF refreshes
+                // the draft in place. Keyed on startPage (not the segment
+                // span) so a segmenter that later refines a multi-page
+                // boundary still hits the same draft id — keeps curator
+                // metadata attached across re-extraction.
+                DraftId: $"draft-{examCode}-p{segment.StartPage}",
+                SourcePage: segment.StartPage,
                 Prompt: promptPreview,
                 LatexContent: sanitizedLatex,
                 AnswerChoices: Array.Empty<string>(),
                 CorrectAnswer: null,
                 ExamCode: examCode,
                 FigureSpecJson: figureSpec,
-                ExtractionConfidence: page.OcrConfidence,
+                ExtractionConfidence: maxOcrConfidence,
                 ReviewNotes: reviewNotes.ToArray()));
         }
 
         return drafts;
+    }
+
+    private static string? SanitizeAndJoinLatex(IReadOnlyList<ExtractedPage> constituent)
+    {
+        var pieces = new List<string>(constituent.Count);
+        foreach (var p in constituent)
+        {
+            if (string.IsNullOrWhiteSpace(p.ExtractedLatex)) continue;
+            var sanitized = LaTeXSanitizer.Sanitize(p.ExtractedLatex);
+            if (!string.IsNullOrWhiteSpace(sanitized)) pieces.Add(sanitized);
+        }
+        return pieces.Count == 0 ? null : string.Join("\n", pieces);
     }
 
     private static string[] BuildWarnings(

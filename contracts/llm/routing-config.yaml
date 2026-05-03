@@ -303,6 +303,22 @@ task_routing:
     max_tokens: 500
     notes: "L3 hint — full worked example with Bloom's-appropriate depth and methodology-aware framing. Separately tracked from full_explanation so over-use (which signals scaffolding regression) is visible in the cost dashboard."
 
+  # ADR-0062: Bagrut PDF question segmenter. Single Haiku call per PDF with
+  # cache_control: ephemeral on the system block. Bounded structured output
+  # (start_page, end_page, label, confidence). Tier 2 — boundary detection
+  # is a closed-set classification; quality bar is "skip cover and
+  # instruction pages", not "compose pedagogically". Falls back to
+  # OneDraftPerPageSegmenter on every failure path so ingestion is fail-open.
+  # Feature-flag gated by Cena:Ingestion:BagrutLlmSegmenterEnabled (default
+  # OFF — flip after curator validates LLM-tier output on a few real PDFs).
+  bagrut_segmentation:
+    primary: claude_haiku_4_5
+    fallback_chain:
+      - claude_haiku_4_5_alias
+    temperature: 0.0
+    max_tokens: 2048
+    notes: "Hebrew Bagrut math exam question-boundary detection. One call per PDF (cache_control: ephemeral on system rubric). Tier 2; per-call ceiling assumes Haiku rates."
+
 
 # ─────────────────────────────────────────────────────────────────────
 # 3. RATE LIMITS & TIMEOUTS
