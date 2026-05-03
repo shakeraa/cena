@@ -213,7 +213,7 @@ public static class QuestionConceptsEndpoints
         group.MapPost("/{id}/enhance-text", async (
             string id,
             [FromServices] IDocumentStore store,
-            [FromServices] IAiGenerationService ai,
+            [FromServices] IOcrTextEnhancer enhancer,
             CancellationToken ct) =>
         {
             await using var session = store.QuerySession();
@@ -233,7 +233,7 @@ public static class QuestionConceptsEndpoints
                 return BadRequest("empty_ocr_text",
                     "Draft has no prompt or LaTeX content to enhance.");
 
-            var resp = await ai.EnhanceOcrTextAsync(
+            var resp = await enhancer.EnhanceOcrTextAsync(
                 new EnhanceOcrTextRequest(ocrInput, payload.ExamCode), ct);
             if (!resp.Success)
                 return BadRequest("ai_enhance_failed",

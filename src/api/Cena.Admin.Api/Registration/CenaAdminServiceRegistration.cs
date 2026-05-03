@@ -374,6 +374,11 @@ public static class CenaAdminServiceRegistration
         services.AddSingleton<Cena.Admin.Api.AiSettings.IAnthropicConnectionProbe,
             Cena.Admin.Api.AiSettings.AnthropicConnectionProbe>();
         services.AddSingleton<IAiGenerationService, AiGenerationService>();
+        // ADR-0062 Phase 1.5 — OCR cleanup pass extracted from
+        // AiGenerationService 2026-05-03. Singleton because it caches
+        // an Anthropic client keyed on the persisted API key, just like
+        // AiGenerationService does.
+        services.AddSingleton<IOcrTextEnhancer, OcrTextEnhancer>();
 
         // prr-200 (ADR-0002, ADR-0032): Deterministic parametric template
         // engine (Strategy 1). Renderer calls ICasRouterService; compiler
