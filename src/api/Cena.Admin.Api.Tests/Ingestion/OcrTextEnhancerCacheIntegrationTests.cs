@@ -138,14 +138,18 @@ public sealed class OcrTextEnhancerCacheIntegrationTests
 
         var cost = new StubLlmCostMetric();
         var configuration = new ConfigurationBuilder().Build(); // no Anthropic:ApiKey
+        var meterFactory = new StubMeterFactory();
+        var runtime = new AnthropicLlmRuntime(
+            NullLogger<AnthropicLlmRuntime>.Instance, meterFactory);
         var enhancer = new OcrTextEnhancer(
             logger: NullLogger<OcrTextEnhancer>.Instance,
             configuration: configuration,
-            meterFactory: new StubMeterFactory(),
+            meterFactory: meterFactory,
             documentStore: store,
             cipher: new StubApiKeyCipher(),
             featureCost: cost,
-            cache: cache);
+            cache: cache,
+            runtime: runtime);
 
         return (enhancer, cache, store, cost, clock);
     }

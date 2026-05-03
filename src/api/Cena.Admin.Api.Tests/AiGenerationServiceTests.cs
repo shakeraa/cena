@@ -113,12 +113,14 @@ public sealed class AiGenerationServiceTests : IAsyncLifetime
             .AddInMemoryCollection(configValues ?? new Dictionary<string, string?>())
             .Build();
         var meterFactory = new TestMeterFactory();
+        var runtime = new AnthropicLlmRuntime(
+            NullLogger<AnthropicLlmRuntime>.Instance, meterFactory);
         var scopeFactory = Substitute.For<IServiceScopeFactory>();
         var gateMode = Substitute.For<ICasGateModeProvider>();
         gateMode.CurrentMode.Returns(CasGateMode.Off);
         var probe = new FakeProbe();
         var service = new AiGenerationService(
-            NullLogger<AiGenerationService>.Instance, config, meterFactory,
+            NullLogger<AiGenerationService>.Instance, config, runtime,
             scopeFactory, gateMode, NullLlmCostMetric.Instance,
             _store, new FakeApiKeyCipher(), probe);
         return (service, probe);
