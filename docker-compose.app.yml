@@ -156,7 +156,14 @@ services:
       # NotConfiguredOcrCascadeService stays registered and Bagrut
       # ingest returns 503 ocr_circuit_open with remediation copy.
       - Ocr__Gemini__ApiKey=${OCR_GEMINI_API_KEY:-}
-      - Ocr__Gemini__Model=${OCR_GEMINI_MODEL:-gemini-1.5-pro}
+      # 2026-05-04: gemini-1.5-pro was deprecated and the
+      # generativelanguage.googleapis.com endpoint started returning 404
+      # for that id, sending every Bagrut PDF page through the Surya-only
+      # fallback (poor quality on Hebrew + math). gemini-2.0-flash is the
+      # current GA multimodal default; per-image cost ~50% of 1.5-pro and
+      # latency ~2x faster. Override via OCR_GEMINI_MODEL in .env if your
+      # Google Cloud project has access to a different / newer model.
+      - Ocr__Gemini__Model=${OCR_GEMINI_MODEL:-gemini-2.0-flash}
       - Ocr__Mathpix__AppId=${OCR_MATHPIX_APP_ID:-}
       - Ocr__Mathpix__AppKey=${OCR_MATHPIX_APP_KEY:-}
       # OCR sidecar (Surya layout + pix2tex math). Same DNS name actor-host
@@ -477,7 +484,14 @@ services:
       # (gitignored). Same set as admin-api so both hosts use identical
       # cascade configuration via Cena.Infrastructure.Ocr.AddOcrCascadeWithRunners.
       - Ocr__Gemini__ApiKey=${OCR_GEMINI_API_KEY:-}
-      - Ocr__Gemini__Model=${OCR_GEMINI_MODEL:-gemini-1.5-pro}
+      # 2026-05-04: gemini-1.5-pro was deprecated and the
+      # generativelanguage.googleapis.com endpoint started returning 404
+      # for that id, sending every Bagrut PDF page through the Surya-only
+      # fallback (poor quality on Hebrew + math). gemini-2.0-flash is the
+      # current GA multimodal default; per-image cost ~50% of 1.5-pro and
+      # latency ~2x faster. Override via OCR_GEMINI_MODEL in .env if your
+      # Google Cloud project has access to a different / newer model.
+      - Ocr__Gemini__Model=${OCR_GEMINI_MODEL:-gemini-2.0-flash}
       - Ocr__Mathpix__AppId=${OCR_MATHPIX_APP_ID:-}
       - Ocr__Mathpix__AppKey=${OCR_MATHPIX_APP_KEY:-}
       # OCR sidecar URL — admin-api & actor-host both reach the sidecar
