@@ -65,6 +65,16 @@ RUN apt-get update \
 
 COPY --from=publish /app/publish .
 
+# Bake the runtime data files used by services that read directly from
+# the repo at boot. Both BagrutTaxonomyCatalog (ADR-0062 Phase 0) and
+# the existing TaxonomyCache walk up from AppContext.BaseDirectory
+# looking for `scripts/bagrut-taxonomy.json`. Without this COPY the
+# walk reaches the filesystem root and the loader throws
+# FileNotFoundException at first request. Keep the canonical path so
+# the loaders find the file at /app/scripts/bagrut-taxonomy.json
+# (AppContext.BaseDirectory == /app at runtime).
+COPY --from=publish /src/scripts/bagrut-taxonomy.json /app/scripts/bagrut-taxonomy.json
+
 RUN groupadd --system --gid 10001 cena \
  && useradd --system --uid 10001 --gid cena --shell /usr/sbin/nologin cena \
  && chown -R cena:cena /app \
