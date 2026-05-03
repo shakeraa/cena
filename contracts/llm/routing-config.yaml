@@ -150,6 +150,37 @@ models:
     is_trusted_provider: true
     notes: "Alias matching SPA dropdown's claude-haiku-4-5-20251001 — same pricing as claude-haiku-4-5-20260101"
 
+  # Multi-model alias rows (2026-05-03) — add the AnthropicSupportedModels
+  # closed-set members that don't already have a row above so
+  # LlmPricingTable.Resolve() succeeds for every option the per-task
+  # override panel might surface to a curator. Same provider, same
+  # rate sheet — only the model_id alias differs.
+  claude_opus_4_7_alias:
+    model_id: "claude-opus-4-7"
+    provider: "anthropic"
+    api_base_url: "https://api.anthropic.com/v1"
+    tier: "opus"
+    context_window: 1000000
+    max_output_tokens: 8192
+    cost_per_input_mtok: 15.00
+    cost_per_output_mtok: 75.00
+    cost_per_cached_input_mtok: 1.50
+    is_trusted_provider: true
+    notes: "Alias surfaced by the per-task override panel — Opus 4.7 list rates."
+
+  claude_sonnet_4_5_alias:
+    model_id: "claude-sonnet-4-5"
+    provider: "anthropic"
+    api_base_url: "https://api.anthropic.com/v1"
+    tier: "sonnet"
+    context_window: 1000000
+    max_output_tokens: 8192
+    cost_per_input_mtok: 3.00
+    cost_per_output_mtok: 15.00
+    cost_per_cached_input_mtok: 0.30
+    is_trusted_provider: true
+    notes: "Alias for claude-sonnet-4-5-20260101 — same pricing, undated form used by the per-task override panel."
+
 
 # ─────────────────────────────────────────────────────────────────────
 # 2. TASK-TO-MODEL MAPPING & FALLBACK CHAINS
@@ -318,6 +349,36 @@ task_routing:
     temperature: 0.0
     max_tokens: 2048
     notes: "Hebrew Bagrut math exam question-boundary detection. One call per PDF (cache_control: ephemeral on system rubric). Tier 2; per-call ceiling assumes Haiku rates."
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2B. PER-TASK DEFAULT MODEL (Cena.Admin.Api.AiSettings.ModelResolver)
+#
+# Authoritative default model_id per task name. The runtime resolution
+# chain is:
+#
+#   AiSettingsDocument.ModelOverridesByTask  (per-task curator override)
+#     ↓ (no override)
+#   default_model_by_task[<task>]            (per-task routing-config default)
+#     ↓ (task missing here)
+#   global_default_model_id                  (catch-all sonnet-tier default)
+#     ↓ (key absent)
+#   throw ModelNotConfiguredException        (fail-loud)
+#
+# These keys cover every task name routed by an [TaskRouting(...)]
+# attribute on a class in src/api/Cena.Admin.Api. Adding a new caller
+# means adding a row here. The closed-set helps an architecture test
+# enforce single-seam routing (no class-private model id consts).
+# ─────────────────────────────────────────────────────────────────────
+
+default_model_by_task:
+  question_generation:  "claude-sonnet-4-6"
+  ocr_text_enhance:     "claude-sonnet-4-6"
+  concept_extraction:   "claude-haiku-4-5-20251001"
+  quality_gate:         "claude-haiku-4-5-20251001"
+  bagrut_segmentation:  "claude-haiku-4-5-20251001"
+
+global_default_model_id: "claude-sonnet-4-6"
 
 
 # ─────────────────────────────────────────────────────────────────────

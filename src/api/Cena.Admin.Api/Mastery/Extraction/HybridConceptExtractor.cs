@@ -111,13 +111,15 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
     // mastery signal channel without helping pedagogy.
     public const int MaxSupportingConcepts = 4;
 
-    // Default model id for the LLM tier. Keeping it as a const here
-    // rather than configuration because ADR-0026 §2 pins concept-
-    // extraction to Tier-2 (Haiku) — a config knob would let an
-    // operator silently route this to Sonnet ($15/Mtok output vs
-    // $5/Mtok), which is exactly the cost-blow-up the routing-config
-    // is designed to prevent.
-    private const string HaikuModelId = "claude-haiku-4-5-20260101";
+    /// <summary>
+    /// Canonical task name routed through <see cref="IModelResolver"/>.
+    /// Kept as a const so call sites and tests share one source-of-truth
+    /// string. The resolver's resolution chain (curator override →
+    /// routing-config-task-default → routing-config-global-default → throw)
+    /// ensures concept-extraction stays on Haiku unless an admin explicitly
+    /// routes it elsewhere via the per-task override panel.
+    /// </summary>
+    public const string TaskName = "concept_extraction";
 
     private readonly RulesOnlyConceptExtractor _rulesTier;
     private readonly BagrutTaxonomyCatalog _catalog;
@@ -136,6 +138,11 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
     // the admin SPA banner reflects "concept-extraction LLM tier failed
     // here is what came back" within 60s of a failure.
     private readonly Cena.Admin.Api.AiSettings.IAnthropicIntegrationStatusService? _integrationStatus;
+    // Optional: tests can construct without a resolver to keep the rules-tier
+    // path independent of the AiSettings stack. When null, the LLM tier short-
+    // circuits to "no LLM" (returns empty list → caller degrades to rules
+    // output). Production DI always supplies the resolver.
+    private readonly IModelResolver? _modelResolver;
 
     /// <summary>
     /// Full DI ctor used in production. <paramref name="invoker"/> is
@@ -160,7 +167,8 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
         IApiKeyCipher? cipher = null,
         ILlmCostMetric? featureCost = null,
         IActivityPropagator? activityPropagator = null,
-        Cena.Admin.Api.AiSettings.IAnthropicIntegrationStatusService? integrationStatus = null)
+        Cena.Admin.Api.AiSettings.IAnthropicIntegrationStatusService? integrationStatus = null,
+        IModelResolver? modelResolver = null)
     {
         ArgumentNullException.ThrowIfNull(rulesTier);
         ArgumentNullException.ThrowIfNull(catalog);
@@ -179,6 +187,7 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
         _runtime = runtime;
         _invoker = invoker;
         _integrationStatus = integrationStatus;
+        _modelResolver = modelResolver;
     }
 
     public async Task<ExtractionResult> ExtractAsync(
@@ -256,7 +265,34 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
             return Array.Empty<QuestionConcept>();
         }
 
-        try { _runtime?.RequestCircuitPermission(HaikuModelId); }
+        // Resolve the per-task model id via the single seam. The resolver
+        // returns the curator's override when set, else the routing-config
+        // default (Haiku for concept_extraction). When no resolver is
+        // wired (pure unit-test path) we degrade to "no LLM" rather than
+        // hardcoding a fallback — the resolver IS the seam and unit tests
+        // that bypass it intentionally exercise rules-only behaviour.
+        if (_modelResolver is null)
+        {
+            _logger.LogDebug(
+                "HybridConceptExtractor: no IModelResolver wired (test scaffolding) — skipping LLM tier (qid={QuestionId})",
+                input.QuestionId);
+            return Array.Empty<QuestionConcept>();
+        }
+
+        string modelId;
+        try
+        {
+            modelId = await _modelResolver.ResolveModelForTaskAsync(TaskName, ct).ConfigureAwait(false);
+        }
+        catch (ModelNotConfiguredException ex)
+        {
+            _logger.LogError(ex,
+                "HybridConceptExtractor: ModelResolver could not resolve task='{Task}' — falling back to rules tier (qid={QuestionId})",
+                TaskName, input.QuestionId);
+            return Array.Empty<QuestionConcept>();
+        }
+
+        try { _runtime?.RequestCircuitPermission(modelId); }
         catch (CircuitOpenException ex)
         {
             _logger.LogWarning(
@@ -292,19 +328,20 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
         activity?.SetTag("trace_id", traceId);
         activity?.SetTag("task", "concept_extraction");
         activity?.SetTag("tier", "tier2");
-        activity?.SetTag("model_id", HaikuModelId);
+        activity?.SetTag("model_id", modelId);
 
         try
         {
             var (toolUseInput, inputTokens, outputTokens) = await _invoker.InvokeAsync(
-                apiKey, HaikuModelId, systemPrompt, userPrompt, ct).ConfigureAwait(false);
+                apiKey, modelId, systemPrompt, userPrompt, ct).ConfigureAwait(false);
             sw.Stop();
 
-            // Gap 30 fix: pricing per-call. Concept-extraction is pinned to
-            // Haiku 4.5 (ADR-0026 §2 + ADR-0062). The legacy meter previously
-            // hardcoded Sonnet $3/$15 which over-reported this caller by ~3x.
-            _runtime?.EmitMetrics(HaikuModelId, "concept_extraction", sw.ElapsedMilliseconds,
-                inputTokens, outputTokens, LlmCallPricing.AnthropicHaiku4_5);
+            // Pricing per-call. ModelResolver may have returned Haiku (default)
+            // or a curator-overridden model (Sonnet, Opus, …); the supported-
+            // models table holds per-Mtok rates so the legacy meter stays
+            // accurate even after a Haiku→Sonnet flip.
+            _runtime?.EmitMetrics(modelId, "concept_extraction", sw.ElapsedMilliseconds,
+                inputTokens, outputTokens, AnthropicSupportedModels.ResolvePricingFor(modelId));
 
             if (_featureCost is not null)
             {
@@ -312,7 +349,7 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
                     feature: "concept-extraction",
                     tier: "tier2",
                     task: "concept_extraction",
-                    modelId: HaikuModelId,
+                    modelId: modelId,
                     inputTokens: inputTokens,
                     outputTokens: outputTokens);
             }
@@ -326,7 +363,7 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
                 _logger.LogWarning(
                     "HybridConceptExtractor: Anthropic returned no tool_use block (trace_id={TraceId} qid={QuestionId}) — falling back to rules tier",
                     traceId, input.QuestionId);
-                _runtime?.RecordSuccess(HaikuModelId);
+                _runtime?.RecordSuccess(modelId);
                 return Array.Empty<QuestionConcept>();
             }
 
@@ -340,7 +377,7 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
                 "HybridConceptExtractor LLM OK (trace_id={TraceId} qid={QuestionId} input={Input} output={Output} duration={DurationMs}ms returned={Returned})",
                 traceId, input.QuestionId, inputTokens, outputTokens, sw.ElapsedMilliseconds, parsed.Count);
 
-            _runtime?.RecordSuccess(HaikuModelId);
+            _runtime?.RecordSuccess(modelId);
             _integrationStatus?.RecordSuccess("concept_extraction");
             return parsed;
         }
@@ -359,7 +396,7 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
         catch (Exception ex)
         {
             sw.Stop();
-            _runtime?.RecordFailure(HaikuModelId);
+            _runtime?.RecordFailure(modelId);
             activity?.SetTag("outcome", "error");
             // Use the trace id even on failure so the cost-of-zero call
             // can be tied to the failed Anthropic span downstream.

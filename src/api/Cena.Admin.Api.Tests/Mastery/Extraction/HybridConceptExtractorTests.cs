@@ -93,6 +93,25 @@ public sealed class HybridConceptExtractorTests
                 : new Dictionary<string, string?> { ["Anthropic:ApiKey"] = apiKey })
             .Build();
 
+    /// <summary>
+    /// Stub <see cref="Cena.Admin.Api.AiSettings.IModelResolver"/> that hands
+    /// back a fixed Haiku model id — wires HybridConceptExtractor's per-task
+    /// resolver path without dragging the real Marten + routing-config-yaml
+    /// stack into these unit tests. The model id matches the historic Haiku
+    /// constant the production routing-config defaults to so existing
+    /// FakeInvoker assertions keep working.
+    /// </summary>
+    private sealed class StubModelResolver : Cena.Admin.Api.AiSettings.IModelResolver
+    {
+        public Task<string> ResolveModelForTaskAsync(string taskName, CancellationToken ct = default)
+            => Task.FromResult("claude-haiku-4-5-20260101");
+        public void Invalidate() { }
+        public Task<IReadOnlyList<Cena.Admin.Api.AiSettings.TaskModelResolution>> SnapshotAsync(
+            CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<Cena.Admin.Api.AiSettings.TaskModelResolution>>(
+                Array.Empty<Cena.Admin.Api.AiSettings.TaskModelResolution>());
+    }
+
     private static HybridConceptExtractor BuildExtractor(
         FakeInvoker invoker,
         IConfiguration? config = null,
@@ -105,7 +124,8 @@ public sealed class HybridConceptExtractorTests
             catalog:       catalog,
             logger:        NullLogger<HybridConceptExtractor>.Instance,
             configuration: config ?? BuildConfiguration(),
-            invoker:       invoker);
+            invoker:       invoker,
+            modelResolver: new StubModelResolver());
     }
 
     // ── Test 1 — rules returns 1 high-confidence → LLM NOT called ────────

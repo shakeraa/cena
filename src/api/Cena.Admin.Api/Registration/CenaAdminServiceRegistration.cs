@@ -68,7 +68,10 @@ public static class CenaAdminServiceRegistration
                 // prr-046: per-feature cost metric is registered by the host's
                 // AddLlmCostMetric() call; nullable so unit tests can construct
                 // the service without a DI container.
-                featureCost: sp.GetService<Cena.Infrastructure.Llm.ILlmCostMetric>()));
+                featureCost: sp.GetService<Cena.Infrastructure.Llm.ILlmCostMetric>(),
+                // 2026-05-03 (multi-model): per-task model resolver — quality_gate
+                // honours curator overrides + routing-config defaults (Haiku).
+                modelResolver: sp.GetService<Cena.Admin.Api.AiSettings.IModelResolver>()));
 
         // RDY-034 / ADR-0002: CAS ingestion gate services.
         // - MathContentDetector: boundary probe for question bodies.
@@ -429,6 +432,25 @@ public static class CenaAdminServiceRegistration
         // consume this instead of holding parallel breaker state.
         services.AddSingleton<Cena.Admin.Api.AiSettings.IAnthropicLlmRuntime,
             Cena.Admin.Api.AiSettings.AnthropicLlmRuntime>();
+
+        // 2026-05-03 (multi-model): per-task model resolver. Loads the YAML
+        // defaults table once at startup (fail-loud if the YAML is missing
+        // or the section absent). Singleton so the cached AiSettingsDocument
+        // is shared across requests; the PUT endpoint invalidates on every
+        // mutation so a curator's flip is visible within milliseconds (the
+        // 60s TTL is the worst-case for federated admin instances that
+        // missed the invalidate signal).
+        services.TryAddSingleton<Cena.Admin.Api.AiSettings.RoutingConfigTaskDefaults>(_ =>
+        {
+            // Reuse the existing resolver convention so dev / hot-reload /
+            // published binaries all find the same routing-config.yaml.
+            var path = Cena.Infrastructure.Llm.LlmCostMetricRegistration
+                .ResolveRoutingConfigPath();
+            return Cena.Admin.Api.AiSettings.RoutingConfigTaskDefaults.LoadFromFile(path);
+        });
+        services.TryAddSingleton<Cena.Admin.Api.AiSettings.IModelResolver,
+            Cena.Admin.Api.AiSettings.ModelResolver>();
+
         services.AddSingleton<IAiGenerationService, AiGenerationService>();
         // ADR-0062 Phase 1.5 — OCR cleanup pass extracted from
         // AiGenerationService 2026-05-03. Singleton because it caches
@@ -736,6 +758,12 @@ public static class CenaAdminServiceRegistration
         // test can mount just that endpoint without dragging in the rest of the
         // AI group's services. See AiSettings/AiTestConnectionEndpoint.cs.
         AiSettings.AiTestConnectionEndpoint.MapAiTestConnectionEndpoint(app);
+
+        // 2026-05-03 (multi-model): per-task model override surface.
+        //   GET /api/admin/ai/settings/model-overrides
+        //   PUT /api/admin/ai/settings/model-overrides/{taskName}
+        // AdminOnly — pulling cost levers needs admin clearance.
+        AiSettings.AiModelOverridesEndpoints.MapAiModelOverridesEndpoints(app);
         app.MapQuestionPipelineEndpoints();
         // Phase 4: trial-cohort dashboard read endpoint (Trial* event funnel).
         Features.TrialCohort.TrialCohortEndpoint.MapTrialCohortEndpoint(app);

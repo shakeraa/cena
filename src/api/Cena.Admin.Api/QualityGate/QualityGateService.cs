@@ -9,6 +9,7 @@ using System.Text.Json;
 using Anthropic;
 using Anthropic.Core;
 using Anthropic.Models.Messages;
+using Cena.Admin.Api.AiSettings;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Llm;
 using Marten;
@@ -43,6 +44,15 @@ public interface IQualityGateService
 [PiiPreScrubbed("Admin tool — prompt composed from CAS-gated AI-generated question text at authoring time. No student profile fields or student free-text enter this seam.")]
 public sealed class QualityGateService : IQualityGateService
 {
+    /// <summary>
+    /// Canonical task name routed through <see cref="IModelResolver"/>.
+    /// Matches contracts/llm/routing-config.yaml § task_routing.quality_gate
+    /// AND § default_model_by_task: — pinned to Haiku by routing-config but
+    /// overridable per-task via the admin SPA panel for an admin who needs
+    /// stricter scoring on a known-flaky question batch.
+    /// </summary>
+    public const string TaskName = "quality_gate";
+
     private readonly QualityGateThresholds _thresholds;
     private readonly IConfiguration? _configuration;
     private readonly ILogger<QualityGateService>? _logger;
@@ -60,6 +70,18 @@ public sealed class QualityGateService : IQualityGateService
     // without DI get the no-stamp default.
     private readonly IActivityPropagator? _activityPropagator;
 
+    // Per-task model resolver — when null, the LLM scoring stage falls back
+    // to the historic Haiku constant (preserves existing test seams that
+    // construct the service with positional args). Production DI always
+    // supplies the resolver.
+    private readonly IModelResolver? _modelResolver;
+
+    /// <summary>
+    /// Last-resort model id used ONLY when no <see cref="IModelResolver"/>
+    /// is wired (test-construction path). Production never reaches this.
+    /// </summary>
+    private const string FallbackHaikuModelId = "claude-haiku-4-5-20260101";
+
     // Lazily created Anthropic client for LLM-based scoring
     private AnthropicClient? _client;
     private string? _lastApiKey;
@@ -76,7 +98,8 @@ public sealed class QualityGateService : IQualityGateService
         ILogger<QualityGateService>? logger = null,
         IDocumentStore? store = null,
         ILlmCostMetric? featureCost = null,
-        IActivityPropagator? activityPropagator = null)
+        IActivityPropagator? activityPropagator = null,
+        IModelResolver? modelResolver = null)
     {
         _thresholds = thresholds ?? QualityGateThresholds.Default;
         _configuration = configuration;
@@ -84,6 +107,7 @@ public sealed class QualityGateService : IQualityGateService
         _store = store;
         _featureCost = featureCost;
         _activityPropagator = activityPropagator;
+        _modelResolver = modelResolver;
     }
 
     public async Task<QualityGateResult> EvaluateAsync(QualityGateInput input)
@@ -180,6 +204,29 @@ public sealed class QualityGateService : IQualityGateService
             return (80, 80, 75);
         }
 
+        // Resolve per-task model id via ModelResolver (curator override
+        // takes precedence; falls through to routing-config default Haiku
+        // for quality_gate). Test-construction paths that omit the resolver
+        // pin to Haiku to preserve existing scoring behaviour.
+        string modelId;
+        if (_modelResolver is not null)
+        {
+            try
+            {
+                modelId = await _modelResolver.ResolveModelForTaskAsync(TaskName).ConfigureAwait(false);
+            }
+            catch (ModelNotConfiguredException ex)
+            {
+                _logger?.LogWarning(ex,
+                    "QualityGate: ModelResolver could not resolve task='{Task}'; using Haiku fallback", TaskName);
+                modelId = FallbackHaikuModelId;
+            }
+        }
+        else
+        {
+            modelId = FallbackHaikuModelId;
+        }
+
         try
         {
             var client = GetOrCreateClient(apiKey);
@@ -234,7 +281,7 @@ public sealed class QualityGateService : IQualityGateService
 
             var response = await client.Messages.Create(new MessageCreateParams
             {
-                Model = "claude-haiku-4-5-20260101",  // Haiku: cheaper model for assessment tasks (routing-config section 2)
+                Model = modelId,
                 MaxTokens = 1024,
                 Temperature = 0.1f, // Low temperature for consistent scoring (routing-config: answer_evaluation)
                 System = new List<TextBlockParam>
@@ -254,14 +301,16 @@ public sealed class QualityGateService : IQualityGateService
             });
 
             // prr-046: per-feature cost tag on success path. Feature tag
-            // "quality-gate" is deliberately pinned to tier-2 (Haiku) per
-            // ADR-0045 §2 — the cost dashboard surfaces drift if the
-            // evaluator silently migrates to Sonnet.
+            // "quality-gate" is pinned to tier-2 in routing-config but the
+            // model_id label tracks ModelResolver — so a Haiku→Sonnet flip
+            // on the override panel surfaces immediately on the cost
+            // dashboard (cena_llm_call_cost_usd_total{model_id="claude-sonnet-4-6"})
+            // and finops sees the cost change in real time.
             _featureCost?.Record(
                 feature: "quality-gate",
                 tier: "tier2",
                 task: "quality_gate",
-                modelId: "claude-haiku-4-5-20260101",
+                modelId: modelId,
                 inputTokens: response.Usage?.InputTokens ?? 0,
                 outputTokens: response.Usage?.OutputTokens ?? 0);
 
