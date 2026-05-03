@@ -578,6 +578,123 @@ const handleClose = () => {
   emit('update:isOpen', false)
 }
 
+// =============================================================================
+// Gap C — Single fused "Confirm metadata + concepts" CTA (2026-05-03).
+//
+// Curators currently click two confirms in sequence: Save in
+// CuratorMetadataPanel, then Confirm in ConceptReviewPanel. The fused
+// CTA at the top of the modal runs both in order (metadata first, then
+// concepts) so they don't have to scroll. Both individual buttons stay
+// — curators may still want to confirm panels independently when
+// debugging a specific gate.
+//
+// Contract with the children: each child exposes via defineExpose:
+//   - canConfirm: ref<boolean>     — readiness to submit
+//   - alreadyConfirmed: ref<boolean> — current persisted state
+//   - confirmExternal: () => Promise<void> — submit, throws on failure
+//   - reload: () => Promise<void>  — refetch state
+//
+// Failure semantics: if metadata save throws, we DO NOT call concept
+// confirm — surface metadata's error inline and bail. If metadata
+// succeeds and concept confirm throws, we leave the metadata as
+// confirmed (it's persisted; idempotent re-save would be wasteful)
+// and surface concept's error inline.
+// =============================================================================
+
+const metadataPanelRef = ref<{
+  canConfirm: { value: boolean }
+  alreadyConfirmed: { value: boolean }
+  confirmExternal: () => Promise<void>
+  reload: () => Promise<void>
+} | null>(null)
+
+const conceptPanelRef = ref<{
+  canConfirm: { value: boolean }
+  alreadyConfirmed: { value: boolean }
+  confirmExternal: () => Promise<void>
+  reload: () => Promise<void>
+} | null>(null)
+
+const fusedSubmitting = ref(false)
+const fusedError = ref<string | null>(null)
+
+// Stepper state — derived from the children's exposed refs. Using
+// computed instead of v-model so the indicator stays a single source
+// of truth (the panels' own state) rather than a parent shadow copy.
+const metadataStepDone = computed(() =>
+  metadataPanelRef.value?.alreadyConfirmed.value === true)
+const conceptsStepDone = computed(() => {
+  if (!item.value || item.value.sourceType !== 'bagrut')
+    return true   // non-Bagrut items skip concept review entirely
+  return conceptPanelRef.value?.alreadyConfirmed.value === true
+})
+const fusedReady = computed(() => metadataStepDone.value && conceptsStepDone.value)
+
+// Fused button is enabled when there is *something to do*. Either:
+//   - metadata is unconfirmed but the metadata panel is ready to save
+//   - concepts unconfirmed but the concept panel has a primary picked
+// (or both). If both gates are already green, the button hides into
+// the "Ready to publish" state.
+const fusedCanSubmit = computed(() => {
+  if (fusedSubmitting.value)
+    return false
+  if (fusedReady.value)
+    return false
+  const metaReady = metadataStepDone.value || (metadataPanelRef.value?.canConfirm.value === true)
+  const conceptReady =
+    conceptsStepDone.value
+    || item.value?.sourceType !== 'bagrut'
+    || (conceptPanelRef.value?.canConfirm.value === true)
+  return metaReady && conceptReady
+})
+
+async function confirmFused() {
+  if (!item.value)
+    return
+  fusedSubmitting.value = true
+  fusedError.value = null
+  try {
+    // Step 1: metadata. Skip if already confirmed.
+    if (!metadataStepDone.value) {
+      if (!metadataPanelRef.value) {
+        fusedError.value = 'Metadata panel not ready — refresh and try again.'
+        return
+      }
+      try {
+        await metadataPanelRef.value.confirmExternal()
+      }
+      catch (e: any) {
+        // Don't proceed to concepts — metadata's own error banner
+        // surfaces the failure inline on its panel. Set a top-level
+        // hint so the fused stepper indicator also reads the gate.
+        fusedError.value = `Metadata save failed: ${e?.data?.message ?? e?.message ?? 'unknown error'}`
+        return
+      }
+    }
+
+    // Step 2: concepts (Bagrut only).
+    if (item.value.sourceType === 'bagrut' && !conceptsStepDone.value) {
+      if (!conceptPanelRef.value) {
+        fusedError.value = 'Concept panel not ready — refresh and try again.'
+        return
+      }
+      try {
+        await conceptPanelRef.value.confirmExternal()
+      }
+      catch (e: any) {
+        fusedError.value = `Concept confirm failed: ${e?.data?.message ?? e?.message ?? 'unknown error'}`
+        return
+      }
+    }
+
+    emit('item-updated')
+    fetchDetail()
+  }
+  finally {
+    fusedSubmitting.value = false
+  }
+}
+
 const sourceTypeColor = (type: string): string => {
   const map: Record<string, string> = {
     url: 'info',
@@ -797,8 +914,112 @@ const approveItem = async () => {
 
           <VDivider class="mb-4" />
 
+          <!-- Gap C — fused gate progress + single confirm CTA (2026-05-03).
+               Stepper reads the children's persisted state directly so
+               there's a single source of truth; the fused button calls
+               both confirms in sequence (metadata → concepts) and
+               surfaces failure inline.
+               a11y: aria-current marks the active step; aria-label on
+               the stepper container announces the progress for screen
+               readers. Each step has aria-label="Step N: <name> —
+               <state>" so SR users hear the gate status without sight. -->
+          <div
+            v-if="item"
+            class="cena-fused-stepper-row mb-4"
+            data-test="confirm-stepper"
+            role="group"
+            aria-label="Publish gate progress"
+          >
+            <div class="cena-fused-steps">
+              <div
+                class="cena-fused-step"
+                :class="{
+                  'cena-fused-step--done': metadataStepDone,
+                  'cena-fused-step--active': !metadataStepDone,
+                }"
+                :aria-current="!metadataStepDone ? 'step' : undefined"
+                aria-label="Step 1 of 3: Metadata"
+              >
+                <VIcon
+                  :icon="metadataStepDone ? 'tabler-circle-check' : 'tabler-circle-dot'"
+                  :color="metadataStepDone ? 'success' : 'primary'"
+                  size="20"
+                />
+                <span class="cena-fused-step-label">
+                  Metadata{{ metadataStepDone ? ' ✓' : '' }}
+                </span>
+              </div>
+              <span class="cena-fused-step-arrow">→</span>
+              <div
+                v-if="item.sourceType === 'bagrut'"
+                class="cena-fused-step"
+                :class="{
+                  'cena-fused-step--done': conceptsStepDone,
+                  'cena-fused-step--active': metadataStepDone && !conceptsStepDone,
+                  'cena-fused-step--blocked': !metadataStepDone && !conceptsStepDone,
+                }"
+                :aria-current="metadataStepDone && !conceptsStepDone ? 'step' : undefined"
+                aria-label="Step 2 of 3: Concepts"
+              >
+                <VIcon
+                  :icon="conceptsStepDone ? 'tabler-circle-check' : 'tabler-circle-dot'"
+                  :color="conceptsStepDone ? 'success' : (metadataStepDone ? 'primary' : 'disabled')"
+                  size="20"
+                />
+                <span class="cena-fused-step-label">
+                  Concepts{{ conceptsStepDone ? ' ✓' : '' }}
+                </span>
+              </div>
+              <span
+                v-if="item.sourceType === 'bagrut'"
+                class="cena-fused-step-arrow"
+              >→</span>
+              <div
+                class="cena-fused-step"
+                :class="{
+                  'cena-fused-step--done': fusedReady,
+                  'cena-fused-step--blocked': !fusedReady,
+                }"
+                aria-label="Step 3 of 3: Ready to publish"
+              >
+                <VIcon
+                  :icon="fusedReady ? 'tabler-rocket' : 'tabler-lock'"
+                  :color="fusedReady ? 'success' : 'disabled'"
+                  size="20"
+                />
+                <span class="cena-fused-step-label">
+                  {{ fusedReady ? 'Ready to publish' : 'Publish locked' }}
+                </span>
+              </div>
+            </div>
+
+            <VBtn
+              color="primary"
+              variant="elevated"
+              :disabled="!fusedCanSubmit"
+              :loading="fusedSubmitting"
+              data-test="confirm-fused-button"
+              prepend-icon="tabler-check-all"
+              @click="confirmFused"
+            >
+              Confirm metadata + concepts
+            </VBtn>
+          </div>
+
+          <VAlert
+            v-if="fusedError"
+            type="error"
+            density="compact"
+            variant="tonal"
+            class="mb-4"
+            data-test="confirm-fused-error"
+          >
+            {{ fusedError }}
+          </VAlert>
+
           <!-- RDY-019e Curator Metadata handshake -->
           <CuratorMetadataPanel
+            ref="metadataPanelRef"
             :item-id="props.itemId"
             class="mb-4"
             @confirmed="() => emit('item-updated')"
@@ -810,6 +1031,7 @@ const approveItem = async () => {
                first-200-items publish gate for this item. -->
           <ConceptReviewPanel
             v-if="item.sourceType === 'bagrut'"
+            ref="conceptPanelRef"
             :item-id="props.itemId"
             class="mb-4"
             @confirmed="() => emit('item-updated')"
@@ -2002,6 +2224,66 @@ const approveItem = async () => {
 }
 .cena-figure-grid--inline {
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+/* cena-fused-stepper-row — Gap C fused confirm + stepper at top of
+   the item-detail body. Lays out as: stepper on the left, button on
+   the right; below 720px the button wraps under the stepper. The
+   stepper itself is a flex row of inert (visual-only) step cells —
+   keyboard reachable via the surrounding role=group + button focus
+   target only; the steps don't take focus on their own (they're
+   informative, not interactive — Vuetify VStepper's actionable steps
+   would over-promise). */
+.cena-fused-stepper-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  background: rgba(var(--v-theme-surface-variant), 0.4);
+  border: 1px solid rgba(var(--v-theme-outline-variant), 0.6);
+  border-radius: 0.4rem;
+}
+.cena-fused-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+.cena-fused-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.25rem;
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-theme-outline-variant), 0.6);
+  /* Honour reduced-motion preferences from the OS — steps fade in/out
+     without animation when prefers-reduced-motion is set. */
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.cena-fused-step--done {
+  background: rgba(var(--v-theme-success), 0.08);
+  border-color: rgba(var(--v-theme-success), 0.4);
+}
+.cena-fused-step--active {
+  background: rgba(var(--v-theme-primary), 0.08);
+  border-color: rgba(var(--v-theme-primary), 0.4);
+  font-weight: 600;
+}
+.cena-fused-step--blocked {
+  opacity: 0.6;
+}
+.cena-fused-step-arrow {
+  color: rgb(var(--v-theme-on-surface-variant));
+  font-weight: 600;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cena-fused-step {
+    transition: none;
+  }
 }
 
 /* cena-figure-anchor — inline figure thumbnail rendered between text

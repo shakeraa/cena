@@ -177,11 +177,36 @@ async function confirm() {
   }
   catch (e: any) {
     err.value = e?.data?.message ?? e?.message ?? 'Failed to confirm concepts.'
+    // Re-throw so an external orchestrator (the fused-confirm CTA on
+    // the parent ItemDetailPanel) can detect the failure and stop the
+    // sequence at concepts instead of falsely claiming the gate
+    // opened. Internal callers swallow via the err.value path above.
+    throw e
   }
   finally {
     saving.value = false
   }
 }
+
+// Expose a minimal contract for the parent's fused "Confirm metadata +
+// concepts" CTA (Gap C, 2026-05-03). The parent reads `canConfirm` /
+// `alreadyConfirmed` to drive the stepper indicator and calls
+// `confirmExternal()` to submit. Keeping the panel's own Confirm
+// button intact — curators may want to confirm panels independently.
+defineExpose({
+  /** True once a primary concept is selected and we're not mid-save. */
+  canConfirm,
+  /** True once the curator (or anyone) has confirmed concepts at least once. */
+  alreadyConfirmed: computed(() => !!data.value?.confirmed),
+  /**
+   * Submit the current selection on behalf of an external caller.
+   * Throws on failure so the orchestrator can halt the chained
+   * metadata→concepts sequence and surface the error inline.
+   */
+  confirmExternal: confirm,
+  /** Force a re-fetch — used by the parent after a successful save. */
+  reload: load,
+})
 
 onMounted(load)
 watch(() => props.itemId, () => { load() })

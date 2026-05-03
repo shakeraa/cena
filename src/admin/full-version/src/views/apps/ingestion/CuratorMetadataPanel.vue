@@ -198,6 +198,9 @@ async function save () {
     if (res.metadataState === 'confirmed') emit('confirmed', props.itemId)
   } catch (e: any) {
     error.value = e?.data?.message ?? e?.message ?? 'Save failed'
+    // Re-throw for the fused-confirm orchestrator on the parent
+    // (Gap C). Internal callers see the inline error via error.value.
+    throw e
   } finally {
     saving.value = false
   }
@@ -309,6 +312,24 @@ watch(() => props.itemId, async (id) => {
   if (!id) return
   await load()
   await loadTaxonomy(edits.value.track ?? null)
+})
+
+// Expose a minimal contract for the parent's fused "Confirm metadata +
+// concepts" CTA (Gap C, 2026-05-03). Mirrors the surface on
+// ConceptReviewPanel so the orchestrator's call sites are symmetric.
+defineExpose({
+  /** True when there's something to save AND we're not mid-save. */
+  canConfirm,
+  /** True once the metadata has been confirmed (current state, not history). */
+  alreadyConfirmed: computed(() => data.value?.metadataState === 'confirmed'),
+  /**
+   * Submit on behalf of an external caller. Throws on failure so the
+   * orchestrator can halt the chained sequence and surface the error
+   * inline on this panel via error.value.
+   */
+  confirmExternal: save,
+  /** Force a re-fetch — used by the parent after a successful save. */
+  reload: load,
 })
 
 // Re-fetch the taxonomy options when the curator changes the track.
