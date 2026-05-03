@@ -17,6 +17,7 @@
 ============================================================================= -->
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { $api } from '@/utils/api'
 
 interface ConceptDto {
@@ -46,6 +47,13 @@ interface ConceptCatalogEntry {
   tracks: string[]
   bloomMin: number
   bloomMax: number
+  // 2026-05-03: localized labels keyed by language code (en/he/ar).
+  // Backend ships at least an English entry per leaf; missing langs
+  // fall back to English on the SPA side via topicLabel/subtopicLabel
+  // below. The English topic/subtopic keys above remain canonical for
+  // event sourcing — these maps are presentational only.
+  topicLabels?: Record<string, string>
+  subtopicLabels?: Record<string, string>
 }
 
 interface ConceptReviewResponse {
@@ -67,6 +75,32 @@ interface Emit {
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emit>()
+
+// 2026-05-03: i18n integration for catalog labels. The catalog
+// dropdown shows topic + subtopic in the curator's current language
+// (en/he/ar) — falling back to English when a translation is
+// missing, then to the raw English key as a last resort.
+//
+// Why we don't pull the SkillCode itself through i18n: the SkillCode
+// (e.g. "math.calculus.derivative-rules") is a stable identifier
+// that flows through events + storage + audit logs. Curators need to
+// see and reason about it (it's what the canonicaliser rejects on
+// typo), so it stays English in the title slot — the Hebrew/Arabic
+// names go in the descriptive subtitle slot where they help curators
+// who aren't native English speakers.
+const { locale } = useI18n()
+
+function topicLabel(entry: ConceptCatalogEntry): string {
+  const map = entry.topicLabels
+  if (!map) return entry.topic
+  return map[locale.value] || map.en || entry.topic
+}
+
+function subtopicLabel(entry: ConceptCatalogEntry): string {
+  const map = entry.subtopicLabels
+  if (!map) return entry.subtopic
+  return map[locale.value] || map.en || entry.subtopic
+}
 
 const loading = ref(false)
 const saving = ref(false)
@@ -304,8 +338,16 @@ watch(() => props.itemId, () => { load() })
                   <span class="font-weight-medium">{{ item.raw.skillCode }}</span>
                 </template>
                 <template #subtitle>
+                  <!-- Localized topic + subtopic per current vue-i18n
+                       locale (en/he/ar), falling back to English then to
+                       the raw English key. SkillCode itself stays English
+                       in the title slot — it's a stable identifier flowing
+                       through events + audit logs, not a display name.
+                       Math content (none here, but pattern matters): the
+                       repo rule is bdi dir=ltr; this subtitle is
+                       descriptive prose in the curator's locale. -->
                   <span class="text-caption text-medium-emphasis">
-                    {{ item.raw.topic }} · {{ item.raw.subtopic }} · Bloom {{ item.raw.bloomMin }}–{{ item.raw.bloomMax }}
+                    {{ topicLabel(item.raw) }} · {{ subtopicLabel(item.raw) }} · Bloom {{ item.raw.bloomMin }}–{{ item.raw.bloomMax }}
                   </span>
                 </template>
               </VListItem>
@@ -333,7 +375,7 @@ watch(() => props.itemId, () => { load() })
                 </template>
                 <template #subtitle>
                   <span class="text-caption text-medium-emphasis">
-                    {{ item.raw.topic }} · {{ item.raw.subtopic }}
+                    {{ topicLabel(item.raw) }} · {{ subtopicLabel(item.raw) }}
                   </span>
                 </template>
               </VListItem>
