@@ -131,7 +131,7 @@
     "vite-plugin-vuetify": "2.1.2",
     "vite-svg-loader": "5.1.0",
     "vitest": "^4.1.2",
-    "vue-shepherd": "3.0.0",
+    "vue-shepherd": "6.0.0",
     "vue-tsc": "3.1.2"
   },
   "resolutions": {
