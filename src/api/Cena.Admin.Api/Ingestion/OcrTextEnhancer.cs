@@ -74,6 +74,12 @@ public interface IOcrTextEnhancer
 [PiiPreScrubbed("Admin tool — input is OCR'd Bagrut draft text reviewed by a curator. No student profile fields or student free-text reach this seam.")]
 public sealed class OcrTextEnhancer : IOcrTextEnhancer
 {
+    /// <summary>
+    /// Canonical task name routed through <see cref="IModelResolver"/>.
+    /// Matches contracts/llm/routing-config.yaml § default_model_by_task:.
+    /// </summary>
+    public const string TaskName = "ocr_text_enhance";
+
     private readonly ILogger<OcrTextEnhancer> _logger;
     private readonly IConfiguration _configuration;
     private readonly IDocumentStore _documentStore;
@@ -81,7 +87,16 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
     private readonly ILlmCostMetric _featureCost;
     private readonly IOcrEnhancementCache _cache;
     private readonly IAnthropicLlmRuntime _runtime;
+    private readonly IModelResolver? _modelResolver;
     private readonly IActivityPropagator? _activityPropagator;
+
+    /// <summary>
+    /// Last-resort model id used ONLY when no <see cref="IModelResolver"/>
+    /// is wired (test-construction path). Production routes via the resolver
+    /// which honours curator overrides + routing-config defaults (Sonnet
+    /// for ocr_text_enhance per § default_model_by_task:).
+    /// </summary>
+    private const string FallbackSonnetModelId = "claude-sonnet-4-6";
 
     // Cache observability — separated from token counters so finops
     // dashboards see "$ saved by cache hit" distinct from "$ spent on
@@ -91,8 +106,6 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
     // triple lives in IAnthropicLlmRuntime now.
     private readonly Counter<long> _cacheHits;
 
-    // Routing config constants
-    private const string SonnetModelId = "claude-sonnet-4-6";
     private const int MaxEnhanceTokens = 2048;
 
     public OcrTextEnhancer(
@@ -104,7 +117,8 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         ILlmCostMetric featureCost,
         IOcrEnhancementCache cache,
         IAnthropicLlmRuntime runtime,
-        IActivityPropagator? activityPropagator = null)
+        IActivityPropagator? activityPropagator = null,
+        IModelResolver? modelResolver = null)
     {
         _logger = logger;
         _configuration = configuration;
@@ -113,6 +127,7 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         _featureCost = featureCost;
         _cache = cache;
         _runtime = runtime;
+        _modelResolver = modelResolver;
         _activityPropagator = activityPropagator;
 
         // Cache-hit counter on the same meter name as the runtime emits —
@@ -160,9 +175,34 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
             return new EnhanceOcrTextResponse(false, "", null,
                 "No API key configured for Anthropic. Set Anthropic:ApiKey in Settings > AI Providers.");
 
-        var modelName = string.IsNullOrWhiteSpace(doc.AnthropicModelId)
-            ? SonnetModelId
-            : doc.AnthropicModelId;
+        // Resolve the per-task model id via ModelResolver — curator override
+        // first, then routing-config default. NOTE: pre-resolver behaviour
+        // honoured doc.AnthropicModelId directly; that field is now the
+        // /api/admin/ai/settings PUT seam (general settings dropdown), while
+        // the per-task override panel writes to ModelOverridesByTask. The
+        // resolver returns the override if present, else falls through to
+        // the routing-config default for ocr_text_enhance (Sonnet 4.6).
+        // doc.AnthropicModelId is intentionally NOT consulted here because
+        // it is the "default model for ad-hoc question generation" knob,
+        // not the OCR-enhance-specific knob.
+        string modelName;
+        if (_modelResolver is not null)
+        {
+            try
+            {
+                modelName = await _modelResolver.ResolveModelForTaskAsync(TaskName, ct).ConfigureAwait(false);
+            }
+            catch (ModelNotConfiguredException ex)
+            {
+                _logger.LogError(ex,
+                    "OcrTextEnhancer: ModelResolver could not resolve task='{Task}'", TaskName);
+                return new EnhanceOcrTextResponse(false, "", null, ex.Message);
+            }
+        }
+        else
+        {
+            modelName = FallbackSonnetModelId;
+        }
 
         try { _runtime.RequestCircuitPermission(modelName); }
         catch (CircuitOpenException ex)
@@ -210,11 +250,12 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
 
             var inputTokens = response.Usage.InputTokens;
             var outputTokens = response.Usage.OutputTokens;
-            // Gap 30 fix: pricing per-call. OcrTextEnhancer reuses the persisted
-            // AnthropicModelId or the SonnetModelId default. Match on family so
-            // an admin selecting Haiku in the SPA dropdown is priced correctly.
+            // Pricing per-call. The resolver may have returned Sonnet (default)
+            // or any curator-overridden model; AnthropicSupportedModels maps the
+            // chosen id back to its $/Mtok rates so the legacy meter stays
+            // accurate after a Sonnet→Haiku flip on the override panel.
             _runtime.EmitMetrics(modelName, "ocr_text_enhance", sw.ElapsedMilliseconds,
-                inputTokens, outputTokens, ResolvePricingFor(modelName));
+                inputTokens, outputTokens, AnthropicSupportedModels.ResolvePricingFor(modelName));
 
             // prr-046: canonical per-feature cost counter (cena_llm_call_cost_usd_total)
             _featureCost.Record(
@@ -335,25 +376,6 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         return string.IsNullOrWhiteSpace(fromConfig) ? null : fromConfig;
     }
 
-    /// <summary>
-    /// Resolve per-call pricing for the configured Anthropic model. Mirrors
-    /// AiGenerationService.ResolvePricingFor — kept local because the
-    /// runtime intentionally accepts no default and forces every consumer
-    /// to be explicit. Family-substring match keeps the SPA-dropdown values
-    /// (claude-haiku-4-5-20251001, claude-sonnet-4-6, etc.) priced correctly.
-    /// </summary>
-    private LlmCallPricing ResolvePricingFor(string modelId)
-    {
-        if (string.IsNullOrWhiteSpace(modelId)) return LlmCallPricing.AnthropicSonnet4_6;
-        if (modelId.Contains("haiku", StringComparison.OrdinalIgnoreCase))
-            return LlmCallPricing.AnthropicHaiku4_5;
-        if (modelId.Contains("sonnet", StringComparison.OrdinalIgnoreCase))
-            return LlmCallPricing.AnthropicSonnet4_6;
-        if (modelId.Contains("opus", StringComparison.OrdinalIgnoreCase))
-            return new LlmCallPricing(15.00m, 75.00m);
-        _logger.LogWarning(
-            "OcrTextEnhancer: unknown model_id={Model} for pricing resolution — defaulting to Sonnet 4.6 rates.",
-            modelId);
-        return LlmCallPricing.AnthropicSonnet4_6;
-    }
+    // Pricing resolution moved to AnthropicSupportedModels.ResolvePricingFor
+    // (single source of truth for the closed-set model→rates mapping).
 }

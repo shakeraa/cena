@@ -325,6 +325,13 @@ public sealed class AiGenerationService : IAiGenerationService
     private readonly IDocumentStore _documentStore;
     private readonly IApiKeyCipher _cipher;
     private readonly IAnthropicConnectionProbe _probe;
+    // Per-task model override resolver (curator overrides + routing-config
+    // defaults). Optional so existing positional-arg tests don't break;
+    // production DI always supplies it.
+    private readonly IModelResolver? _modelResolver;
+
+    /// <summary>Canonical task name routed via <see cref="IModelResolver"/>.</summary>
+    public const string TaskName = "question_generation";
 
     // 5-second hot cache of the AiSettingsDocument so the per-request load
     // doesn't hit Marten on every Generate call. Invalidated on Update.
@@ -348,7 +355,8 @@ public sealed class AiGenerationService : IAiGenerationService
         IDocumentStore documentStore,
         IApiKeyCipher cipher,
         IAnthropicConnectionProbe probe,
-        IActivityPropagator? activityPropagator = null)
+        IActivityPropagator? activityPropagator = null,
+        IModelResolver? modelResolver = null)
     {
         _logger = logger;
         _configuration = configuration;
@@ -360,6 +368,7 @@ public sealed class AiGenerationService : IAiGenerationService
         _cipher = cipher;
         _probe = probe;
         _activityPropagator = activityPropagator;
+        _modelResolver = modelResolver;
     }
 
     // ── Persistence helpers ───────────────────────────────────────────────
@@ -457,13 +466,52 @@ public sealed class AiGenerationService : IAiGenerationService
     /// Project a doc into the public AiProviderConfig view used by the
     /// internal call sites. The returned ApiKey is plaintext (resolved via
     /// <see cref="ResolveApiKey"/>); never store this value back.
+    /// <para>
+    /// Model precedence:
+    ///   1. doc.AnthropicModelId — admin SPA's primary "Model" dropdown
+    ///      (preserved as the per-call override surface; selecting Opus
+    ///      here makes EVERY question_generation call go through Opus,
+    ///      regardless of any per-task override).
+    ///   2. ModelResolver for question_generation — falls through when
+    ///      doc.AnthropicModelId is empty so the admin's per-task panel
+    ///      can drive question_generation routing without populating
+    ///      the legacy field.
+    ///   3. SonnetModelId — last-resort const for the
+    ///      no-resolver-no-doc-model case (test scaffolding).
+    /// </para>
     /// </summary>
-    private AiProviderConfig ProjectAnthropicConfig(AiSettingsDocument doc, string? resolvedApiKey)
+    private async Task<AiProviderConfig> ProjectAnthropicConfigAsync(
+        AiSettingsDocument doc,
+        string? resolvedApiKey,
+        CancellationToken ct = default)
     {
+        string modelId;
+        if (!string.IsNullOrWhiteSpace(doc.AnthropicModelId))
+        {
+            modelId = doc.AnthropicModelId;
+        }
+        else if (_modelResolver is not null)
+        {
+            try
+            {
+                modelId = await _modelResolver.ResolveModelForTaskAsync(TaskName, ct).ConfigureAwait(false);
+            }
+            catch (ModelNotConfiguredException ex)
+            {
+                _logger.LogWarning(ex,
+                    "AiGenerationService: ModelResolver could not resolve task='{Task}' — using SonnetModelId fallback", TaskName);
+                modelId = SonnetModelId;
+            }
+        }
+        else
+        {
+            modelId = SonnetModelId;
+        }
+
         return new AiProviderConfig(
             AiProvider.Anthropic,
             resolvedApiKey ?? "",
-            string.IsNullOrWhiteSpace(doc.AnthropicModelId) ? SonnetModelId : doc.AnthropicModelId,
+            modelId,
             doc.AnthropicTemperature,
             doc.AnthropicBaseUrl,
             doc.AnthropicApiVersion,
@@ -474,7 +522,7 @@ public sealed class AiGenerationService : IAiGenerationService
     {
         var doc = await LoadDocAsync().ConfigureAwait(false);
         var apiKey = ResolveApiKey(doc);
-        var effectiveConfig = ProjectAnthropicConfig(doc, apiKey);
+        var effectiveConfig = await ProjectAnthropicConfigAsync(doc, apiKey).ConfigureAwait(false);
 
         if (string.IsNullOrEmpty(apiKey))
         {
@@ -705,7 +753,7 @@ public sealed class AiGenerationService : IAiGenerationService
             // the per-call pricing from the model name so the legacy
             // llm_cost_usd meter matches the per-feature counter.
             _runtime.EmitMetrics(modelName, "question_generation", sw.ElapsedMilliseconds,
-                inputTokens, outputTokens, ResolvePricingFor(modelName));
+                inputTokens, outputTokens, AnthropicSupportedModels.ResolvePricingFor(modelName));
             // prr-046: canonical per-feature cost counter — stays at the call
             // site because the (feature, tier, task) tags are caller-owned.
             _featureCost.Record(
@@ -762,36 +810,8 @@ public sealed class AiGenerationService : IAiGenerationService
         }
     }
 
-    /// <summary>
-    /// Resolve the per-call pricing for a configurable Anthropic model.
-    /// AiGenerationService allows the admin to pick any Anthropic model
-    /// from the SPA dropdown — Sonnet today, anything else tomorrow. We
-    /// match on the well-known model-family substrings the SPA dropdown
-    /// emits; an unknown model falls back to Sonnet (the historic default
-    /// the legacy meter used). When the unknown branch fires we log a
-    /// warning so finops sees the dropped-into-default behaviour.
-    /// </summary>
-    private LlmCallPricing ResolvePricingFor(string modelId)
-    {
-        if (string.IsNullOrWhiteSpace(modelId)) return LlmCallPricing.AnthropicSonnet4_6;
-        if (modelId.Contains("haiku", StringComparison.OrdinalIgnoreCase))
-            return LlmCallPricing.AnthropicHaiku4_5;
-        if (modelId.Contains("sonnet", StringComparison.OrdinalIgnoreCase))
-            return LlmCallPricing.AnthropicSonnet4_6;
-        if (modelId.Contains("opus", StringComparison.OrdinalIgnoreCase))
-        {
-            // Opus 4 list price ~ $15 in / $75 out per Mtok. Inline rather
-            // than a third static helper because Opus is not currently
-            // wired in the SPA dropdown — keep the surface narrow until it
-            // is, but compute correctly when an admin picks it manually.
-            return new LlmCallPricing(15.00m, 75.00m);
-        }
-        _logger.LogWarning(
-            "AiGenerationService: unknown model_id={Model} for pricing resolution — defaulting to Sonnet 4.6 rates. " +
-            "Add an explicit branch in ResolvePricingFor when this model lands in the SPA dropdown.",
-            modelId);
-        return LlmCallPricing.AnthropicSonnet4_6;
-    }
+    // Pricing resolution moved to AnthropicSupportedModels.ResolvePricingFor
+    // (single source of truth for the closed-set model→rates mapping).
 
     // ── Response Parsing ──
 

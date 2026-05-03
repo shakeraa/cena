@@ -59,7 +59,45 @@ public sealed class AiSettingsDocument
     public int QuestionsPerBatch { get; set; } = 5;
     public bool AutoRunQualityGate { get; set; } = true;
 
+    // ── Per-task model overrides (V2 — added 2026-05-03) ──────────────────
+    /// <summary>
+    /// Curator-configurable per-task model override. Keyed by canonical task
+    /// name from <c>contracts/llm/routing-config.yaml</c> (e.g.
+    /// <c>concept_extraction</c>, <c>quality_gate</c>, <c>bagrut_segmentation</c>,
+    /// <c>ocr_text_enhance</c>, <c>question_generation</c>); value is the
+    /// Anthropic model id the curator chose for that task this week.
+    /// <para>
+    /// Empty map (the default) means every task uses the routing-config
+    /// default — backwards-compatible with V1 documents that pre-date this
+    /// field. Marten's JSON deserializer fills the property with an empty
+    /// dictionary when reading old rows because the property's default
+    /// initializer runs on every materialised instance, so no Marten
+    /// upcaster is required for additive expansion.
+    /// </para>
+    /// <para>
+    /// Validation (closed-set against <c>AnthropicSupportedModels</c>) is
+    /// enforced at the admin endpoint write site, not here — the
+    /// Marten layer is the persistence seam, not the validation seam, and
+    /// keeping policy out of the document type lets the closed-set list
+    /// evolve without touching the schema.
+    /// </para>
+    /// </summary>
+    public Dictionary<string, string> ModelOverridesByTask { get; set; } = new();
+
     // ── Audit ─────────────────────────────────────────────────────────────
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     public string UpdatedBy { get; set; } = "system";
+
+    /// <summary>
+    /// Last actor that mutated <see cref="ModelOverridesByTask"/> via the
+    /// admin endpoint. Surfaces in GET /api/admin/ai/settings/model-overrides
+    /// so curators see "Tamar changed quality_gate from Haiku to Sonnet 23
+    /// minutes ago". Distinct from <see cref="UpdatedBy"/> because the
+    /// generic Update endpoint and the model-overrides endpoint are
+    /// separate audit surfaces.
+    /// </summary>
+    public string? ModelOverridesLastChangedBy { get; set; }
+
+    /// <summary>Last time <see cref="ModelOverridesByTask"/> mutated; null when no overrides have ever been set.</summary>
+    public DateTimeOffset? ModelOverridesLastChangedAt { get; set; }
 }

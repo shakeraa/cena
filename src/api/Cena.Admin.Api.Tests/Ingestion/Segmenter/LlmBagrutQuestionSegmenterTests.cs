@@ -118,7 +118,7 @@ public sealed class LlmBagrutQuestionSegmenterTests
         // Sanity: prompt content reached the invoker correctly.
         var captured = invoker.LastCall;
         Assert.NotNull(captured);
-        Assert.Equal(LlmBagrutQuestionSegmenter.HaikuModelId, captured!.ModelId);
+        Assert.Equal(LlmBagrutQuestionSegmenter.FallbackHaikuModelId, captured!.ModelId);
         Assert.Contains("Bagrut", captured.SystemPrompt);
         Assert.Contains("--- PAGE 1 ---", captured.UserPrompt);
         Assert.Contains("--- PAGE 6 ---", captured.UserPrompt);
@@ -284,7 +284,7 @@ public sealed class LlmBagrutQuestionSegmenterTests
         Assert.Equal("content-segmentation", rec.Feature);
         Assert.Equal("tier2", rec.Tier);
         Assert.Equal("bagrut_segmentation", rec.Task);
-        Assert.Equal(LlmBagrutQuestionSegmenter.HaikuModelId, rec.ModelId);
+        Assert.Equal(LlmBagrutQuestionSegmenter.FallbackHaikuModelId, rec.ModelId);
         Assert.Equal(1234L, rec.InputTokens);
         Assert.Equal(56L, rec.OutputTokens);
     }

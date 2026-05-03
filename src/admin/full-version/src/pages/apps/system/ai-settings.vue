@@ -218,6 +218,128 @@ const testConnection = async (provider: string) => {
   }
 }
 
+// ── Per-task model overrides (2026-05-03 multi-model) ──────────────────────
+// Loaded lazily when the Advanced accordion expands so a curator who never
+// opens it pays no extra GET round-trip on settings load.
+
+interface SupportedModel {
+  modelId: string
+  displayName: string
+  inputUsdPerMtok: number
+  outputUsdPerMtok: number
+  tier: string
+}
+
+interface TaskModelRow {
+  task: string
+  currentModelId: string
+  source: string
+  isOverridden: boolean
+  overrideModelId: string | null
+  description: string | null
+}
+
+interface ModelOverridesResponse {
+  supportedModels: SupportedModel[]
+  tasks: TaskModelRow[]
+  lastChangedBy: string | null
+  lastChangedAt: string | null
+  globalDefaultModelId: string | null
+}
+
+const overridesPanelExpanded = ref<string[]>([])
+const overridesLoading = ref(false)
+const overridesSaving = ref<Record<string, boolean>>({})
+const overridesError = ref<string | null>(null)
+const overridesData = ref<ModelOverridesResponse | null>(null)
+
+const fetchOverrides = async () => {
+  overridesLoading.value = true
+  try {
+    overridesData.value = await $api<ModelOverridesResponse>(
+      '/admin/ai/settings/model-overrides',
+    )
+    overridesError.value = null
+  }
+  catch (err: any) {
+    overridesError.value = err?.data?.error
+      ?? err?.message
+      ?? 'Failed to load per-task model overrides'
+  }
+  finally {
+    overridesLoading.value = false
+  }
+}
+
+// Build the per-row dropdown items so each option label includes the
+// per-Mtok cost (curators see the cost impact at decision time).
+const overrideDropdownItems = computed(() =>
+  (overridesData.value?.supportedModels ?? []).map(m => ({
+    title: `${m.displayName} — $${m.inputUsdPerMtok} input / $${m.outputUsdPerMtok} output per Mtok`,
+    value: m.modelId,
+  })),
+)
+
+const setTaskOverride = async (taskName: string, modelId: string | null) => {
+  overridesSaving.value = { ...overridesSaving.value, [taskName]: true }
+  // Optimistic update: flip the row immediately so the curator sees their
+  // pick reflected without a GET round-trip; revert on error below.
+  const previousRow = overridesData.value?.tasks.find(t => t.task === taskName)
+  if (overridesData.value && previousRow) {
+    overridesData.value = {
+      ...overridesData.value,
+      tasks: overridesData.value.tasks.map(t => t.task === taskName
+        ? {
+            ...t,
+            currentModelId: modelId ?? '',
+            isOverridden: modelId != null,
+            overrideModelId: modelId,
+            source: modelId != null ? 'override' : 'routing-config-task-default',
+          }
+        : t),
+    }
+  }
+  try {
+    await $api(`/admin/ai/settings/model-overrides/${encodeURIComponent(taskName)}`, {
+      method: 'PUT',
+      body: { modelId },
+    })
+    // Re-fetch so currentModelId / source / lastChangedBy reflect server truth.
+    await fetchOverrides()
+    overridesError.value = null
+  }
+  catch (err: any) {
+    // Revert the optimistic flip.
+    if (overridesData.value && previousRow) {
+      overridesData.value = {
+        ...overridesData.value,
+        tasks: overridesData.value.tasks.map(t => t.task === taskName ? previousRow : t),
+      }
+    }
+    overridesError.value = err?.data?.error
+      ?? err?.message
+      ?? `Failed to update override for ${taskName}`
+  }
+  finally {
+    overridesSaving.value = { ...overridesSaving.value, [taskName]: false }
+  }
+}
+
+const onOverrideDropdownChange = (taskName: string, value: string | null) => {
+  setTaskOverride(taskName, value)
+}
+
+const onResetOverride = (taskName: string) => {
+  setTaskOverride(taskName, null)
+}
+
+// Load the overrides panel data on first expand (lazy, per the comment above).
+watch(overridesPanelExpanded, async (newVal) => {
+  if (newVal.length > 0 && overridesData.value === null && !overridesLoading.value) {
+    await fetchOverrides()
+  }
+})
+
 onMounted(fetchSettings)
 </script>
 
@@ -472,6 +594,150 @@ onMounted(fetchSettings)
                 </VCol>
               </VRow>
             </VCardText>
+          </VCard>
+
+          <!-- Advanced — per-task model overrides (2026-05-03 multi-model)
+               Default collapsed. Lets a curator route a single task (e.g.
+               quality_gate) to a stronger or cheaper model without touching
+               the primary "Model" dropdown above. Empty map = use the
+               routing-config defaults. -->
+          <VCard
+            class="mb-6"
+            data-test="ai-advanced-overrides-card"
+          >
+            <VExpansionPanels v-model="overridesPanelExpanded" variant="accordion">
+              <VExpansionPanel value="overrides">
+                <VExpansionPanelTitle>
+                  <div class="d-flex align-center gap-2">
+                    <VIcon icon="tabler-adjustments" size="20" />
+                    <span class="font-weight-medium">Advanced — Per-Task Model Overrides</span>
+                    <VChip size="x-small" color="info" variant="tonal" label>
+                      Curator-configurable
+                    </VChip>
+                  </div>
+                </VExpansionPanelTitle>
+                <VExpansionPanelText>
+                  <p class="text-body-2 text-medium-emphasis mb-4">
+                    Route specific LLM tasks (concept extraction, quality gate, segmentation, &hellip;)
+                    to a stronger or cheaper model than the routing-config default. Changes are audited
+                    and visible across every host within 60 seconds.
+                  </p>
+
+                  <VAlert
+                    v-if="overridesError"
+                    color="error"
+                    variant="tonal"
+                    class="mb-4"
+                    closable
+                    data-test="ai-overrides-error"
+                    @click:close="overridesError = null"
+                  >
+                    {{ overridesError }}
+                  </VAlert>
+
+                  <div
+                    v-if="overridesLoading"
+                    class="d-flex justify-center py-8"
+                  >
+                    <VProgressCircular indeterminate size="32" />
+                  </div>
+
+                  <template v-else-if="overridesData">
+                    <div
+                      v-if="overridesData.tasks.length === 0"
+                      class="text-center text-medium-emphasis py-8"
+                    >
+                      No tasks configured. Add rows under
+                      <code>contracts/llm/routing-config.yaml § default_model_by_task:</code>.
+                    </div>
+
+                    <VTable
+                      v-else
+                      density="compact"
+                      data-test="ai-overrides-table"
+                    >
+                      <thead>
+                        <tr>
+                          <th>Task</th>
+                          <th>Current model</th>
+                          <th>Source</th>
+                          <th>Override</th>
+                          <th />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr
+                          v-for="row in overridesData.tasks"
+                          :key="row.task"
+                          :data-test="`ai-overrides-row-${row.task}`"
+                        >
+                          <td>
+                            <div class="font-weight-medium">
+                              {{ row.task }}
+                            </div>
+                            <div
+                              v-if="row.description"
+                              class="text-caption text-medium-emphasis"
+                            >
+                              {{ row.description }}
+                            </div>
+                          </td>
+                          <td>
+                            <code class="text-body-2">{{ row.currentModelId }}</code>
+                          </td>
+                          <td>
+                            <VChip
+                              size="x-small"
+                              :color="row.isOverridden ? 'warning' : 'default'"
+                              variant="tonal"
+                              label
+                            >
+                              {{ row.isOverridden ? 'Override' : 'Routing-config default' }}
+                            </VChip>
+                          </td>
+                          <td style="min-width: 320px">
+                            <AppSelect
+                              :model-value="row.overrideModelId"
+                              :items="overrideDropdownItems"
+                              :placeholder="`Use default (${row.currentModelId})`"
+                              :loading="overridesSaving[row.task]"
+                              :disabled="overridesSaving[row.task]"
+                              clearable
+                              density="compact"
+                              @update:model-value="(value: string | null) => onOverrideDropdownChange(row.task, value)"
+                            />
+                          </td>
+                          <td>
+                            <VBtn
+                              v-if="row.isOverridden"
+                              size="small"
+                              variant="text"
+                              color="primary"
+                              :loading="overridesSaving[row.task]"
+                              @click="onResetOverride(row.task)"
+                            >
+                              Reset to default
+                            </VBtn>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </VTable>
+
+                    <div
+                      v-if="overridesData.lastChangedBy"
+                      class="text-caption text-medium-emphasis mt-4"
+                      data-test="ai-overrides-last-changed"
+                    >
+                      Last changed by
+                      <span class="font-weight-medium">{{ overridesData.lastChangedBy }}</span>
+                      <span v-if="overridesData.lastChangedAt">
+                        on {{ new Date(overridesData.lastChangedAt).toLocaleString() }}
+                      </span>
+                    </div>
+                  </template>
+                </VExpansionPanelText>
+              </VExpansionPanel>
+            </VExpansionPanels>
           </VCard>
         </VCol>
 

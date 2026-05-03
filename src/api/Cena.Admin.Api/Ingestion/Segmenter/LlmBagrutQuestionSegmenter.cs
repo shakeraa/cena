@@ -58,18 +58,16 @@ public sealed class LlmBagrutQuestionSegmenter : IBagrutQuestionSegmenter
     public const string EnabledFlagKey = "Cena:Ingestion:BagrutLlmSegmenterEnabled";
 
     /// <summary>
-    /// Pinned model id — concept-extraction uses the same constant
-    /// discipline (HybridConceptExtractor.HaikuModelId) so an operator can
-    /// not silently route this caller to Sonnet via configuration. ADR-0026
-    /// §2 — content-segmentation is Tier 2 and the per-call budget assumes
-    /// Haiku rates.
+    /// Last-resort model id used ONLY when no <see cref="IModelResolver"/>
+    /// is wired (test-construction path). Production routes via the resolver
+    /// which honours curator overrides + routing-config defaults.
     /// <para>
     /// Matches the dated alias row in routing-config.yaml
     /// (claude_haiku_4_5_alias / 20251001) so LlmPricingTable lookups
-    /// resolve cleanly.
+    /// resolve cleanly when the resolver is bypassed.
     /// </para>
     /// </summary>
-    public const string HaikuModelId = "claude-haiku-4-5-20251001";
+    public const string FallbackHaikuModelId = "claude-haiku-4-5-20251001";
 
     private const string FeatureName = "content-segmentation";
     private const string TaskName = "bagrut_segmentation";
@@ -85,6 +83,7 @@ public sealed class LlmBagrutQuestionSegmenter : IBagrutQuestionSegmenter
     private readonly IApiKeyCipher? _cipher;
     private readonly ILlmCostMetric? _featureCost;
     private readonly IActivityPropagator? _activityPropagator;
+    private readonly IModelResolver? _modelResolver;
 
     public LlmBagrutQuestionSegmenter(
         OneDraftPerPageSegmenter fallback,
@@ -95,7 +94,8 @@ public sealed class LlmBagrutQuestionSegmenter : IBagrutQuestionSegmenter
         IDocumentStore? documentStore = null,
         IApiKeyCipher? cipher = null,
         ILlmCostMetric? featureCost = null,
-        IActivityPropagator? activityPropagator = null)
+        IActivityPropagator? activityPropagator = null,
+        IModelResolver? modelResolver = null)
     {
         ArgumentNullException.ThrowIfNull(fallback);
         ArgumentNullException.ThrowIfNull(invoker);
@@ -111,6 +111,7 @@ public sealed class LlmBagrutQuestionSegmenter : IBagrutQuestionSegmenter
         _cipher = cipher;
         _featureCost = featureCost;
         _activityPropagator = activityPropagator;
+        _modelResolver = modelResolver;
     }
 
     public async Task<IReadOnlyList<BagrutQuestionSegment>> SegmentAsync(
@@ -150,11 +151,35 @@ public sealed class LlmBagrutQuestionSegmenter : IBagrutQuestionSegmenter
             return _fallback.Segment(pages);
         }
 
+        // Resolve model id via ModelResolver (curator override or
+        // routing-config default — Haiku for bagrut_segmentation). When
+        // no resolver is wired (test-construction path) we use the
+        // FallbackHaikuModelId pin so existing tests keep passing.
+        string modelId;
+        if (_modelResolver is not null)
+        {
+            try
+            {
+                modelId = await _modelResolver.ResolveModelForTaskAsync(TaskName, ct).ConfigureAwait(false);
+            }
+            catch (ModelNotConfiguredException ex)
+            {
+                _logger.LogError(ex,
+                    "LlmBagrutQuestionSegmenter: ModelResolver could not resolve task='{Task}' (trace_id={TraceId} pdf={PdfId}) — falling back to one-draft-per-page",
+                    TaskName, SafeTraceId(), pdfId);
+                return _fallback.Segment(pages);
+            }
+        }
+        else
+        {
+            modelId = FallbackHaikuModelId;
+        }
+
         // Gate 3: per-model breaker. A Haiku trip from concept-extraction
         // also gates this caller (intentional — both routes use the same
         // model on the same Anthropic account; a flaky-model trip should
         // suppress further outbound traffic for the open window).
-        try { _runtime?.RequestCircuitPermission(HaikuModelId); }
+        try { _runtime?.RequestCircuitPermission(modelId); }
         catch (CircuitOpenException ex)
         {
             _logger.LogWarning(
@@ -173,26 +198,28 @@ public sealed class LlmBagrutQuestionSegmenter : IBagrutQuestionSegmenter
         activity?.SetTag("trace_id", traceId);
         activity?.SetTag("task", TaskName);
         activity?.SetTag("tier", Tier);
-        activity?.SetTag("model_id", HaikuModelId);
+        activity?.SetTag("model_id", modelId);
         activity?.SetTag("pdf_id", pdfId);
         activity?.SetTag("page_count", (long)pages.Count);
 
         try
         {
             var (toolInput, inputTokens, outputTokens) = await _invoker.InvokeAsync(
-                apiKey, HaikuModelId, systemPrompt, userPrompt, ct).ConfigureAwait(false);
+                apiKey, modelId, systemPrompt, userPrompt, ct).ConfigureAwait(false);
             sw.Stop();
 
             // Cost is emitted on the success path regardless of whether the
             // tool produced usable output — the round-trip cost real money.
+            // Pricing tracks ModelResolver — a Haiku→Sonnet override flips
+            // the rate from $1/$5 per Mtok to $3/$15 per Mtok automatically.
             _runtime?.EmitMetrics(
-                HaikuModelId, TaskName, sw.ElapsedMilliseconds,
-                inputTokens, outputTokens, LlmCallPricing.AnthropicHaiku4_5);
+                modelId, TaskName, sw.ElapsedMilliseconds,
+                inputTokens, outputTokens, AnthropicSupportedModels.ResolvePricingFor(modelId));
             _featureCost?.Record(
                 feature: FeatureName,
                 tier: Tier,
                 task: TaskName,
-                modelId: HaikuModelId,
+                modelId: modelId,
                 inputTokens: inputTokens,
                 outputTokens: outputTokens);
 
@@ -202,7 +229,7 @@ public sealed class LlmBagrutQuestionSegmenter : IBagrutQuestionSegmenter
                 _logger.LogWarning(
                     "LlmBagrutQuestionSegmenter: Anthropic returned no tool_use block (trace_id={TraceId} pdf={PdfId} duration_ms={DurationMs} input_tokens={InputTokens} output_tokens={OutputTokens}) — falling back to one-draft-per-page",
                     traceId, pdfId, sw.ElapsedMilliseconds, inputTokens, outputTokens);
-                _runtime?.RecordSuccess(HaikuModelId);
+                _runtime?.RecordSuccess(modelId);
                 return _fallback.Segment(pages);
             }
 
@@ -211,7 +238,7 @@ public sealed class LlmBagrutQuestionSegmenter : IBagrutQuestionSegmenter
             {
                 // Already logged by TryParseSegments at WARN.
                 activity?.SetTag("outcome", "validation_failed");
-                _runtime?.RecordSuccess(HaikuModelId);
+                _runtime?.RecordSuccess(modelId);
                 return _fallback.Segment(pages);
             }
 
@@ -227,7 +254,7 @@ public sealed class LlmBagrutQuestionSegmenter : IBagrutQuestionSegmenter
                 _logger.LogWarning(
                     "LlmBagrutQuestionSegmenter: LLM returned 0 segments for a non-empty PDF (trace_id={TraceId} pdf={PdfId} duration_ms={DurationMs} pages={PageCount}) — falling back to one-draft-per-page",
                     traceId, pdfId, sw.ElapsedMilliseconds, pages.Count);
-                _runtime?.RecordSuccess(HaikuModelId);
+                _runtime?.RecordSuccess(modelId);
                 return _fallback.Segment(pages);
             }
 
@@ -238,7 +265,7 @@ public sealed class LlmBagrutQuestionSegmenter : IBagrutQuestionSegmenter
             _logger.LogInformation(
                 "LlmBagrutQuestionSegmenter OK (trace_id={TraceId} pdf={PdfId} duration_ms={DurationMs} input_tokens={InputTokens} output_tokens={OutputTokens} pages={PageCount} segments={SegmentCount})",
                 traceId, pdfId, sw.ElapsedMilliseconds, inputTokens, outputTokens, pages.Count, parsed.Count);
-            _runtime?.RecordSuccess(HaikuModelId);
+            _runtime?.RecordSuccess(modelId);
             return parsed;
         }
         catch (CircuitOpenException)
@@ -264,7 +291,7 @@ public sealed class LlmBagrutQuestionSegmenter : IBagrutQuestionSegmenter
         catch (Exception ex)
         {
             sw.Stop();
-            _runtime?.RecordFailure(HaikuModelId);
+            _runtime?.RecordFailure(modelId);
             activity?.SetTag("outcome", "error");
             _logger.LogWarning(ex,
                 "LlmBagrutQuestionSegmenter: Anthropic call failed (trace_id={TraceId} pdf={PdfId} duration_ms={DurationMs}) — falling back to one-draft-per-page",
