@@ -1,12 +1,20 @@
 # ═══════════════════════════════════════════════════════════════════════
-# Cena Platform — Dev-only hot-reload overlay (RDY-056)
+# Cena Platform — Dev hot-reload overlay (RDY-056)
 #
-# Dev-time escape hatch that swaps every service container's entrypoint
-# for a file-watching equivalent, and bind-mounts the host source so
-# edits on your laptop propagate into the running container without a
-# rebuild.
+# Swaps every backend service container's entrypoint for a file-watching
+# equivalent and bind-mounts the host source so edits on your laptop
+# propagate into the running container without a rebuild.
+#
+# Loaded BY DEFAULT by scripts/cena-up.sh (the canonical bring-up entry
+# point). The 2026-05-03 staleness bug — fresh `/enhance-text` endpoint
+# returning 404 from a baked image until somebody manually rebuilt —
+# happened because this overlay was opt-in and easy to forget. cena-up.sh
+# now loads it unless `--prod-image` is passed.
 #
 # Usage:
+#   scripts/cena-up.sh                                    # default path
+#
+#   # Or directly via compose, e.g. for the e2e-flow harness:
 #   docker compose -f docker-compose.yml -f docker-compose.app.yml \
 #                  -f docker-compose.hotreload.yml up -d
 #
@@ -63,6 +71,15 @@ services:
       - sh
       - -c
       - "dotnet restore src/api/Cena.Admin.Api.Host/Cena.Admin.Api.Host.csproj /p:SkipOpenApiGeneration=true && exec dotnet watch --project src/api/Cena.Admin.Api.Host/Cena.Admin.Api.Host.csproj --non-interactive --no-hot-reload run --no-launch-profile /p:SkipOpenApiGeneration=true"
+    # Hot-reload first-boot does `dotnet restore` (cold NuGet cache) + watch
+    # build + Marten schema warm before Kestrel binds 5052 — typically
+    # 3-6 min on Apple Silicon. The prod-image start_period of 90s in the
+    # base file is far too tight for that path; extend it here so compose
+    # doesn't fail dependents (admin-spa) with "container is unhealthy"
+    # while watch is still compiling. Steady-state edits are fast — the
+    # interval/timeout/retries don't need to change.
+    healthcheck:
+      start_period: 600s
 
   # ── .NET: Student API ─────────────────────────────────────────────
   student-api:
@@ -96,6 +113,8 @@ services:
       - sh
       - -c
       - "dotnet restore src/api/Cena.Student.Api.Host/Cena.Student.Api.Host.csproj /p:SkipOpenApiGeneration=true && exec dotnet watch --project src/api/Cena.Student.Api.Host/Cena.Student.Api.Host.csproj --non-interactive --no-hot-reload run --no-launch-profile /p:SkipOpenApiGeneration=true"
+    healthcheck:
+      start_period: 600s   # cold dotnet-watch boot; see admin-api block.
 
   # ── .NET: Actor Host ──────────────────────────────────────────────
   actor-host:
@@ -108,6 +127,15 @@ services:
     environment:
       - DOTNET_USE_POLLING_FILE_WATCHER=true
       - DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true
+      # The dev SDK image bakes ASPNETCORE_HTTP_PORTS=8080, which beats the
+      # appsettings.json Kestrel endpoint that binds the prod-image actor-
+      # host on 5050. admin-api / student-api set ASPNETCORE_URLS in
+      # docker-compose.app.yml, but actor-host's block didn't (the prod
+      # binary just honors appsettings.json hard-coded). Pin the URL here
+      # so the dev container binds 5050 and the existing /health/ready
+      # probe + sibling-service service_healthy waits still resolve.
+      - ASPNETCORE_URLS=http://+:5050
+      - ASPNETCORE_HTTP_PORTS=
     volumes:
       - ./src:/src/src
       - ./db/migrations:/src/db/migrations
@@ -122,6 +150,8 @@ services:
       - sh
       - -c
       - "dotnet restore src/actors/Cena.Actors.Host/Cena.Actors.Host.csproj /p:SkipOpenApiGeneration=true && exec dotnet watch --project src/actors/Cena.Actors.Host/Cena.Actors.Host.csproj --non-interactive --no-hot-reload run --no-launch-profile /p:SkipOpenApiGeneration=true"
+    healthcheck:
+      start_period: 600s   # cold dotnet-watch boot; see admin-api block.
 
   # ── Python: SymPy Sidecar ─────────────────────────────────────────
   sympy-sidecar:
