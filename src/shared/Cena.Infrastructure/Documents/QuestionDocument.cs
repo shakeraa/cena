@@ -69,32 +69,29 @@ public class QuestionDocument
     /// <summary>
     /// The PRIMARY concept this question tests. BKT keys mastery updates
     /// off this id (see ConceptAttempted_V3 in Cena.Actors.Events.LearnerEvents).
-    /// Per ADR-0062 this MUST equal PrimaryConceptId after Phase 0 lands;
-    /// kept as a separate field for back-compat with seeded questions and
-    /// the existing student-session read path. New code should write
-    /// PrimaryConceptId; the projection mirrors it onto ConceptId.
+    /// This is the single string the question-pool and student-session
+    /// read paths consume. The full concept set (primary + supporting)
+    /// lives on the event stream and is projected by QuestionListProjection
+    /// onto QuestionReadModel.Concepts (per ADR-0062 §4 + Implementation
+    /// drift). This field is NOT updated by the concept-extraction events.
     /// </summary>
     public string ConceptId { get; set; } = "";
 
     /// <summary>
-    /// ADR-0062 Phase 0 — primary concept SkillCode (canonical form,
-    /// e.g. "math.calculus.derivative-rules"). Mirrors ConceptId for
-    /// back-compat. The projection writes both fields together so the
-    /// student-session read path keeps working unchanged.
+    /// ADR-0062 Phase 0 (declared but unwired). The concept-extraction
+    /// projection landed on QuestionReadModel.Concepts instead of widening
+    /// QuestionDocument; no production writer assigns to this field. See
+    /// ADR-0062 "Implementation drift" — a future cleanup pass will
+    /// either remove the field or wire a writer.
     /// </summary>
     public string PrimaryConceptId { get; set; } = "";
 
     /// <summary>
-    /// ADR-0062 Phase 0 — full concept set this question tests, including
-    /// the primary plus any supporting concepts. PrimaryConceptId is
-    /// always the first element when populated. Empty for questions that
-    /// haven't been through the new extraction pipeline yet.
-    ///
-    /// BKT does NOT fan out across this list — it stays single-concept
-    /// per ADR-0039. Supporting concepts (indexes 1..N) drive the
-    /// MasterySignalEmitted_V1 nudge channel that turns on in Phase 2,
-    /// and only when the leaf has crossed the ≥10-items publication
-    /// floor (the precondition gate from the 002 multi-persona research).
+    /// ADR-0062 Phase 0 (declared but unwired). The full concept set lives
+    /// on the event stream and is projected onto QuestionReadModel.Concepts;
+    /// no production writer assigns to this field on QuestionDocument. See
+    /// ADR-0062 "Implementation drift". Future cleanup will either remove
+    /// the field or wire a writer.
     /// </summary>
     public List<string> ConceptIds { get; set; } = new();
 

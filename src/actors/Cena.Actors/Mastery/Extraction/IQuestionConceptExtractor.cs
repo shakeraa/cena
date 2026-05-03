@@ -4,8 +4,9 @@
 // The single seam through which a question's prompt + LaTeX flow on
 // their way to a canonical concept set. Returns the list of
 // `QuestionConcept` rows (primary first) that the caller persists via
-// `QuestionConceptsExtracted_V1` and the projection mirrors onto
-// `QuestionDocument.PrimaryConceptId / ConceptIds`.
+// `QuestionConceptsExtracted_V1`. The projection mirrors the set onto
+// `QuestionReadModel.Concepts` and the aggregate rebuilds the same set
+// into `QuestionState.ConceptIds` on replay (per ADR-0062 §4).
 //
 // Tier discipline (per ADR-0062 §1):
 //   * RulesOnlyConceptExtractor (this turn): wraps the existing keyword

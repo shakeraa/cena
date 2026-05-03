@@ -28,9 +28,11 @@
 //
 // Persistence: POST appends QuestionConceptsConfirmed_V1 to the
 // question stream (which is also the draft id during In-Review). The
-// Phase 1 turn does NOT yet patch QuestionDocument.PrimaryConceptId /
-// ConceptIds — that's the projection layer (separate file). The event
-// is the source of truth; downstream consumers re-aggregate.
+// endpoint does NOT touch QuestionReadModel directly — the inline
+// QuestionListProjection picks up the event and writes to
+// QuestionReadModel.Concepts; QuestionState rebuilds ConceptIds on
+// aggregate replay. The event is the source of truth; downstream
+// consumers re-aggregate.
 // =============================================================================
 
 using Cena.Actors.Events;
