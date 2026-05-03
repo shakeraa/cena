@@ -26,9 +26,7 @@ public static class ExperimentAdminEndpoints
             return Results.Ok(result);
         }).WithName("GetExperiments")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         group.MapGet("/{experimentName}", async (string experimentName, ClaimsPrincipal user, IExperimentAdminService service) =>
         {
@@ -37,9 +35,7 @@ public static class ExperimentAdminEndpoints
         }).WithName("GetExperimentDetail")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         group.MapGet("/{experimentName}/funnel", async (string experimentName, ClaimsPrincipal user, IExperimentAdminService service) =>
         {
@@ -48,9 +44,7 @@ public static class ExperimentAdminEndpoints
         }).WithName("GetExperimentFunnel")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         return app;
     }

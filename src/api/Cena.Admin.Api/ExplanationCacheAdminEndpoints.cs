@@ -27,9 +27,7 @@ public static class ExplanationCacheAdminEndpoints
             return Results.Ok(stats);
         }).WithName("GetExplanationCacheStats")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/explanations/by-question/{questionId}
         group.MapGet("/by-question/{questionId}", async (
@@ -41,9 +39,7 @@ public static class ExplanationCacheAdminEndpoints
         }).WithName("GetExplanationsByQuestion")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST /api/admin/explanations/invalidate
         group.MapPost("/invalidate", async (
@@ -54,9 +50,7 @@ public static class ExplanationCacheAdminEndpoints
             return Results.Ok(result);
         }).WithName("InvalidateExplanationCache")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/explanations/quality-scores
         group.MapGet("/quality-scores", async (
@@ -76,9 +70,7 @@ public static class ExplanationCacheAdminEndpoints
             return Results.Ok(result);
         }).WithName("GetExplanationQualityScores")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         return app;
     }

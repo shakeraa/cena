@@ -30,9 +30,7 @@ public static class IngestionSettingsEndpoints
             return Results.Ok(settings);
         }).WithName("GetIngestionSettings")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // PUT — save full settings document
         group.MapPut("/", async (
@@ -57,9 +55,7 @@ public static class IngestionSettingsEndpoints
         }).WithName("UpdateIngestionSettings")
     .Produces<object>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status400BadRequest)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST — test email connection.
         // Accepts either {config, password} (TestEmailRequest) or a bare EmailIngestionConfig
@@ -79,9 +75,7 @@ public static class IngestionSettingsEndpoints
         }).WithName("TestEmailIngestionConnection")
     .Produces<object>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status400BadRequest)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST — test cloud directory connection.
         // Accepts either {config, secretKey} (TestCloudDirRequest) or a bare CloudDirConfig
@@ -101,9 +95,7 @@ public static class IngestionSettingsEndpoints
         }).WithName("TestCloudDirConnection")
     .Produces<object>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status400BadRequest)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         return app;
     }

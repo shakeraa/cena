@@ -76,9 +76,7 @@ public static class ComplianceEndpoints
         })
         .WithName("QueryComplianceAuditLog")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/compliance/audit-log/summary
         group.MapGet("/audit-log/summary", async (
@@ -133,9 +131,7 @@ public static class ComplianceEndpoints
         })
         .WithName("AuditLogSummary")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/compliance/data-retention
         group.MapGet("/data-retention", async (IQuerySession querySession) =>
@@ -291,9 +287,7 @@ public static class ComplianceEndpoints
         })
         .WithName("DataRetentionPolicy")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         return app;
     }

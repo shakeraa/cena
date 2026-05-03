@@ -45,9 +45,7 @@ public static class StagnationInsightsEndpoints
             };
         }).WithName("SubmitStagnationAnalysis")
     .Produces(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/stagnation/jobs/{jobId} — poll job status + result
         group.MapGet("/jobs/{jobId}", async (
@@ -65,9 +63,7 @@ public static class StagnationInsightsEndpoints
         }).WithName("PollStagnationJob")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         return app;
     }

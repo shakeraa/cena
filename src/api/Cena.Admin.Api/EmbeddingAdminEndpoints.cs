@@ -29,9 +29,7 @@ public static class EmbeddingAdminEndpoints
             return Results.Ok(stats);
         }).WithName("GetEmbeddingCorpusStats")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST /api/admin/embeddings/search
         group.MapPost("/search", async (
@@ -42,9 +40,7 @@ public static class EmbeddingAdminEndpoints
             return Results.Ok(result);
         }).WithName("SearchEmbeddings")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // GET /api/admin/embeddings/duplicates?threshold=0.95&page=1&pageSize=20
         group.MapGet("/duplicates", async (
@@ -62,9 +58,7 @@ public static class EmbeddingAdminEndpoints
             return Results.Ok(result);
         }).WithName("GetEmbeddingDuplicates")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         // POST /api/admin/embeddings/reindex
         group.MapPost("/reindex", async (
@@ -81,9 +75,7 @@ public static class EmbeddingAdminEndpoints
             return Results.Ok(result);
         }).WithName("RequestEmbeddingReindex")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         return app;
     }

@@ -53,9 +53,7 @@ public static class MessagingAdminEndpoints
             return Results.Ok(result);
         }).WithName("GetMessagingThreads")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         group.MapGet("/threads/{threadId}", async (
             string threadId,
@@ -70,9 +68,7 @@ public static class MessagingAdminEndpoints
         }).WithName("GetMessagingThreadDetail")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         group.MapPost("/threads", async (
             CreateThreadRequest request,
@@ -157,9 +153,7 @@ public static class MessagingAdminEndpoints
                 new { ThreadId = threadId });
         }).WithName("CreateMessagingThread")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         group.MapPost("/threads/{threadId}/messages", async (
             string threadId,
@@ -191,9 +185,7 @@ public static class MessagingAdminEndpoints
             return Results.Accepted();
         }).WithName("SendMessageInThread")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         group.MapPut("/threads/{threadId}/mute", async (
             string threadId,
@@ -213,9 +205,7 @@ public static class MessagingAdminEndpoints
             return Results.Ok();
         }).WithName("MuteMessagingThread")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         group.MapGet("/contacts", async (
             string? search,
@@ -226,9 +216,7 @@ public static class MessagingAdminEndpoints
             return Results.Ok(result);
         }).WithName("GetMessagingContacts")
     .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+    .WithStandardErrorResponses();
 
         return app;
     }
