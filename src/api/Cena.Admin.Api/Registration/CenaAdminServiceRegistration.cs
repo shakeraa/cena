@@ -279,15 +279,19 @@ public static class CenaAdminServiceRegistration
         // BagrutTaxonomyCatalog is the closed-set canonicalizer; load once
         // from scripts/bagrut-taxonomy.json so every consumer (extractor,
         // curator endpoint, future projection) reads the same catalog.
-        // RulesOnlyConceptExtractor is the Phase 1 Tier-1 extractor;
-        // future Hybrid extractor swaps in here without changing call
-        // sites. NullConceptItemPublicationCounter keeps the Phase 2
-        // ≥10-items/leaf gate CLOSED until a Marten-backed counter
-        // replaces it (gate fails closed by design).
+        // HybridConceptExtractor is the Phase 1 Tier-1+Tier-2 extractor:
+        // rules-tier first (delegated to RulesOnlyConceptExtractor), LLM
+        // fallback only when rules return zero or low-confidence (<0.5)
+        // primary. RulesOnly stays registered as a concrete service so
+        // Hybrid can consume it without re-resolving through the interface.
+        // NullConceptItemPublicationCounter keeps the Phase 2 ≥10-items/leaf
+        // gate CLOSED until a Marten-backed counter replaces it (gate fails
+        // closed by design).
         services.TryAddSingleton<Cena.Actors.Mastery.BagrutTaxonomyCatalog>(_ =>
             Cena.Actors.Mastery.BagrutTaxonomyCatalog.LoadFromDisk());
+        services.TryAddSingleton<Cena.Actors.Mastery.Extraction.RulesOnlyConceptExtractor>();
         services.TryAddSingleton<Cena.Actors.Mastery.Extraction.IQuestionConceptExtractor,
-            Cena.Actors.Mastery.Extraction.RulesOnlyConceptExtractor>();
+            Cena.Admin.Api.Mastery.Extraction.HybridConceptExtractor>();
         services.TryAddSingleton<Cena.Actors.Mastery.Extraction.IConceptItemPublicationCounter,
             Cena.Actors.Mastery.Extraction.NullConceptItemPublicationCounter>();
 
