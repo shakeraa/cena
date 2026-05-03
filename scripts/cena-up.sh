@@ -54,12 +54,14 @@ cd "$REPO_ROOT"
 FORCE_BUILD=0
 RESTART_ONLY=0
 PROD_IMAGE=0
+ALLOW_WORKTREE=0
 SVCS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --force-build) FORCE_BUILD=1; shift ;;
-    --restart)     RESTART_ONLY=1; shift ;;
-    --prod-image)  PROD_IMAGE=1;   shift ;;
+    --force-build)     FORCE_BUILD=1; shift ;;
+    --restart)         RESTART_ONLY=1; shift ;;
+    --prod-image)      PROD_IMAGE=1;   shift ;;
+    --allow-worktree)  ALLOW_WORKTREE=1; shift ;;
     -h|--help)
       # Print everything between the first two ====...==== banner lines.
       awk '/^# =====+$/{n++; next} n==1 {sub(/^# ?/,""); print} n>=2{exit}' "$0"
@@ -73,6 +75,56 @@ while [[ $# -gt 0 ]]; do
       SVCS+=("$1"); shift ;;
   esac
 done
+
+# ── 0. Worktree guard ────────────────────────────────────────────────
+# This script writes docker-compose state (mounts, volumes, container
+# names) keyed to the working directory it runs from. When invoked from
+# a git worktree (e.g. .claude/worktrees/foo/), every bind mount in the
+# resulting container points at the worktree path. The moment the
+# worktree is removed (post-merge cleanup), every running container
+# loses its source tree mid-flight — `dotnet watch` reloads to nothing,
+# Vite serves blank pages, the user blames Vite, and the actual cause
+# (bad mount root) is invisible from the symptom.
+#
+# Refuse to run from a worktree unless the operator overrides with
+# --allow-worktree. The override is for the rare case someone genuinely
+# wants a worktree-scoped throwaway stack (e.g. running two stacks
+# concurrently against two branches), and they'd better know to use a
+# distinct -p project name to avoid container-name collisions with the
+# canonical `-p cena` stack.
+git_dir="$(git rev-parse --git-dir 2>/dev/null || true)"
+if [[ -n "$git_dir" && "$git_dir" == *"/.git/worktrees/"* ]]; then
+  if [[ $ALLOW_WORKTREE -eq 0 ]]; then
+    canonical_root="$(echo "$git_dir" | sed 's|/.git/worktrees/.*||')"
+    worktree_name="$(basename "$(dirname "$git_dir")/$(basename "$git_dir")" | sed 's|^.*/||')"
+    cat >&2 <<ERRMSG
+[cena-up] ERROR: invoked from inside a git worktree.
+
+  worktree path: $REPO_ROOT
+  worktree name: $(basename "$REPO_ROOT")
+  canonical:     $canonical_root
+
+cena-up.sh writes docker-compose mounts keyed to the working directory.
+If this script ran here, every container's bind-mount would point at
+this worktree — and the moment the worktree is removed (post-merge
+cleanup), the running stack loses its source tree mid-flight. Symptoms
+include blank Vite pages, dotnet watch reloading to nothing, and 404s
+on freshly-added endpoints with no obvious cause.
+
+Recovery:
+  cd $canonical_root
+  ./scripts/cena-up.sh ${SVCS[*]:-}
+
+If you genuinely want a worktree-scoped throwaway stack (rare; you'll
+need a distinct -p project name to avoid colliding with -p cena),
+re-run with --allow-worktree.
+ERRMSG
+    exit 1
+  else
+    echo "[cena-up] WARNING: running from worktree path $REPO_ROOT (--allow-worktree)" >&2
+    echo "[cena-up]          mounts will break if this worktree is removed; you have been warned" >&2
+  fi
+fi
 
 # Compose overlay stack. Hot-reload is the default; --prod-image opts out
 # to the production-image composition (no bind-mounts, no `dotnet watch`).
