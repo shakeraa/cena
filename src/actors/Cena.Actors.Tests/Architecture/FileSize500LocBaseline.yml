@@ -34,8 +34,8 @@ grandfathered:
 
   # ---- Admin API surface (pre-2026-04-20 legacy; refactor candidates) ----
   - path: src/api/Cena.Admin.Api/AdminApiEndpoints.cs
-    baseline_loc: 1500
-    reason: "Admin minimal-API surface; split into per-domain endpoint groups is a follow-up refactor. PRR-RETRY-IMPL replaced the 501 try/catch on /items/{id}/retry with a 409 BYTES_NOT_PERSISTED branch + a 6-line architecture comment (+3 LOC)."
+    baseline_loc: 1304
+    reason: "Admin minimal-API surface; split into per-domain endpoint groups is a follow-up refactor. PRR-RETRY-IMPL replaced the 501 try/catch on /items/{id}/retry with a 409 BYTES_NOT_PERSISTED branch + a 6-line architecture comment (+3 LOC). claude-subagent-produces-rollout ratcheted 1500 -> 1304 by replacing the 401/429/500 .Produces<CenaError>() trio with .WithStandardErrorResponses() across 99 endpoints (-196 LOC)."
   - path: src/api/Cena.Admin.Api/QuestionBankSeedData.cs
     baseline_loc: 1429
     reason: "Historical seed data; will be replaced by CAS-gated pipeline output (ADR-0032)"
