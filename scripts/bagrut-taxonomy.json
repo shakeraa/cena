@@ -1,7 +1,7 @@
 {
   "$schema": "bagrut-taxonomy-schema",
-  "version": "1.0.0",
-  "description": "Formal topic taxonomy for Israeli Bagrut mathematics exams. Based on Ministry of Education syllabus (meyda.education.gov.il). All concept IDs match CurriculumSeedData and prerequisite-graph.json.",
+  "version": "1.1.0",
+  "description": "Formal topic taxonomy for Israeli Bagrut mathematics exams. Based on Ministry of Education syllabus (meyda.education.gov.il). All concept IDs match CurriculumSeedData and prerequisite-graph.json. v1.1.0 (2026-05-03) adds Hebrew + Arabic display labels for the curator UI; English keys (e.g. 'algebra.quadratic_equations') remain canonical and are unchanged.",
   "tracks": {
     "math_5u": {
       "name": "Mathematics 5-Unit (806/807)",
@@ -217,11 +217,69 @@
     "VEC-003": "cross-product",
     "VEC-004": "vector-applications"
   },
+  "labels": {
+    "$comment": "Display labels for the curator UI (ConceptReviewPanel autocomplete). English keys above remain canonical for storage/event sourcing; the labels map is purely presentational. Translation strategy 2026-05-03: human-curated for the 7 topics + 42 unique subtopics. Hebrew uses the Ministry of Education's syllabus terminology (meyda.education.gov.il) where possible; Arabic uses the standard syllabus terms used in Israeli Arab schools (which take the Arabic-language Bagrut). Subtopic keys are unique across all topics — the flat map below intentionally has no topic prefix to avoid duplication. If a subtopic key is later reused under a different topic, switch to a 'topic.subtopic' compound key.",
+    "topics": {
+      "algebra":      { "en": "Algebra",                  "he": "אלגברה",       "ar": "الجبر" },
+      "functions":    { "en": "Functions",                "he": "פונקציות",     "ar": "الدوال" },
+      "calculus":     { "en": "Calculus",                 "he": "חשבון דיפרנציאלי ואינטגרלי", "ar": "التفاضل والتكامل" },
+      "geometry":     { "en": "Geometry",                 "he": "גיאומטריה",    "ar": "الهندسة" },
+      "trigonometry": { "en": "Trigonometry",             "he": "טריגונומטריה", "ar": "علم المثلثات" },
+      "probability":  { "en": "Probability & Statistics", "he": "הסתברות וסטטיסטיקה", "ar": "الاحتمال والإحصاء" },
+      "vectors":      { "en": "Vectors",                  "he": "וקטורים",      "ar": "المتجهات" }
+    },
+    "subtopics": {
+      "number_properties":           { "en": "Number properties",           "he": "תכונות המספרים",         "ar": "خصائص الأعداد" },
+      "linear_equations":            { "en": "Linear equations",            "he": "משוואות לינאריות",       "ar": "المعادلات الخطية" },
+      "inequalities":                { "en": "Inequalities",                "he": "אי-שוויונים",            "ar": "المتباينات" },
+      "quadratic_equations":         { "en": "Quadratic equations",         "he": "משוואות ריבועיות",       "ar": "المعادلات التربيعية" },
+      "systems_of_equations":        { "en": "Systems of equations",        "he": "מערכות משוואות",         "ar": "أنظمة المعادلات" },
+      "polynomials":                 { "en": "Polynomials",                 "he": "פולינומים",              "ar": "كثيرات الحدود" },
+      "rational_expressions":        { "en": "Rational expressions",        "he": "ביטויים רציונליים",      "ar": "التعابير النسبية" },
+      "sequences_series":            { "en": "Sequences and series",        "he": "סדרות וטורים",           "ar": "المتتاليات والمتسلسلات" },
+      "function_basics":             { "en": "Function basics",             "he": "מושגי יסוד בפונקציות",   "ar": "أساسيات الدوال" },
+      "linear_functions":            { "en": "Linear functions",            "he": "פונקציות לינאריות",      "ar": "الدوال الخطية" },
+      "quadratic_functions":         { "en": "Quadratic functions",         "he": "פונקציות ריבועיות",      "ar": "الدوال التربيعية" },
+      "exponential_functions":       { "en": "Exponential functions",       "he": "פונקציות מעריכיות",      "ar": "الدوال الأسية" },
+      "logarithmic_functions":       { "en": "Logarithmic functions",       "he": "פונקציות לוגריתמיות",    "ar": "الدوال اللوغاريتمية" },
+      "composite_functions":         { "en": "Composite functions",         "he": "פונקציות מורכבות",       "ar": "الدوال المركبة" },
+      "inverse_functions":           { "en": "Inverse functions",           "he": "פונקציות הופכיות",       "ar": "الدوال العكسية" },
+      "limits":                      { "en": "Limits",                      "he": "גבולות",                 "ar": "النهايات" },
+      "derivative_definition":       { "en": "Derivative definition",       "he": "הגדרת הנגזרת",           "ar": "تعريف المشتقة" },
+      "derivative_rules":            { "en": "Derivative rules",            "he": "כללי גזירה",             "ar": "قواعد الاشتقاق" },
+      "applications_of_derivatives": { "en": "Applications of derivatives", "he": "יישומי הנגזרת",          "ar": "تطبيقات المشتقة" },
+      "integrals_intro":             { "en": "Integrals — introduction",    "he": "מבוא לאינטגרלים",        "ar": "مقدمة في التكاملات" },
+      "definite_integrals":          { "en": "Definite integrals",          "he": "אינטגרלים מסוימים",      "ar": "التكاملات المحددة" },
+      "angles_lines":                { "en": "Angles and lines",            "he": "זוויות וישרים",          "ar": "الزوايا والمستقيمات" },
+      "triangles":                   { "en": "Triangles",                   "he": "משולשים",                "ar": "المثلثات" },
+      "circle_properties":           { "en": "Circle properties",           "he": "תכונות המעגל",           "ar": "خصائص الدائرة" },
+      "coordinate_geometry":         { "en": "Coordinate geometry",         "he": "גיאומטריה אנליטית",      "ar": "الهندسة الإحداثية" },
+      "trigonometric_ratios":        { "en": "Trigonometric ratios",        "he": "יחסים טריגונומטריים",    "ar": "النسب المثلثية" },
+      "area_volume":                 { "en": "Area and volume",             "he": "שטח ונפח",               "ar": "المساحة والحجم" },
+      "analytic_geometry":           { "en": "Analytic geometry",           "he": "גיאומטריה אנליטית מתקדמת", "ar": "الهندسة التحليلية" },
+      "trig_identities":             { "en": "Trigonometric identities",    "he": "זהויות טריגונומטריות",   "ar": "المتطابقات المثلثية" },
+      "trig_equations":              { "en": "Trigonometric equations",     "he": "משוואות טריגונומטריות",  "ar": "المعادلات المثلثية" },
+      "sine_cosine_rules":           { "en": "Sine and cosine rules",       "he": "משפטי הסינוס והקוסינוס", "ar": "قانوني الجيب وجيب التمام" },
+      "radian_measure":              { "en": "Radian measure",              "he": "מידת הרדיאן",            "ar": "قياس الراديان" },
+      "counting_principles":         { "en": "Counting principles",         "he": "עקרונות הספירה",         "ar": "مبادئ العد" },
+      "basic_probability":           { "en": "Basic probability",           "he": "הסתברות בסיסית",         "ar": "الاحتمال الأساسي" },
+      "conditional_probability":     { "en": "Conditional probability",     "he": "הסתברות מותנית",         "ar": "الاحتمال الشرطي" },
+      "binomial_distribution":       { "en": "Binomial distribution",       "he": "התפלגות בינומית",        "ar": "التوزيع ثنائي الحدين" },
+      "normal_distribution":         { "en": "Normal distribution",         "he": "התפלגות נורמלית",        "ar": "التوزيع الطبيعي" },
+      "statistical_inference":       { "en": "Statistical inference",       "he": "הסקה סטטיסטית",          "ar": "الاستدلال الإحصائي" },
+      "vector_basics":               { "en": "Vector basics",               "he": "מושגי יסוד בוקטורים",    "ar": "أساسيات المتجهات" },
+      "dot_product":                 { "en": "Dot product",                 "he": "מכפלה סקלרית",           "ar": "الجداء النقطي" },
+      "cross_product":               { "en": "Cross product",               "he": "מכפלה וקטורית",          "ar": "الجداء الاتجاهي" },
+      "vector_applications":         { "en": "Vector applications",         "he": "יישומי וקטורים",         "ar": "تطبيقات المتجهات" }
+    }
+  },
   "validation": {
     "tracks": 3,
     "total_5u_subtopics": 42,
     "total_4u_subtopics": 17,
     "total_3u_subtopics": 14,
-    "all_concept_ids_match_prerequisite_graph": true
+    "all_concept_ids_match_prerequisite_graph": true,
+    "topic_label_count": 7,
+    "subtopic_label_count": 42
   }
 }
