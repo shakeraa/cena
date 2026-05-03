@@ -377,6 +377,12 @@ public static class CenaAdminServiceRegistration
             Cena.Admin.Api.AiSettings.HkdfApiKeyCipher>();
         services.AddSingleton<Cena.Admin.Api.AiSettings.IAnthropicConnectionProbe,
             Cena.Admin.Api.AiSettings.AnthropicConnectionProbe>();
+        // Shared LLM runtime — owns the Anthropic client cache, in-process
+        // circuit breaker, and legacy per-service meters. AiGenerationService,
+        // OcrTextEnhancer, and any future Anthropic-backed admin feature
+        // consume this instead of holding parallel breaker state.
+        services.AddSingleton<Cena.Admin.Api.AiSettings.IAnthropicLlmRuntime,
+            Cena.Admin.Api.AiSettings.AnthropicLlmRuntime>();
         services.AddSingleton<IAiGenerationService, AiGenerationService>();
         // ADR-0062 Phase 1.5 — OCR cleanup pass extracted from
         // AiGenerationService 2026-05-03. Singleton because it caches
