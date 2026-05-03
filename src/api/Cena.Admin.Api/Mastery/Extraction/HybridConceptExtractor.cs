@@ -282,8 +282,11 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
                 apiKey, HaikuModelId, systemPrompt, userPrompt, ct).ConfigureAwait(false);
             sw.Stop();
 
+            // Gap 30 fix: pricing per-call. Concept-extraction is pinned to
+            // Haiku 4.5 (ADR-0026 §2 + ADR-0062). The legacy meter previously
+            // hardcoded Sonnet $3/$15 which over-reported this caller by ~3x.
             _runtime?.EmitMetrics(HaikuModelId, "concept_extraction", sw.ElapsedMilliseconds,
-                inputTokens, outputTokens);
+                inputTokens, outputTokens, LlmCallPricing.AnthropicHaiku4_5);
 
             if (_featureCost is not null)
             {

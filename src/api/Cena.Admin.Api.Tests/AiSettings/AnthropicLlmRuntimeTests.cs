@@ -148,7 +148,8 @@ public class AnthropicLlmRuntimeTests
             taskType: "question_generation",
             durationMs: 1234,
             inputTokens: 500,
-            outputTokens: 250);
+            outputTokens: 250,
+            pricing: LlmCallPricing.AnthropicSonnet4_6);
 
         // Expect at least: llm_request_duration_ms, llm_tokens_total (×2),
         // llm_cost_usd — all tagged with the shared model + task tags.
