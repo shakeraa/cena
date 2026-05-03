@@ -378,6 +378,10 @@ public static class CenaAdminServiceRegistration
         // AiGenerationService 2026-05-03. Singleton because it caches
         // an Anthropic client keyed on the persisted API key, just like
         // AiGenerationService does.
+        // OcrEnhancementCache (Marten document, sha256-keyed, 24h TTL)
+        // is a singleton — no per-request state and TimeProvider.System
+        // is thread-safe.
+        services.AddSingleton<IOcrEnhancementCache, OcrEnhancementCache>();
         services.AddSingleton<IOcrTextEnhancer, OcrTextEnhancer>();
 
         // prr-200 (ADR-0002, ADR-0032): Deterministic parametric template

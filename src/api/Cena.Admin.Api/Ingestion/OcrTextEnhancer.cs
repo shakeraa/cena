@@ -7,6 +7,18 @@
 // SPA renders the output through the same renderMixedMathText path the
 // curator already trusts.
 //
+// Cache layer (added 2026-05-03)
+// ------------------------------
+// Calls are deterministic at temperature=0, so identical input must not
+// pay for the LLM twice. This service consults `IOcrEnhancementCache`
+// (Marten document, sha256(input)-keyed, 24h absolute TTL) before
+// invoking Anthropic and writes the cleaned text back on success. Cache
+// hits emit a `llm_cache_hits_total` counter (no token counters) so the
+// cost dashboard separates "money saved" from "money spent". Persistence
+// onto the BagrutDraftPayloadDocument lives in the endpoint handler
+// (QuestionConceptsEndpoints), not here — the enhancer doesn't know
+// about drafts. See OcrEnhancementCache.cs for the choice rationale.
+//
 // Extracted from AiGenerationService 2026-05-03. Trade-offs:
 //
 // 1) ~30 LOC duplication. Anthropic client + API-key resolution + meter
@@ -56,7 +68,13 @@ public sealed record EnhanceOcrTextResponse(
     bool Success,
     string EnhancedText,
     string? ModelUsed,
-    string? Error);
+    string? Error,
+    // CacheHit and InputHash are populated on every Success=true path so
+    // the calling endpoint can persist the cache key on the draft and
+    // the SPA can reflect "the result was cached" in observability /
+    // ops surfaces. Non-success responses leave both null.
+    bool CacheHit = false,
+    string? InputHash = null);
 
 /// <summary>
 /// ADR-0062 Phase 1.5 — runs the OCR-cleanup pass on a Bagrut draft's
@@ -80,6 +98,7 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
     private readonly IDocumentStore _documentStore;
     private readonly IApiKeyCipher _cipher;
     private readonly ILlmCostMetric _featureCost;
+    private readonly IOcrEnhancementCache _cache;
     private readonly IActivityPropagator? _activityPropagator;
 
     // Legacy per-service meters preserved on the SAME meter name as
@@ -88,6 +107,11 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
     private readonly Histogram<double> _requestDuration;
     private readonly Counter<long> _tokensTotal;
     private readonly Counter<double> _costUsd;
+    // Cache observability — separated from token counters so finops
+    // dashboards see "$ saved by cache hit" distinct from "$ spent on
+    // LLM call". Tagged by task_type so this meter shape can host other
+    // task types in the future (currently just ocr_text_enhance).
+    private readonly Counter<long> _cacheHits;
 
     // Anthropic client cache — keyed on plaintext key, refreshed when the
     // operator rotates the persisted cipher.
@@ -120,6 +144,7 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         IDocumentStore documentStore,
         IApiKeyCipher cipher,
         ILlmCostMetric featureCost,
+        IOcrEnhancementCache cache,
         IActivityPropagator? activityPropagator = null)
     {
         _logger = logger;
@@ -127,6 +152,7 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         _documentStore = documentStore;
         _cipher = cipher;
         _featureCost = featureCost;
+        _cache = cache;
         _activityPropagator = activityPropagator;
 
         // Same meter name as AiGenerationService — meter factories
@@ -143,6 +169,9 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         _costUsd = meter.CreateCounter<double>(
             "llm_cost_usd", unit: "USD",
             description: "LLM cost in USD");
+        _cacheHits = meter.CreateCounter<long>(
+            "llm_cache_hits_total",
+            description: "Number of cache hits that avoided an LLM call");
     }
 
     public async Task<EnhanceOcrTextResponse> EnhanceOcrTextAsync(
@@ -151,6 +180,29 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
     {
         if (req is null || string.IsNullOrWhiteSpace(req.OcrText))
             return new EnhanceOcrTextResponse(false, "", null, "ocrText is required.");
+
+        // Cache lookup (sha256-keyed). Hits skip API-key resolution +
+        // circuit breaker + LLM call entirely. The cache key is
+        // surfaced on the response so the endpoint can persist it on
+        // the draft alongside the enhanced text.
+        var inputHash = _cache.ComputeKey(req.OcrText);
+        var cached = await _cache.TryGetAsync(inputHash, ct).ConfigureAwait(false);
+        if (cached is not null)
+        {
+            _cacheHits.Add(1,
+                new KeyValuePair<string, object?>("task_type", "ocr_text_enhance"),
+                new KeyValuePair<string, object?>("model_id", cached.ModelUsed));
+            _logger.LogInformation(
+                "OcrTextEnhancer cache HIT (model={Model} computedAt={ComputedAt} hash={Hash})",
+                cached.ModelUsed, cached.ComputedAt, inputHash);
+            return new EnhanceOcrTextResponse(
+                Success: true,
+                EnhancedText: cached.EnhancedText,
+                ModelUsed: cached.ModelUsed,
+                Error: null,
+                CacheHit: true,
+                InputHash: inputHash);
+        }
 
         var doc = await LoadDocAsync(ct).ConfigureAwait(false);
         var apiKey = ResolveApiKey(doc);
@@ -245,11 +297,35 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
             activity?.SetTag("input_tokens", (long)inputTokens);
             activity?.SetTag("output_tokens", (long)outputTokens);
             _logger.LogInformation(
-                "OcrTextEnhancer OK (trace_id={TraceId} model={Model} input={Input} output={Output} duration={DurationMs}ms)",
-                traceId, modelName, inputTokens, outputTokens, sw.ElapsedMilliseconds);
+                "OcrTextEnhancer OK (trace_id={TraceId} model={Model} input={Input} output={Output} duration={DurationMs}ms hash={Hash})",
+                traceId, modelName, inputTokens, outputTokens, sw.ElapsedMilliseconds, inputHash);
 
             RecordSuccess(modelName);
-            return new EnhanceOcrTextResponse(true, text!.Trim(), modelName, null);
+            var enhanced = text!.Trim();
+
+            // Best-effort cache write. A failure here must not turn a
+            // successful LLM call into a failed response — the curator
+            // already paid for the tokens, surface the result and let
+            // the next call re-cache. Logged at warn level for SIEM.
+            try
+            {
+                await _cache.StoreAsync(inputHash, enhanced, modelName, ct)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception cacheEx)
+            {
+                _logger.LogWarning(cacheEx,
+                    "OcrTextEnhancer cache write failed (hash={Hash}) — returning fresh result anyway",
+                    inputHash);
+            }
+
+            return new EnhanceOcrTextResponse(
+                Success: true,
+                EnhancedText: enhanced,
+                ModelUsed: modelName,
+                Error: null,
+                CacheHit: false,
+                InputHash: inputHash);
         }
         catch (CircuitOpenException ex)
         {

@@ -252,6 +252,17 @@ public static class MartenConfiguration
             // non-Ministry-only views without scanning the full table.
             .Index(x => x.IsMinistryReference);
 
+        // ── OCR Enhancement Cache Document (ADR-0062 Phase 1.5) ──
+        // Keyed on sha256(input). Identical inputs (across drafts) share
+        // a row; re-OCR of the same draft yields a different hash and
+        // misses cleanly. ExpiresAt is indexed so a janitor sweep can
+        // DELETE WHERE ExpiresAt < NOW() in a single seek. See
+        // src/api/Cena.Admin.Api/Ingestion/OcrEnhancementCache.cs for
+        // the choice rationale.
+        opts.Schema.For<Cena.Infrastructure.Documents.OcrEnhancementCacheDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.ExpiresAt);
+
         // ── Question CAS Binding (ADR-0032 §4 / RDY-049) ──
         // Unique index on (QuestionId, CorrectAnswerHash) gives us
         // concurrency-safe idempotency: two racing verify calls on the
