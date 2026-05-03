@@ -163,6 +163,99 @@ public sealed class BagrutTaxonomyCatalogTests
     }
 
     [Fact]
+    public void Parse_LabelsBlockMissing_FallsBackToEnglishHumanisedKey()
+    {
+        // Older taxonomy JSON (or synthetic test catalogs without a
+        // `labels` block) still works — every leaf gets an EN-only
+        // entry derived from the English key. Pinning this so any
+        // future "labels are required" change is intentional, not
+        // accidental.
+        var cat = Synthetic();
+        Assert.True(cat.TryCanonicalize("CAL-003", out _, out var leaf));
+        Assert.Equal("Calculus", leaf!.LocalizedTopic("en"));
+        Assert.Equal("Derivative rules", leaf.LocalizedSubtopic("en"));
+
+        // Hebrew/Arabic missing → English fallback (not the raw key).
+        Assert.Equal("Calculus", leaf.LocalizedTopic("he"));
+        Assert.Equal("Derivative rules", leaf.LocalizedSubtopic("ar"));
+    }
+
+    [Fact]
+    public void Parse_LabelsBlockPresent_LocalizedAccessorsResolve()
+    {
+        const string jsonWithLabels = """
+        {
+          "version": "test",
+          "tracks": {
+            "math_5u": {
+              "name": "5u",
+              "topics": {
+                "calculus": {
+                  "name": "Calculus",
+                  "subtopics": {
+                    "derivative_rules": { "conceptId": "CAL-003", "bloom_range": [3, 5] }
+                  }
+                }
+              }
+            }
+          },
+          "labels": {
+            "topics": {
+              "calculus": { "en": "Calculus", "he": "חשבון", "ar": "تفاضل" }
+            },
+            "subtopics": {
+              "derivative_rules": { "en": "Derivative rules", "he": "כללי גזירה", "ar": "قواعد الاشتقاق" }
+            }
+          }
+        }
+        """;
+
+        var cat = BagrutTaxonomyCatalog.Parse(jsonWithLabels);
+        Assert.True(cat.TryCanonicalize("CAL-003", out _, out var leaf));
+
+        Assert.Equal("Calculus", leaf!.LocalizedTopic("en"));
+        Assert.Equal("חשבון",   leaf.LocalizedTopic("he"));
+        Assert.Equal("تفاضل",   leaf.LocalizedTopic("ar"));
+
+        Assert.Equal("Derivative rules", leaf.LocalizedSubtopic("en"));
+        Assert.Equal("כללי גזירה",       leaf.LocalizedSubtopic("he"));
+        Assert.Equal("قواعد الاشتقاق",   leaf.LocalizedSubtopic("ar"));
+
+        // Unknown lang → falls back to English (not the raw key).
+        Assert.Equal("Calculus",         leaf.LocalizedTopic("zh"));
+        Assert.Equal("Derivative rules", leaf.LocalizedSubtopic("zh"));
+    }
+
+    [Fact]
+    public void LoadFromDisk_LabelsCoverAllTopicsAndSubtopics()
+    {
+        // The published taxonomy MUST translate every leaf — a missing
+        // entry would fall back to the English key in the curator UI,
+        // which is the bug we shipped before this catch-all test was
+        // added (he/ar curators saw raw "derivative_rules" strings).
+        var cat = BagrutTaxonomyCatalog.LoadFromDisk();
+
+        foreach (var leaf in cat.AllLeaves)
+        {
+            // Every supported lang must produce a non-empty, non-key
+            // string. We compare against the raw key with underscores
+            // intact to reject the EnglishOnlyFallback humanisation
+            // path (which keeps spaces) and the raw-key fallback.
+            foreach (var lang in new[] { "en", "he", "ar" })
+            {
+                var topic = leaf.LocalizedTopic(lang);
+                var sub   = leaf.LocalizedSubtopic(lang);
+                Assert.False(string.IsNullOrWhiteSpace(topic),
+                    $"missing topic label for {leaf.TopicKey} lang={lang}");
+                Assert.False(string.IsNullOrWhiteSpace(sub),
+                    $"missing subtopic label for {leaf.SubtopicKey} lang={lang}");
+                Assert.NotEqual(leaf.TopicKey, topic);
+                Assert.NotEqual(leaf.SubtopicKey, sub);
+            }
+        }
+    }
+
+    [Fact]
     public void LoadFromDisk_RealTaxonomy_ParsesEndToEnd()
     {
         // Sanity check that the production taxonomy JSON shape stays
