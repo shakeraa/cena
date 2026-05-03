@@ -47,7 +47,13 @@ export const { themeConfig, layoutConfig } = defineThemeConfig({
         },
       ],
     },
-    theme: 'system',
+    // 2026-05-03: light is the default. Admin curators work in
+    // bright office lighting and the dark theme made low-contrast
+    // OCR text harder to spot during review. The user-toggle
+    // (navbar palette icon) still respects an explicit choice and
+    // persists it to localStorage; this only changes first-load
+    // behaviour for users who haven't picked one yet.
+    theme: 'light',
     skin: Skins.Default,
     iconRenderer: VIcon,
   },
