@@ -77,6 +77,65 @@ required.
 
 ---
 
+## `Cena:Ingestion:BagrutLlmSegmenterEnabled`
+
+| Field | Value |
+|---|---|
+| **Current state** | **OFF** by default (gate stays closed until curator validates LLM-tier output on a few real Bagrut PDFs) |
+| **Env var** | `Cena__Ingestion__BagrutLlmSegmenterEnabled` |
+| **Owner** | claude-code (coordinator) |
+| **Owning ADR** | [ADR-0062](../adr/0062-multi-concept-canonical-extraction.md) §LLM segmenter, [ADR-0026](../adr/0026-llm-three-tier-routing.md) Tier 2 |
+| **Reads at** | `Cena.Admin.Api.Ingestion.Segmenter.LlmBagrutQuestionSegmenter.SegmentAsync` |
+| **Symptoms when off** | `BagrutPdfIngestionService` produces one draft per populated OCR page (legacy heuristic — exam-cover and "answer N of M" pages produce phantom drafts). LLM-tier code is bypassed entirely; no Anthropic round-trip. |
+
+### What this flag actually gates
+
+Calling Anthropic Haiku once per Bagrut PDF to identify question boundaries
+(skip exam-cover, "answer 5 of 8" preambles, instructions, answer-key pages;
+group multi-page questions into one draft). When **on**, the LLM's
+structured tool-use output drives draft creation; when **off**, the prior
+`OneDraftPerPageSegmenter` heuristic runs unchanged.
+
+The flag is independent of the implementation: implementation correctness is
+verified by code review + tests; the flag stays off until a curator confirms
+LLM-tier output looks clean on a real Bagrut PDF (per the user-reported
+defect on 35581-q.pdf, 2026-05-03).
+
+The LLM tier is **fail-open by construction** — every failure path (no API
+key, breaker open, malformed response, exception, segment references a
+non-existent page) falls back to `OneDraftPerPageSegmenter` after a single
+WARN log line carrying `trace_id + pdfId + duration`. Flipping the flag on
+in production cannot break ingestion; the worst-case behaviour is a single
+extra Anthropic round-trip per PDF that returns a fallback result.
+
+### How to flip on (after curator validation)
+
+```bash
+# Local dev — repo-root .env (gitignored)
+echo 'Cena__Ingestion__BagrutLlmSegmenterEnabled=true' >> .env
+docker compose -f docker-compose.yml -f docker-compose.app.yml up -d admin-api
+```
+
+For CI / staging / prod hosts, set
+`Cena__Ingestion__BagrutLlmSegmenterEnabled=true` on the runtime environment.
+The admin-api reads it at call time (per PDF), so a flag flip takes effect
+on the next ingestion without a host restart.
+
+### Verification after flip
+
+1. Upload a Bagrut PDF that previously produced phantom drafts (35581-q.pdf
+   or any PDF with ≥1 cover/instructions page before the first שאלה N marker).
+2. Confirm the resulting draft list skips cover/instruction pages — the
+   first draft's `SourcePage` should equal the page hosting שאלה 1, not 1.
+3. Spot-check the admin SPA's curator panel: each draft prompt should
+   correspond to a real question, not exam-cover boilerplate.
+4. Inspect logs for the structured `LlmBagrutQuestionSegmenter OK` line
+   carrying `trace_id`, `pdf_id`, `duration_ms`, `input_tokens`,
+   `output_tokens`, `pages`, `segments`. Per-feature cost flows into the
+   `cena_llm_call_cost_usd_total{feature="content-segmentation"}` series.
+
+---
+
 ## How to add a new flag
 
 1. Add `Cena:<Area>:<Flag>` to `appsettings.{Environment}.json` with a `_doc` sibling that names the gating ADR/PRR.

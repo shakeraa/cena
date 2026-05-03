@@ -324,6 +324,33 @@ public static class CenaAdminServiceRegistration
             .BindConfiguration("Ingestion:BagrutPdfStorage");
         services.TryAddSingleton<Ingestion.IBagrutPdfStore, Ingestion.LocalFileSystemBagrutPdfStore>();
 
+        // ADR-0062 LLM-backed Bagrut question segmenter (Haiku one-shot,
+        // 2026-05-03). The segmenter replaces the inline one-draft-per-page
+        // heuristic that user-reported defect 35581-q.pdf flagged as
+        // producing phantom drafts for exam-cover and "answer 5 of 8"
+        // preamble pages.
+        //
+        // Wiring discipline:
+        //   - OneDraftPerPageSegmenter is registered as a concrete singleton
+        //     so LlmBagrutQuestionSegmenter can consume it directly without
+        //     re-resolving through the interface (matches the rules-tier /
+        //     hybrid-tier split in HybridConceptExtractor).
+        //   - The Anthropic invoker is the test seam (mirrors
+        //     IAnthropicConceptExtractionInvoker) — registered explicitly so
+        //     unit tests can substitute a hand-rolled fake.
+        //   - IBagrutQuestionSegmenter binds to the LLM-backed impl
+        //     unconditionally; the LLM impl reads the
+        //     Cena:Ingestion:BagrutLlmSegmenterEnabled flag at call time and
+        //     short-circuits to the fallback when off. This keeps the DI
+        //     graph stable across flag flips (no host restart required).
+        services.TryAddSingleton<Ingestion.Segmenter.OneDraftPerPageSegmenter>();
+        services.TryAddSingleton<
+            Ingestion.Segmenter.IAnthropicSegmenterInvoker,
+            Ingestion.Segmenter.DefaultAnthropicSegmenterInvoker>();
+        services.TryAddSingleton<
+            Ingestion.Segmenter.IBagrutQuestionSegmenter,
+            Ingestion.Segmenter.LlmBagrutQuestionSegmenter>();
+
         // RDY-OCR-WIREUP-C (Phase 2.3): Bagrut PDF ingestion routes through
         // the real OCR cascade (IOcrCascadeService, ADR-0033). No stubs.
         services.AddScoped<Ingestion.IBagrutPdfIngestionService, Ingestion.BagrutPdfIngestionService>();

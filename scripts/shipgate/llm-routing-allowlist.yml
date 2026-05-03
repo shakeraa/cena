@@ -69,6 +69,11 @@ allowlist:
   # carry [TaskRouting] attributes, so they are no longer allowlist exceptions.
   # See docs/adr/0045-hint-and-llm-tier-selection.md §§2-5.
 
+  # --- thin SDK invokers (test seams) ---------------------------------------
+
+  - path: "src/api/Cena.Admin.Api/Ingestion/Segmenter/DefaultAnthropicSegmenterInvoker.cs"
+    reason: "Thin Anthropic SDK adapter for the segmenter — owns the tool schema + cache_control wiring only. Tier lives on the consumer LlmBagrutQuestionSegmenter (already tagged tier2/bagrut_segmentation). Mirrors the existing DefaultAnthropicConceptExtractionInvoker arrangement."
+
   # --- architecture tests + negative fixtures --------------------------------
 
   - path: "src/actors/Cena.Actors.Tests/Architecture/"
