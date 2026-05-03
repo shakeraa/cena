@@ -169,6 +169,13 @@ volumes:
   # via `docker volume rm cena_source_pdfs cena_ocr_figures` when needed.
   cena_source_pdfs:
   cena_ocr_figures:
+  # vision-extractor branch (2026-05-04): rasterised source-page PNGs.
+  # Written by PdfPageRasterizer (Poppler pdftoppm at 200 DPI) on each
+  # ingestion when the Cena:Ingestion:BagrutVisionExtractorEnabled flag is
+  # on. The vision-LLM ingests these PNGs; the SPA also reads them via
+  # the new GET /api/admin/ingestion/items/{id}/page/{N}.png endpoint.
+  # Wipe via `docker volume rm cena_source_pages` when needed.
+  cena_source_pages:
   # Firebase Auth emulator persistence (2026-05-01). Entrypoint exports
   # users on graceful shutdown + imports them on startup so dev login
   # survives container recreation and Docker Desktop restarts. Wipe via
