@@ -69,34 +69,20 @@ public class QuestionDocument
     /// <summary>
     /// The PRIMARY concept this question tests. BKT keys mastery updates
     /// off this id (see ConceptAttempted_V3 in Cena.Actors.Events.LearnerEvents).
-    /// Per ADR-0062 this MUST equal PrimaryConceptId after Phase 0 lands;
-    /// kept as a separate field for back-compat with seeded questions and
-    /// the existing student-session read path. New code should write
-    /// PrimaryConceptId; the projection mirrors it onto ConceptId.
+    ///
+    /// ADR-0062 reminder: the multi-concept set authored under the new
+    /// extraction pipeline lives on the question event stream
+    /// (QuestionConceptsExtracted_V1 / QuestionConceptsConfirmed_V1)
+    /// and is projected onto QuestionReadModel.Concepts (see
+    /// QuestionListProjection.Apply). QuestionDocument is the
+    /// student-session pool's seeded view; widening it for multi-
+    /// concept turned out to be write-never (no production code path
+    /// populates the extra fields), so the new architecture targets
+    /// QuestionReadModel.Concepts directly. ConceptId stays as the
+    /// single primary id consumed by the BKT path (ADR-0039 keeps
+    /// BKT single-skill).
     /// </summary>
     public string ConceptId { get; set; } = "";
-
-    /// <summary>
-    /// ADR-0062 Phase 0 — primary concept SkillCode (canonical form,
-    /// e.g. "math.calculus.derivative-rules"). Mirrors ConceptId for
-    /// back-compat. The projection writes both fields together so the
-    /// student-session read path keeps working unchanged.
-    /// </summary>
-    public string PrimaryConceptId { get; set; } = "";
-
-    /// <summary>
-    /// ADR-0062 Phase 0 — full concept set this question tests, including
-    /// the primary plus any supporting concepts. PrimaryConceptId is
-    /// always the first element when populated. Empty for questions that
-    /// haven't been through the new extraction pipeline yet.
-    ///
-    /// BKT does NOT fan out across this list — it stays single-concept
-    /// per ADR-0039. Supporting concepts (indexes 1..N) drive the
-    /// MasterySignalEmitted_V1 nudge channel that turns on in Phase 2,
-    /// and only when the leaf has crossed the ≥10-items publication
-    /// floor (the precondition gate from the 002 multi-persona research).
-    /// </summary>
-    public List<string> ConceptIds { get; set; } = new();
 
     public string Prompt { get; set; } = "";
     public string QuestionType { get; set; } = "multiple-choice"; // multiple-choice, free-text, etc.

@@ -35,6 +35,12 @@ public class SeedLoaderMustUseQuestionBankServiceTest
         Path.Combine("Cena.Actors", "Cas", "CasGatedQuestionPersister.cs"),
         // This test.
         "SeedLoaderMustUseQuestionBankServiceTest.cs",
+        // ADR-0062 Phase 1 persister contract test — observes (does not
+        // perform) the persister's StartStream<QuestionState> call via
+        // NSubstitute Received() assertions. The literal string is the
+        // assertion target, not a write site. Adding the file here
+        // documents the carve-out instead of obfuscating the call shape.
+        "CasGatedPersisterConceptExtractionTests.cs",
     };
 
     [Fact]

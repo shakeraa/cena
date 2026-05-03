@@ -20,11 +20,14 @@
 //      audit trail shows what the extractor said vs. what shipped.
 //
 //   `QuestionConceptsConfirmed_V1` — emitted on curator confirm /
-//      override. Carries the final concept set that the projection
-//      writes onto QuestionDocument.PrimaryConceptId / ConceptIds. For
-//      the first 200 items (calibration corpus) this event is required
-//      before publish; after that the extractor's set auto-confirms
-//      with the curator UI surfacing one-click override.
+//      override. Carries the final concept set that
+//      QuestionListProjection writes onto QuestionReadModel.Concepts
+//      (and QuestionState.ConceptIds rebuilds on replay). For the first
+//      200 items (calibration corpus) this event is REQUIRED before
+//      publish — see QuestionBankService.PublishAsync + the
+//      IConceptCurationCalibrationCounter gate. After 200 the
+//      extractor's set auto-confirms with the curator UI surfacing
+//      one-click override.
 //
 // Both events are stream-keyed on QuestionId — the same stream the
 // existing question lifecycle events use — so AggregateStreamAsync

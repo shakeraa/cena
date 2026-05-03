@@ -4,8 +4,11 @@
 // The single seam through which a question's prompt + LaTeX flow on
 // their way to a canonical concept set. Returns the list of
 // `QuestionConcept` rows (primary first) that the caller persists via
-// `QuestionConceptsExtracted_V1` and the projection mirrors onto
-// `QuestionDocument.PrimaryConceptId / ConceptIds`.
+// `QuestionConceptsExtracted_V1`. QuestionListProjection mirrors the
+// SkillCodes onto `QuestionReadModel.Concepts` so the admin list view +
+// MartenQuestionPool see the full set without re-aggregating the
+// stream. QuestionState.ConceptIds rebuilds the same set on
+// aggregate replay so the BKT primary-skill key stays consistent.
 //
 // Tier discipline (per ADR-0062 §1):
 //   * RulesOnlyConceptExtractor (this turn): wraps the existing keyword

@@ -4,6 +4,7 @@
 // =============================================================================
 
 using System.Security.Claims;
+using Cena.Admin.Api.Concepts;
 using Cena.Admin.Api.Validation;
 using Cena.Infrastructure.Auth;
 using Marten;
@@ -986,15 +987,11 @@ public static class AdminApiEndpoints
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
-        group.MapPost("/{id}/publish", async (string id, HttpContext ctx, IQuestionBankService service) =>
-        {
-            var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
-            var success = await service.PublishAsync(id, userId);
-            return success ? Results.Ok() : Results.NotFound();
-        }).WithName("PublishQuestion")
+        group.MapPost("/{id}/publish", PublishCalibrationGate.PublishWithGateAsync).WithName("PublishQuestion")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status409Conflict)
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 

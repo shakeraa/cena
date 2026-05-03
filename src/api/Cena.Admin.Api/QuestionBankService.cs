@@ -8,7 +8,9 @@ using System.Globalization;
 using System.Text.Json;
 using Cena.Actors.Cas;
 using Cena.Actors.Events;
+using Cena.Actors.Mastery.Extraction;
 using Cena.Actors.Questions;
+using Cena.Admin.Api.Concepts;
 using Cena.Admin.Api.QualityGate;
 using Cena.Infrastructure.Documents;
 using QualityGateServices = Cena.Admin.Api.QualityGate;
@@ -40,30 +42,22 @@ public interface IQuestionBankService
     Task<QuestionBankDetailResponse?> UpdateExplanationAsync(string id, string explanation, string userId);
 }
 
-public sealed class QuestionBankService : IQuestionBankService
+public sealed class QuestionBankService(
+    IDocumentStore store,
+    QualityGateServices.IQualityGateService qualityGate,
+    ICasVerificationGate casGate,
+    ICasGateModeProvider casGateMode,
+    ICasGatedQuestionPersister persister,
+    IConceptCurationCalibrationCounter calibrationCounter,
+    ILogger<QuestionBankService> logger) : IQuestionBankService
 {
-    private readonly IDocumentStore _store;
-    private readonly QualityGateServices.IQualityGateService _qualityGate;
-    private readonly ICasVerificationGate _casGate;
-    private readonly ICasGateModeProvider _casGateMode;
-    private readonly ICasGatedQuestionPersister _persister;
-    private readonly ILogger<QuestionBankService> _logger;
-
-    public QuestionBankService(
-        IDocumentStore store,
-        QualityGateServices.IQualityGateService qualityGate,
-        ICasVerificationGate casGate,
-        ICasGateModeProvider casGateMode,
-        ICasGatedQuestionPersister persister,
-        ILogger<QuestionBankService> logger)
-    {
-        _store = store;
-        _qualityGate = qualityGate;
-        _casGate = casGate;
-        _casGateMode = casGateMode;
-        _persister = persister;
-        _logger = logger;
-    }
+    private readonly IDocumentStore _store = store;
+    private readonly QualityGateServices.IQualityGateService _qualityGate = qualityGate;
+    private readonly ICasVerificationGate _casGate = casGate;
+    private readonly ICasGateModeProvider _casGateMode = casGateMode;
+    private readonly ICasGatedQuestionPersister _persister = persister;
+    private readonly IConceptCurationCalibrationCounter _calibrationCounter = calibrationCounter;
+    private readonly ILogger<QuestionBankService> _logger = logger;
 
     public async Task<QuestionListResponse> GetQuestionsAsync(
         string? subject, int? bloomsLevel,
@@ -448,15 +442,14 @@ public sealed class QuestionBankService : IQuestionBankService
         // (keyed on QuestionId + CorrectAnswerHash) and incurs no extra CAS
         // round-trip. We no longer pass a pre-computed result — that
         // parameter was removed to close the trust-the-caller bypass.
-        var persistOutcome = await _persister.PersistAsync(
-            questionId: id,
-            creationEvent: creationEvent,
-            context: new GatedPersistContext(
-                Subject: request.Subject,
-                Stem: request.Stem,
-                CorrectAnswerRaw: correctAnswerRaw,
-                Language: request.Language,
-                Variable: null),
+        // ADR-0062 Phase 1 — feed the rules-tier extractor any
+        // upstream-classified topic/track context.
+        var persistOutcome = await _persister.PersistAsync(id, creationEvent,
+            new GatedPersistContext(request.Subject, request.Stem, correctAnswerRaw,
+                request.Language, Variable: null, Latex: null,
+                TrackHint: PublishCalibrationGate.DeriveTrackHint(request.Grade),
+                RuleTierHint: request.Topic,
+                RuleTierConfidence: string.IsNullOrWhiteSpace(request.Topic) ? 0.0 : 0.5),
             extraEventsOnNewStream: extras);
 
         _logger.LogInformation(
@@ -472,6 +465,9 @@ public sealed class QuestionBankService : IQuestionBankService
         var state = await session.Events.AggregateStreamAsync<QuestionState>(id);
         if (state == null) return false;
         if (state.Status != DomainStatus.Approved) return false;
+
+        // ADR-0062 Phase 1 calibration gate. See PublishCalibrationGate.
+        await PublishCalibrationGate.EnforceAsync(id, state, _calibrationCounter, _logger);
 
         var evt = new QuestionPublished_V1(id, userId, DateTimeOffset.UtcNow);
         session.Events.Append(id, state.EventVersion + 1, evt);
@@ -622,4 +618,5 @@ public sealed class QuestionBankService : IQuestionBankService
     private static string SlugToName(string slug) =>
         CultureInfo.InvariantCulture.TextInfo.ToTitleCase(
             slug.Replace("-", " ").Replace("_", " "));
+
 }

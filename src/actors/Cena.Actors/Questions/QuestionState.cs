@@ -125,6 +125,23 @@ public sealed class QuestionState
     public List<string> ConceptIds { get; set; } = new();
 
     /// <summary>
+    /// ADR-0062 Phase 1 — true if the stream has at least one
+    /// QuestionConceptsExtracted_V1 event. Drives the publish-gate
+    /// calibration check in QuestionBankService.PublishAsync (first-200
+    /// curator-confirm corpus). Idempotent on replay.
+    /// </summary>
+    public bool HasConceptExtractionEvent { get; set; }
+
+    /// <summary>
+    /// ADR-0062 Phase 1 — true if the stream has at least one
+    /// QuestionConceptsConfirmed_V1 event (curator confirm or override).
+    /// Combined with <see cref="HasConceptExtractionEvent"/> + the
+    /// calibration counter to decide whether publish is allowed during
+    /// the first-200 calibration phase.
+    /// </summary>
+    public bool HasConceptConfirmEvent { get; set; }
+
+    /// <summary>
     /// FIND-pedagogy-008 — learning-objective id this question assesses.
     /// Nullable: old V1 streams upcast with null; authored questions should
     /// set a value at creation time and the authoring service logs a warning
@@ -399,6 +416,13 @@ public sealed class QuestionState
 
     public void Apply(QuestionConceptsExtracted_V1 e)
     {
+        // ADR-0062 Phase 1 calibration gate: flag every extraction event
+        // — empty or not — so PublishAsync can tell "this question went
+        // through the new pipeline" apart from "legacy item, gate
+        // bypass". Setting this on empty extractions is correct: a
+        // rules-tier miss is still a real extraction pass.
+        HasConceptExtractionEvent = true;
+
         // Skip empty extractions (rule tier produced nothing) so a
         // re-extraction with no rules-tier hit doesn't blank a curator's
         // confirmed concept set.
@@ -410,6 +434,12 @@ public sealed class QuestionState
 
     public void Apply(QuestionConceptsConfirmed_V1 e)
     {
+        // ADR-0062 Phase 1 calibration gate: this flag opens the publish
+        // gate even when calibration phase is still active. Curator
+        // confirm with empty Concepts (no concepts apply) still counts —
+        // see the comment below; "deliberate operator signal".
+        HasConceptConfirmEvent = true;
+
         // Curator override always wins, even if the list is empty —
         // that's a deliberate "no concepts apply" signal we don't
         // second-guess.

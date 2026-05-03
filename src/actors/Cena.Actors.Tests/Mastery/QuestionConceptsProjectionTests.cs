@@ -156,6 +156,76 @@ public sealed class QuestionConceptsProjectionTests
         Assert.Equal(v0 + 1, state.EventVersion);
     }
 
+    // ---- Calibration-gate flag tracking on QuestionState ----
+
+    [Fact]
+    public void State_ExtractionEvent_FlipsHasConceptExtractionEventFlag()
+    {
+        // The publish gate (QuestionBankService.PublishAsync) reads
+        // HasConceptExtractionEvent to decide whether to fire. The flag
+        // must flip on the FIRST extraction event regardless of whether
+        // the concept list is empty — a rules-tier miss is still a real
+        // pipeline pass and gate-relevant.
+        var state = new QuestionState();
+        Assert.False(state.HasConceptExtractionEvent);
+
+        state.Apply(Extracted(/* no concepts */));
+
+        Assert.True(state.HasConceptExtractionEvent);
+        Assert.False(state.HasConceptConfirmEvent);
+    }
+
+    [Fact]
+    public void State_ConfirmEvent_FlipsHasConceptConfirmEventFlag()
+    {
+        var state = new QuestionState();
+
+        state.Apply(Confirmed(CuratorAction.AcceptedAsExtracted,
+            Concept("math.calculus.derivative-rules", ConceptRole.Primary)));
+
+        Assert.True(state.HasConceptConfirmEvent);
+    }
+
+    [Fact]
+    public void State_ConfirmFlag_StaysTrue_OnReConfirm()
+    {
+        // Idempotency check. Re-confirms (curator changes their mind)
+        // must keep the flag true on every replay so the gate stays
+        // open consistently.
+        var state = new QuestionState();
+        state.Apply(Confirmed(CuratorAction.AcceptedAsExtracted,
+            Concept("math.calculus.derivative-rules", ConceptRole.Primary)));
+        state.Apply(Confirmed(CuratorAction.PrimaryEdited,
+            Concept("math.calculus.applications-of-derivatives", ConceptRole.Primary)));
+
+        Assert.True(state.HasConceptConfirmEvent);
+    }
+
+    [Fact]
+    public void State_FlagsReplay_IsMonotone_AcrossProductionEventOrder()
+    {
+        // Production event order: creation → extracted → confirmed.
+        // Trace through every projector method and confirm both flags
+        // land true (per memory rule feedback_event_sourcing_replay_check).
+        var state = new QuestionState();
+        Assert.False(state.HasConceptExtractionEvent);
+        Assert.False(state.HasConceptConfirmEvent);
+
+        state.Apply(Extracted(Concept("math.functions.quadratic-functions", ConceptRole.Primary)));
+        Assert.True(state.HasConceptExtractionEvent);
+        Assert.False(state.HasConceptConfirmEvent);
+
+        state.Apply(Confirmed(CuratorAction.AcceptedAsExtracted,
+            Concept("math.functions.quadratic-functions", ConceptRole.Primary)));
+        Assert.True(state.HasConceptExtractionEvent);
+        Assert.True(state.HasConceptConfirmEvent);
+
+        // Re-extraction (curator triggers re-run): flags stay true.
+        state.Apply(Extracted(Concept("math.algebra.polynomials", ConceptRole.Primary)));
+        Assert.True(state.HasConceptExtractionEvent);
+        Assert.True(state.HasConceptConfirmEvent);
+    }
+
     [Fact]
     public void Projection_And_State_StayConsistent_AcrossSameStream()
     {

@@ -507,9 +507,13 @@ public static class MartenConfiguration
         opts.Events.AddEventType<Cena.Actors.QuestionBank.Templates.ParametricTemplateDeleted_V1>();
         opts.Events.AddEventType<Cena.Actors.QuestionBank.Templates.ParametricTemplatePreviewExecuted_V1>();
 
-        // ADR-0062 Phase 0 — concept extraction events. Stream-keyed on
-        // QuestionId; the QuestionConceptsProjection folds them onto
-        // QuestionDocument.PrimaryConceptId / ConceptIds.
+        // ADR-0062 Phase 0/1 — concept extraction events. Stream-keyed on
+        // QuestionId; QuestionListProjection folds them onto
+        // QuestionReadModel.Concepts and QuestionState.Apply rebuilds
+        // ConceptIds on aggregate replay. The earlier plan to widen
+        // QuestionDocument with PrimaryConceptId/ConceptIds was reverted
+        // — no production writer was wired and the read path is
+        // QuestionReadModel-backed (MartenQuestionPool, admin list view).
         opts.Events.AddEventType<Cena.Actors.Events.QuestionConceptsExtracted_V1>();
         opts.Events.AddEventType<Cena.Actors.Events.QuestionConceptsConfirmed_V1>();
 

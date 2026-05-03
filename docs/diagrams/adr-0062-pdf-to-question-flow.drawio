@@ -1,0 +1,193 @@
+<mxfile host="app.diagrams.net" agent="cena/adr-0062" version="1.0">
+  <diagram name="PDF→Question (ADR-0062 Phase 1)" id="pdf-to-question-flow">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="2200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Curator lane -->
+        <mxCell id="lane-curator" value="Curator" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="320" height="2080" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-upload" value="Upload Bagrut PDF" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="80" y="100" width="240" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-review" value="Review kanban item:&#10;visual + metadata + concepts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="80" y="700" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-confirm" value="POST /items/{id}/concepts&#10;(curator-confirmed concept set)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="80" y="1020" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-trigger" value="'Generate variants'" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="80" y="1180" width="240" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-publish" value="Click Publish" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="80" y="1900" width="240" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Ingest lane -->
+        <mxCell id="lane-ingest" value="Bagrut ingest surface (admin-api)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="380" y="40" width="320" height="640" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-ingestEp" value="POST /api/admin/ingestion/bagrut&#10;(SuperAdminOnly)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="100" width="240" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-pdfStore" value="BagrutPdfStore&#10;writes /var/cena/source-pdfs/{sha}.pdf" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="420" y="180" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-ocr" value="BagrutPdfIngestionService&#10;OCR cascade (ADR-0033)&#10;pdftoppm + tesseract" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="270" width="240" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-draftSvc" value="BagrutDraftPersistence&#10;(creates kanban + draft + extracted event)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="380" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="store-pipeline" value="PipelineItemDocument&#10;kanban 'In Review' + AutoExtractedMetadata" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="380" y="470" width="220" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="store-payload" value="BagrutDraftPayloadDocument&#10;prompt + LaTeX + figures" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="380" y="560" width="220" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="store-draftStream" value="Draft event stream&#10;QuestionConceptsExtracted_V1&#10;(rules-tier from keyword classifier)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#fff3cd;strokeColor=#856404" vertex="1" parent="1">
+          <mxGeometry x="610" y="510" width="240" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Curator panel lane -->
+        <mxCell id="lane-panel" value="Curator panels (Vuexy SPA)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="720" y="700" width="320" height="380" as="geometry" />
+        </mxCell>
+
+        <mxCell id="panel-visual" value="Visual review&#10;PDF + figures side-by-side" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="760" y="760" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="panel-metadata" value="Curator metadata panel&#10;subject / track / topic" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="760" y="850" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="panel-concept" value="Concept review panel&#10;extracted vs. closed-set catalog" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="760" y="940" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="panel-confirmEp" value="POST /items/{id}/concepts&#10;BagrutTaxonomyCatalog canonicalises" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="760" y="1020" width="240" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Variant gen lane -->
+        <mxCell id="lane-variant" value="Variant generation" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="380" y="1180" width="320" height="280" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-variantJob" value="GenerateVariantsJobStrategy&#10;(SOURCE_ANCHORED, gated PRR-249)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="1240" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-aiSvc" value="AiGenerationService.BatchGenerateAsync&#10;(Anthropic Haiku/Sonnet)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="1320" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-qg" value="IQualityGateService&#10;(8 sub-scorers)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8d7da;strokeColor=#721c24" vertex="1" parent="1">
+          <mxGeometry x="420" y="1400" width="240" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Single-writer lane -->
+        <mxCell id="lane-writer" value="Single-writer (ADR-0002 / ADR-0032 / ADR-0062)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="720" y="1180" width="380" height="500" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-qbs" value="QuestionBankService.CreateQuestionAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="760" y="1240" width="300" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-persister" value="★ CasGatedQuestionPersister ★&#10;THE only StartStream&lt;QuestionState&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d4edda;strokeColor=#155724;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="760" y="1300" width="300" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-cas" value="ICasVerificationGate&#10;SymPy round-trip" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8d7da;strokeColor=#721c24" vertex="1" parent="1">
+          <mxGeometry x="760" y="1380" width="140" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-extractor" value="IQuestionConceptExtractor&#10;(closed-set, may be empty)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="920" y="1380" width="140" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="store-stream" value="Question event stream — atomic batch:&#10;1. Authored/Ingested/AiGenerated_V2&#10;2. QuestionConceptsExtracted_V1 (NEW)&#10;3. QuestionQualityEvaluated_V1&#10;4. QuestionApproved_V1 (auto)?" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#fff3cd;strokeColor=#856404" vertex="1" parent="1">
+          <mxGeometry x="760" y="1460" width="300" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Publish gate lane -->
+        <mxCell id="lane-publish" value="Publish gate (ADR-0062 Phase 1 calibration)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="380" y="1700" width="720" height="400" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-publishEp" value="POST /questions/{id}/publish" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="420" y="1760" width="240" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-counter" value="IConceptCurationCalibrationCounter&#10;(distinct streams w/ Confirmed_V1)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8d7da;strokeColor=#721c24" vertex="1" parent="1">
+          <mxGeometry x="420" y="1820" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-decide" value="Calibration phase active&#10;AND not yet curator-confirmed?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f8d7da;strokeColor=#721c24" vertex="1" parent="1">
+          <mxGeometry x="420" y="1900" width="240" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step-block" value="409 Conflict&#10;'concept_calibration_gate'&#10;+ /concepts pointer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="420" y="2000" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="store-published" value="Stream gets QuestionPublished_V1&#10;visible to MartenQuestionPool" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="800" y="1900" width="280" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Edges -->
+        <mxCell id="e1" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-upload" target="step-ingestEp"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-ingestEp" target="step-pdfStore"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-pdfStore" target="step-ocr"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-ocr" target="step-draftSvc"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-draftSvc" target="store-pipeline"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-draftSvc" target="store-payload"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-draftSvc" target="store-draftStream"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e8" style="endArrow=classic;html=1;" edge="1" parent="1" source="store-pipeline" target="step-review"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" style="endArrow=classic;html=1;dashed=1;" edge="1" parent="1" source="store-payload" target="panel-visual"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e10" style="endArrow=classic;html=1;dashed=1;" edge="1" parent="1" source="store-pipeline" target="panel-metadata"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e11" style="endArrow=classic;html=1;dashed=1;" edge="1" parent="1" source="store-draftStream" target="panel-concept"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e12" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-review" target="step-confirm"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e13" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-confirm" target="panel-confirmEp"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e14" style="endArrow=classic;html=1;" edge="1" parent="1" source="panel-confirmEp" target="store-draftStream" entryX="1" entryY="0.5"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e15" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-review" target="step-trigger"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e16" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-trigger" target="step-variantJob"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e17" style="endArrow=classic;html=1;dashed=1;" edge="1" parent="1" source="store-payload" target="step-variantJob"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e18" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-variantJob" target="step-aiSvc"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e19" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-aiSvc" target="step-qg"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e20" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-qg" target="step-qbs"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e21" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-qbs" target="step-persister"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e22" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-persister" target="step-cas"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e23" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-persister" target="step-extractor"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e24" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-persister" target="store-stream"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e25" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-publish" target="step-publishEp"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e26" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-publishEp" target="step-counter"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e27" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-counter" target="step-decide"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e28" value="yes (block)" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-decide" target="step-block"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e29" value="no (publish)" style="endArrow=classic;html=1;" edge="1" parent="1" source="step-decide" target="store-published"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e30" style="endArrow=classic;html=1;dashed=1;" edge="1" parent="1" source="step-block" target="panel-concept"><mxGeometry relative="1" as="geometry" /><mxPoint as="sourcePoint" x="540" y="2070"/><mxPoint as="targetPoint" x="880" y="970"/></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

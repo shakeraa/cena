@@ -16,7 +16,10 @@
 // =============================================================================
 
 using Cena.Actors.Cas;
+using Cena.Actors.Mastery;
+using Cena.Actors.Mastery.Extraction;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Cena.Student.Api.Host.Cas;
 
@@ -38,6 +41,17 @@ internal static class CasPersistenceServiceRegistration
         services.AddSingleton<IStemSolutionExtractor, StemSolutionExtractor>();
         services.AddSingleton<ICasGateModeProvider, CasGateModeProvider>();
         services.AddScoped<ICasVerificationGate, CasVerificationGate>();
+
+        // ADR-0062 Phase 1 — concept extractor seam. Every creation path
+        // through the persister emits QuestionConceptsExtracted_V1 when an
+        // extractor is bound. Mirrors the admin-side registration in
+        // CenaAdminServiceRegistration so dev + prod cannot drift on
+        // concept-set discipline. Use TryAdd so a host-specific override
+        // (e.g. HybridConceptExtractor in a future session) wins.
+        services.TryAddSingleton<BagrutTaxonomyCatalog>(_ =>
+            BagrutTaxonomyCatalog.LoadFromDisk());
+        services.TryAddSingleton<IQuestionConceptExtractor, RulesOnlyConceptExtractor>();
+
         services.AddScoped<ICasGatedQuestionPersister, CasGatedQuestionPersister>();
         return services;
     }

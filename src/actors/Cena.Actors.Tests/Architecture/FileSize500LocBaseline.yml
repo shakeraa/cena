@@ -45,9 +45,6 @@ grandfathered:
   - path: src/api/Cena.Admin.Api/AdminUserService.cs
     baseline_loc: 530
     reason: "Pre-2026-04-20 legacy; extract tenant-scoping helpers is a follow-up"
-  - path: src/api/Cena.Admin.Api/QuestionBankService.cs
-    baseline_loc: 502
-    reason: "Pre-2026-04-20 legacy; extract versioning + locale handlers is a follow-up"
 
   # ---- Student API endpoint surface (pre-2026-04-20 legacy) ----
   - path: src/api/Cena.Student.Api.Host/Endpoints/SessionEndpoints.cs

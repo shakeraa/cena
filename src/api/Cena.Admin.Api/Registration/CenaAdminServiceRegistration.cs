@@ -290,6 +290,14 @@ public static class CenaAdminServiceRegistration
             Cena.Actors.Mastery.Extraction.RulesOnlyConceptExtractor>();
         services.TryAddSingleton<Cena.Actors.Mastery.Extraction.IConceptItemPublicationCounter,
             Cena.Actors.Mastery.Extraction.NullConceptItemPublicationCounter>();
+        // ADR-0062 Phase 1 — calibration-corpus publish gate. Singleton
+        // because the counter caches the in-flight count and the
+        // "calibration complete" flag inside the instance; restarting
+        // the host re-reads on first publish call. Configurable
+        // threshold via Cena:Concepts:CalibrationThreshold; defaults to
+        // 200 per ADR-0062 §5.
+        services.TryAddSingleton<Cena.Actors.Mastery.Extraction.IConceptCurationCalibrationCounter,
+            Cena.Actors.Mastery.Extraction.MartenConceptCurationCalibrationCounter>();
 
         services.AddScoped<Ingestion.IBagrutDraftPersistence, Ingestion.BagrutDraftPersistence>();
         services.AddScoped<Ingestion.IIngestionJobStrategy, Ingestion.BagrutIngestionJobStrategy>();

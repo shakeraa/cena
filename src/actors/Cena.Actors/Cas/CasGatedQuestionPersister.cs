@@ -30,6 +30,8 @@
 //     the same session/transaction.
 // =============================================================================
 
+using Cena.Actors.Events;
+using Cena.Actors.Mastery.Extraction;
 using Cena.Actors.Questions;
 using Marten;
 using Microsoft.Extensions.Logging;
@@ -42,13 +44,27 @@ namespace Cena.Actors.Cas;
 /// <c>QuestionAuthored_V2</c>, <c>QuestionIngested_V2</c>,
 /// <c>QuestionAiGenerated_V2</c>, and their V1 predecessors — so callers
 /// pass it explicitly.
+///
+/// ADR-0062 Phase 1 — concept-extraction hints are optional. Callers with
+/// upstream-classified topic / track context (e.g. variant generation off
+/// a Bagrut draft, ingestion off a curator-confirmed metadata row) pass
+/// them so the rules-tier extractor canonicalises to a SkillCode. Callers
+/// without context pass null; the extractor returns an empty set and the
+/// curator picks at review time. The persister appends
+/// <c>QuestionConceptsExtracted_V1</c> on every creation path when an
+/// <c>IQuestionConceptExtractor</c> is bound, so no caller can forget to
+/// emit the event — same single-writer logic as the CAS gate itself.
 /// </summary>
 public sealed record GatedPersistContext(
     string Subject,
     string Stem,
     string CorrectAnswerRaw,
     string Language,
-    string? Variable = null);
+    string? Variable = null,
+    string? Latex = null,
+    string? TrackHint = null,
+    string? RuleTierHint = null,
+    double RuleTierConfidence = 0.0);
 
 /// <summary>
 /// RDY-037: Outcome of a gated persist. The binding (if any) has already been
@@ -128,17 +144,25 @@ public sealed class CasGatedQuestionPersister : ICasGatedQuestionPersister
     private readonly ICasGateModeProvider _mode;
     private readonly IDocumentStore _store;
     private readonly ILogger<CasGatedQuestionPersister> _logger;
+    // ADR-0062 Phase 1 — optional (nullable) so legacy host compositions
+    // and unit tests that don't bind an extractor still build. Production
+    // hosts (admin + student) bind RulesOnlyConceptExtractor by default.
+    // When null, the persister silently skips the QuestionConceptsExtracted
+    // append — same graceful-degradation pattern as the CAS gate's Off mode.
+    private readonly IQuestionConceptExtractor? _conceptExtractor;
 
     public CasGatedQuestionPersister(
         ICasVerificationGate gate,
         ICasGateModeProvider mode,
         IDocumentStore store,
-        ILogger<CasGatedQuestionPersister> logger)
+        ILogger<CasGatedQuestionPersister> logger,
+        IQuestionConceptExtractor? conceptExtractor = null)
     {
         _gate = gate;
         _mode = mode;
         _store = store;
         _logger = logger;
+        _conceptExtractor = conceptExtractor;
     }
 
     /// <inheritdoc />
@@ -205,10 +229,42 @@ public sealed class CasGatedQuestionPersister : ICasGatedQuestionPersister
 
         // Build the event batch. Creation event MUST lead — it bootstraps
         // the QuestionState aggregate.
-        var events = new List<object>(1 + (extraEventsOnNewStream?.Count ?? 0))
+        var events = new List<object>(2 + (extraEventsOnNewStream?.Count ?? 0))
         {
             creationEvent
         };
+
+        // ADR-0062 Phase 1 — emit QuestionConceptsExtracted_V1 immediately
+        // after the creation event so the new question stream carries the
+        // canonical concept set on the very first write. Done HERE, not
+        // in callers, so every creation path (admin authoring, AI variant
+        // generation, ingestion, seeders) gets the event for free — same
+        // architectural rationale as the single-writer CAS gate.
+        //
+        // The extractor is closed-set: a topic hint that doesn't
+        // canonicalise yields an empty Concepts list, which Apply() in
+        // QuestionState + QuestionListProjection treats as a no-op
+        // (curator picks at review). We never invent a SkillCode.
+        if (_conceptExtractor is not null)
+        {
+            var extraction = await _conceptExtractor.ExtractAsync(
+                new ExtractionInput(
+                    QuestionId:         questionId,
+                    Prompt:             context.Stem,
+                    Latex:              context.Latex,
+                    TrackHint:          context.TrackHint,
+                    RuleTierHint:       context.RuleTierHint,
+                    RuleTierConfidence: context.RuleTierConfidence),
+                ct);
+
+            events.Add(new QuestionConceptsExtracted_V1(
+                QuestionId:         questionId,
+                Concepts:           extraction.Concepts,
+                ExtractionStrategy: extraction.Strategy,
+                ExtractedBy:        nameof(CasGatedQuestionPersister),
+                Timestamp:          DateTimeOffset.UtcNow));
+        }
+
         if (extraEventsOnNewStream is not null)
             events.AddRange(extraEventsOnNewStream);
 
