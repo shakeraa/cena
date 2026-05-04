@@ -251,8 +251,21 @@ public static class QuestionConceptsEndpoints
                 return BadRequest("empty_ocr_text",
                     "Draft has no prompt or LaTeX content to enhance.");
 
+            // ADR-0062 Phase 1.5 vision-aware enhance (t_3401e9e79877):
+            // pass the source PDF id + page so the enhancer can attach the
+            // rendered page PNG as an image content block. The enhancer
+            // fail-opens to text-only when the PNG cannot be resolved
+            // (cache miss + no rasterizer + no pdf-store, or a backfilled
+            // item with no persisted PDF bytes).
             var resp = await enhancer.EnhanceOcrTextAsync(
-                new EnhanceOcrTextRequest(ocrInput, payload.ExamCode), ct);
+                new EnhanceOcrTextRequest(
+                    OcrText: ocrInput,
+                    SourceContext: payload.ExamCode,
+                    SourcePdfId: string.IsNullOrWhiteSpace(payload.SourcePdfId)
+                        ? null
+                        : payload.SourcePdfId,
+                    SourcePage: payload.SourcePage > 0 ? payload.SourcePage : (int?)null),
+                ct);
             if (!resp.Success)
                 return BadRequest("ai_enhance_failed",
                     resp.Error ?? "Anthropic call failed without a reason.");

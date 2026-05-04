@@ -494,6 +494,15 @@ public static class CenaAdminServiceRegistration
         // is a singleton — no per-request state and TimeProvider.System
         // is thread-safe.
         services.AddSingleton<IOcrEnhancementCache, OcrEnhancementCache>();
+        // ADR-0062 Phase 1.5 vision-aware enhance (t_3401e9e79877):
+        // DefaultAnthropicEnhanceInvoker hides the SDK call (system block,
+        // image-or-text user-message composition, response → text) so the
+        // enhancer's tests can substitute a fake invoker. Singleton — no
+        // per-request state; pulls the SDK client cache from the shared
+        // IAnthropicLlmRuntime.
+        services.TryAddSingleton<
+            Ingestion.IAnthropicEnhanceInvoker,
+            Ingestion.DefaultAnthropicEnhanceInvoker>();
         services.AddSingleton<IOcrTextEnhancer, OcrTextEnhancer>();
 
         // prr-200 (ADR-0002, ADR-0032): Deterministic parametric template
