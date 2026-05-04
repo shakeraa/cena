@@ -424,7 +424,16 @@ task_routing:
 
 default_model_by_task:
   question_generation:    "claude-sonnet-4-6"
-  ocr_text_enhance:       "claude-sonnet-4-6"
+  # 2026-05-04: bumped ocr_text_enhance from sonnet-4-6 → opus-4-7. User
+  # showed Opus 4.7 produced a clean correct HTML reconstruction of the
+  # 35581-q.pdf page-2 Q1 fractions (1/4 v² + 13/6 v + 10/3) on first
+  # try, while Sonnet 4.6 was rotating numerators/denominators when fed
+  # Poppler's two-line stacked-fraction output. The cost delta is
+  # ~10×, but at typical Bagrut volumes (a few PDFs/day, 6 pages each)
+  # the absolute spend stays small (~$0.30–$0.60 per ingest) and the
+  # quality jump is load-bearing. Curators who want to flip back to
+  # Sonnet for cost reasons can use the per-task override panel.
+  ocr_text_enhance:       "claude-opus-4-7"
   concept_extraction:     "claude-haiku-4-5-20251001"
   quality_gate:           "claude-haiku-4-5-20251001"
   bagrut_segmentation:    "claude-haiku-4-5-20251001"
