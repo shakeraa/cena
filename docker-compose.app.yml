@@ -187,6 +187,14 @@ services:
       # ON but Gemini fails, BagrutPdfIngestionService falls back to the
       # legacy cascade unchanged.
       - Cena__Ingestion__BagrutVisionExtractorEnabled=${CENA_BAGRUT_VISION_EXTRACTOR_ENABLED:-false}
+      # text-layer-first branch (claude-subagent-text-layer / pdfpig-first,
+      # 2026-05-04): PdfPig-based text-layer extraction runs BEFORE the
+      # vision-LLM and BEFORE the legacy cascade. For 100% of Ministry-of-
+      # Education Bagrut PDFs (Adobe InDesign-tagged) the embedded text
+      # layer returns Hebrew + math perfectly at zero LLM cost. Default ON
+      # in prod (text-layer is the safe path; vision picks up only when the
+      # extractor reports HasTextLayer=false on real scans).
+      - Cena__Ingestion__BagrutTextLayerExtractorEnabled=${CENA_BAGRUT_TEXT_LAYER_EXTRACTOR_ENABLED:-true}
       # Vision extractor uses its own Gemini API key + model (separate from
       # Ocr:Gemini which the legacy cascade's Layer-4b rescue runner uses).
       # When unset, falls back to Ocr:Gemini:ApiKey (single-key dev setup).

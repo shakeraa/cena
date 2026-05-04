@@ -69,6 +69,13 @@ services:
       # if Gemini fails, BagrutPdfIngestionService falls back to the legacy
       # cascade unchanged.
       - Cena__Ingestion__BagrutVisionExtractorEnabled=${CENA_BAGRUT_VISION_EXTRACTOR_ENABLED:-true}
+      # text-layer-first branch (claude-subagent-text-layer / pdfpig-first,
+      # 2026-05-04) — runs BEFORE vision-LLM. Default ON in both prod and
+      # hot-reload because text-layer is the cheap, deterministic, perfect
+      # path for InDesign-tagged Bagrut PDFs. The path is fail-open: when
+      # the extractor reports HasTextLayer=false (real scan PDFs) the
+      # orchestrator falls through to the vision-LLM extractor unchanged.
+      - Cena__Ingestion__BagrutTextLayerExtractorEnabled=${CENA_BAGRUT_TEXT_LAYER_EXTRACTOR_ENABLED:-true}
     volumes:
       - ./src:/src/src
       - ./db/migrations:/src/db/migrations

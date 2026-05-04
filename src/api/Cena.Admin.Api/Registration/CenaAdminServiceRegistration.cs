@@ -386,6 +386,20 @@ public static class CenaAdminServiceRegistration
                 Ingestion.Vision.IBagrutPageVisionExtractor,
                 Ingestion.Vision.GeminiVisionPageExtractor>();
 
+        // text-layer-first branch (claude-subagent-text-layer / pdfpig-first,
+        // 2026-05-04): PdfPig-based extraction runs BEFORE the vision-LLM
+        // path. For 100% of the Ministry-of-Education Bagrut PDFs (Adobe
+        // InDesign-tagged) the embedded text layer returns Hebrew + math
+        // perfectly at zero LLM cost. The
+        // Cena:Ingestion:BagrutTextLayerExtractorEnabled flag defaults ON
+        // in prod + hot-reload (text-layer is the safe path; vision picks
+        // up only when the extractor reports HasTextLayer=false on real
+        // scans). Closes the cover-page-as-question + multi-question-per-page
+        // + truncated-prompt defects user-reported on 35581-q.pdf.
+        services.TryAddSingleton<
+            Ingestion.TextLayer.IPdfTextLayerExtractor,
+            Ingestion.TextLayer.PdfPigTextLayerExtractor>();
+
         // prr-242: Bagrut reference-corpus service. Produces BagrutCorpusItem
         // rows downstream of the PDF ingest, and also serves as the production
         // IMinistryReferenceCorpus feed for the MinistrySimilarityChecker

@@ -42,6 +42,16 @@ namespace Cena.Admin.Api.Ingestion.Segmenter;
 /// review queue with a flag). Today the only consumer is the warning surface
 /// in BagrutPdfIngestionService.BuildWarnings.
 /// </para>
+/// <para>
+/// <see cref="IntraPageIndex"/> is the 0-based slot of this segment within
+/// its <see cref="StartPage"/> when text-layer extraction detected multiple
+/// `שאלה N` markers on the same page (user-reported defect on 35581-q.pdf
+/// page 2 which carries Q1 + Q2). Null when the segment is the only one on
+/// its start page (the common case). The field is OPTIONAL — both the LLM
+/// segmenter and the legacy OneDraftPerPageSegmenter leave it null. The
+/// materialiser uses it ONLY to disambiguate draft ids when two segments
+/// share a page.
+/// </para>
 /// </summary>
 public sealed record BagrutQuestionSegment(
     int StartPage,
@@ -49,6 +59,12 @@ public sealed record BagrutQuestionSegment(
     string? QuestionLabel,
     double Confidence)
 {
+    /// <summary>
+    /// 0-based intra-page slot when multiple segments share <see cref="StartPage"/>.
+    /// Null when the segment is the only one on its start page (legacy path).
+    /// </summary>
+    public int? IntraPageIndex { get; init; }
+
     /// <summary>
     /// Throws when the segment is structurally invalid (wrong page order,
     /// non-positive page numbers, confidence outside 0..1). Called by the
@@ -67,6 +83,9 @@ public sealed record BagrutQuestionSegment(
         if (double.IsNaN(Confidence) || Confidence < 0.0 || Confidence > 1.0)
             throw new ArgumentOutOfRangeException(nameof(Confidence), Confidence,
                 "Confidence must be a finite value in [0,1].");
+        if (IntraPageIndex is int idx && idx < 0)
+            throw new ArgumentOutOfRangeException(nameof(IntraPageIndex), idx,
+                "IntraPageIndex must be non-negative when set.");
     }
 }
 
