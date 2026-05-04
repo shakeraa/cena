@@ -216,14 +216,33 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
             var client = _runtime.GetOrCreateClient(apiKey);
             var systemPrompt =
                 "You are an OCR-cleanup assistant for Israeli Bagrut math papers. " +
-                "Input: raw OCR text from a Bagrut question (Hebrew/Arabic with embedded math). " +
+                "Input: text extracted from a Bagrut question via Poppler `pdftotext -layout` " +
+                "(Hebrew/Arabic prose interleaved with math). " +
                 "Output rules: " +
                 "1) Wrap inline math in \\( ... \\) and display math in \\[ ... \\]. " +
                 "2) Preserve Hebrew/Arabic prose verbatim and keep RTL paragraph flow. " +
                 "3) Restore paragraph breaks; do not invent content. " +
                 "4) Where the source clearly references a figure (e.g. 'see graph', 'in the diagram'), " +
                 "insert a marker on its own line: [[FIGURE:p<page>]] when a page is given, else [[FIGURE]]. " +
-                "5) Return ONLY the cleaned text. No commentary.";
+                "5) Return ONLY the cleaned text. No commentary. " +
+                "" +
+                "FRACTION RECONSTRUCTION (load-bearing): Poppler emits stacked fractions " +
+                "as TWO consecutive lines — numerators on the upper line, denominators " +
+                "(plus the algebraic expression) on the lower line, aligned by column. " +
+                "When you see a line of bare numerators directly above a line containing " +
+                "an algebraic expression, pair each numerator with the FIRST digit at its " +
+                "approximate column position on the lower line and emit \\frac{n}{d} for " +
+                "each pair. Read columns LEFT-TO-RIGHT in display order even though the " +
+                "surrounding prose is RTL — fractions are LTR. Example: " +
+                "\n  Input lines: '   1     13     10\\n  4 v 2 + 6 v + 3'" +
+                "\n  Correct output: \\(\\frac{1}{4}v^2 + \\frac{13}{6}v + \\frac{10}{3}\\)" +
+                "\n  WRONG output (column drift): \\(\\frac{10}{3}v^2 + \\frac{13}{4}v + \\frac{1}{2}\\) " +
+                "" +
+                "EXPONENT RECONSTRUCTION: a digit (typically 2 or 3) appearing immediately " +
+                "after a variable letter (v, x, y, t, etc.) and separated from it by a single " +
+                "space is the variable's EXPONENT — emit v^2 not 'v 2 +'. The lone digit is " +
+                "NOT a free term; it's a superscript that the layout-mode pdftotext flattens " +
+                "to inline.";
             var userPrompt = req.OcrText;
 
             var createParams = new MessageCreateParams
