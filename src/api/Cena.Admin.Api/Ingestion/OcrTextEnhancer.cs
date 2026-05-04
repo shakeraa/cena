@@ -245,11 +245,23 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
                 "to inline.";
             var userPrompt = req.OcrText;
 
+            // Temperature note (2026-05-04): Opus 4.7 rejects the
+            // `temperature` parameter outright (Anthropic deprecated it
+            // for that model in favour of internal reasoning controls).
+            // Sonnet 4.6 / Haiku 4.5 still accept it. Detect the model
+            // family at the call site rather than carrying a static
+            // "supports_temperature" flag in routing-config — the SDK
+            // contract is "omit the field entirely on Opus", which is
+            // what `Temperature = null` produces under the SDK's nullable
+            // float? property. The legacy temperature=0 stays for the
+            // older models so deterministic OCR cleanup keeps its pin.
+            var supportsTemperature = !modelName.StartsWith("claude-opus-4-7", StringComparison.Ordinal);
+
             var createParams = new MessageCreateParams
             {
                 Model = modelName,
                 MaxTokens = MaxEnhanceTokens,
-                Temperature = 0.0f,
+                Temperature = supportsTemperature ? 0.0f : null,
                 System = new List<TextBlockParam> { new TextBlockParam { Text = systemPrompt } },
                 Messages = new List<MessageParam>
                 {
