@@ -1391,9 +1391,21 @@ const approveItem = async () => {
                        splitter — markers only appear in enhanced text,
                        so the original recreated form skips the figure
                        fragments and renders as a single html block. -->
+                  <!-- 2026-05-04: dir="rtl" + lang="he" so logical-order
+                       Hebrew text from PdfPigTextLayerExtractor's Poppler
+                       pipeline renders right-to-left. Math segments inside
+                       are already wrapped in <bdi dir="ltr"> by
+                       renderMixedMathText so they keep LTR positioning
+                       inside the RTL block. The dir hint is on the block
+                       wrapper rather than each prose segment because the
+                       browser's bidi algorithm needs the surrounding
+                       direction to position whitespace and punctuation
+                       correctly. -->
                   <div
                     class="cena-mmt-block cena-recreated-text"
                     data-test="item-detail-recreated-text"
+                    dir="rtl"
+                    lang="he"
                   >
                     <template
                       v-for="(frag, fi) in renderTextWithFigures(

@@ -65,8 +65,15 @@ internal static class BagrutPageQuestionSplitter
         var slices = new List<PageQuestionSlice>(hits.Count);
         for (var i = 0; i < hits.Count; i++)
         {
-            var start = hits[i].Index;
-            var end = (i + 1 < hits.Count) ? hits[i + 1].Index : rawText.Length;
+            // Slice at the START OF THE LINE containing the marker — not
+            // the marker offset itself. Hebrew RTL Bagrut convention puts
+            // the question number to the RIGHT of the question's first
+            // line, which in logical (memory) order means the marker is
+            // at the END of that line. Slicing at hits[i].Index would
+            // drop the first sentence of the question. Walk back from
+            // the marker to the previous newline (or 0) and start there.
+            var start = StartOfLine(rawText, hits[i].Index);
+            var end = (i + 1 < hits.Count) ? StartOfLine(rawText, hits[i + 1].Index) : rawText.Length;
             // Defensive: clamp.
             if (start < 0) start = 0;
             if (end > rawText.Length) end = rawText.Length;
@@ -77,5 +84,19 @@ internal static class BagrutPageQuestionSplitter
         }
 
         return slices;
+    }
+
+    /// <summary>
+    /// Walk backwards from <paramref name="offset"/> to the start of its
+    /// containing line (i.e. the index immediately after the previous
+    /// '\n', or 0 if none). Mirrors String.LastIndexOf('\n', offset) + 1
+    /// but tolerates offset==text.Length and avoids the quirky -1 case.
+    /// </summary>
+    private static int StartOfLine(string text, int offset)
+    {
+        if (offset <= 0) return 0;
+        if (offset > text.Length) offset = text.Length;
+        var nl = text.LastIndexOf('\n', offset - 1);
+        return nl < 0 ? 0 : nl + 1;
     }
 }
