@@ -23,6 +23,12 @@
     <PackageReference Include="Azure.Storage.Blobs" Version="12.24.0" />
     <PackageReference Include="Google.Cloud.Storage.V1" Version="4.11.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.4" />
+    <!-- text-layer-first ingestion (claude-subagent-text-layer / pdfpig-first):
+         MIT-licensed, .NET-native PDF parser, zero native deps. Runs as the
+         FIRST extraction path in BagrutPdfIngestionService — InDesign-tagged
+         Ministry-of-Education Bagrut PDFs return perfect Hebrew + math from
+         the embedded text layer with no LLM round-trip and no OCR. -->
+    <PackageReference Include="PdfPig" Version="0.1.10" />
   </ItemGroup>
 
   <ItemGroup>
