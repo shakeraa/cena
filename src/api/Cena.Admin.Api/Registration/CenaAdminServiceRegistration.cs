@@ -505,6 +505,19 @@ public static class CenaAdminServiceRegistration
             Ingestion.DefaultAnthropicEnhanceInvoker>();
         services.AddSingleton<IOcrTextEnhancer, OcrTextEnhancer>();
 
+        // 2026-05-04 (t_1c57e7389cb4): single-call PDF → HTML extractor
+        // (Opus 4.7 with full PDF as DocumentBlockParam). Curator-triggered
+        // via POST /api/admin/ingestion/items/{id}/render-html. Singleton
+        // because the underlying IAnthropicLlmRuntime caches the SDK client
+        // and there is no per-request state. The invoker is the SDK seam;
+        // tests substitute a fake to assert the request shape.
+        services.TryAddSingleton<
+            Ingestion.Html.IAnthropicPdfHtmlInvoker,
+            Ingestion.Html.DefaultAnthropicPdfHtmlInvoker>();
+        services.TryAddSingleton<
+            Ingestion.Html.IPdfToHtmlExtractor,
+            Ingestion.Html.PdfToHtmlOpusExtractor>();
+
         // prr-200 (ADR-0002, ADR-0032): Deterministic parametric template
         // engine (Strategy 1). Renderer calls ICasRouterService; compiler
         // wraps the renderer with determinism + dedupe. No LLM import — the
