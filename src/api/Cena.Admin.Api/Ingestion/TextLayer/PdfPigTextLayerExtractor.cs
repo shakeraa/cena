@@ -8,13 +8,23 @@
 // glyphs, even the bracketed RTL markers (e.g. ‫.1‬ for "question 1").
 //
 // Reading order:
-//   PdfPig's Page.Text reflects the PDF content-stream order, which on
-//   InDesign-tagged Bagrut PDFs is the same as the visual reading order
-//   (right-to-left lines, top-to-bottom). We use Page.Text directly for
-//   RawText; for Blocks we run PdfPig's DefaultWordExtractor and group
-//   words into lines by Y-band. We DO NOT reorder anything — Bidi is the
-//   renderer's job, and the cover-page / question-marker heuristics
-//   operate on Hebrew Unicode characters that survive verbatim.
+//   PdfPig's Page.Text reflects the PDF content-stream order. On
+//   InDesign-tagged Bagrut PDFs that order is VISUAL (Hebrew chars
+//   left-to-right within each line) — readable when re-bidi'd by a
+//   browser RTL block, but stored as visually-reversed Unicode in the
+//   DB and curator UI. Verified empirically against
+//   corpus/tests/35581-q.pdf — Page.Text contains "תוארוה" not
+//   "הוראות". This is a UX defect the curator panel cannot easily fix.
+//
+//   Therefore RawText is sourced from Poppler `pdftotext -layout` (a
+//   subprocess that ships logical-order Hebrew with proper bidi
+//   handling). PdfPig still owns page count + Block bbox extraction;
+//   only the per-page TEXT crosses to Poppler. Both are read-only,
+//   side-effect-free, and deterministic.
+//
+//   Blocks: PdfPig's DefaultWordExtractor + Y-band grouping. Block
+//   text remains visual-reversed (it's only used for bbox + counts in
+//   architecture tests; the RawText is what hits the curator UI).
 //
 // Encrypted PDFs:
 //   PdfPig throws PdfDocumentEncryptedException when no password is
@@ -85,6 +95,16 @@ public sealed class PdfPigTextLayerExtractor : IPdfTextLayerExtractor
                 $"PDF is encrypted (password required): {ex.Message}", ex);
         }
 
+        // Materialise the PDF on disk once so `pdftotext -layout -f N -l N`
+        // can read it per page. The temp file lives only for the duration
+        // of this call; the finally cleans up regardless of which branch
+        // (text-layer success / per-page failure) returns.
+        var tmpPdfPath = Path.Combine(Path.GetTempPath(),
+            $"cena-textlayer-{pdfId}-{Guid.NewGuid():N}.pdf");
+        File.WriteAllBytes(tmpPdfPath, pdfBytes);
+
+        try
+        {
         using (document)
         {
             var pages = new List<TextLayerPage>(document.NumberOfPages);
@@ -111,7 +131,11 @@ public sealed class PdfPigTextLayerExtractor : IPdfTextLayerExtractor
                     continue;
                 }
 
-                var rawText = page.Text ?? string.Empty;
+                // Visual-reversed if we use page.Text; route through
+                // Poppler `pdftotext -layout` for logical-order Hebrew.
+                // The temp PDF file is materialised once at the start of
+                // ExtractCore and reused per page (-f N -l N selects).
+                var rawText = ExtractPageTextViaPoppler(tmpPdfPath, pageNumber, pdfId, ct);
                 var blocks = ExtractBlocks(page);
 
                 pages.Add(new TextLayerPage(
@@ -138,6 +162,99 @@ public sealed class PdfPigTextLayerExtractor : IPdfTextLayerExtractor
             }
 
             return new PdfTextLayerExtraction(pages, hasTextLayer);
+        }
+        }
+        finally
+        {
+            try { File.Delete(tmpPdfPath); }
+            catch { /* best-effort cleanup */ }
+        }
+    }
+
+    /// <summary>
+    /// Run <c>pdftotext -layout -f N -l N</c> against the on-disk PDF and
+    /// return the page's logical-order text. Poppler's bidi handling is
+    /// the right shape for Hebrew (and Arabic) — characters are stored
+    /// in logical order, paragraphs flow RTL when rendered with dir="rtl".
+    /// On any subprocess failure (binary missing, exit non-zero, timeout)
+    /// returns string.Empty and logs WARN; the caller falls through to
+    /// HasTextLayer=false → vision branch.
+    /// </summary>
+    private string ExtractPageTextViaPoppler(
+        string tmpPdfPath, int pageNumber, string pdfId, CancellationToken ct)
+    {
+        var outputPath = Path.Combine(Path.GetTempPath(),
+            $"cena-pdftotext-{Guid.NewGuid():N}.txt");
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "pdftotext",
+                ArgumentList =
+                {
+                    "-layout",
+                    "-enc", "UTF-8",
+                    "-f", pageNumber.ToString(),
+                    "-l", pageNumber.ToString(),
+                    tmpPdfPath,
+                    outputPath,
+                },
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+
+            using var proc = System.Diagnostics.Process.Start(psi)
+                ?? throw new InvalidOperationException("Failed to start pdftotext process");
+
+            // 30s ceiling per page is well above the typical ~50ms
+            // pdftotext takes; covers a corrupt-input pathological case.
+            if (!proc.WaitForExit(TimeSpan.FromSeconds(30)))
+            {
+                try { proc.Kill(entireProcessTree: true); } catch { }
+                _logger.LogWarning(
+                    "PdfPigTextLayerExtractor: pdftotext timed out (30s) pdf={PdfId} page={Page}",
+                    pdfId, pageNumber);
+                return string.Empty;
+            }
+
+            if (proc.ExitCode != 0)
+            {
+                var stderr = proc.StandardError.ReadToEnd();
+                _logger.LogWarning(
+                    "PdfPigTextLayerExtractor: pdftotext exit={ExitCode} pdf={PdfId} page={Page} stderr={Stderr}",
+                    proc.ExitCode, pdfId, pageNumber,
+                    stderr.Length > 200 ? stderr[..200] + "…" : stderr);
+                return string.Empty;
+            }
+
+            return File.Exists(outputPath)
+                ? File.ReadAllText(outputPath)
+                : string.Empty;
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            // pdftotext binary not on PATH — fall through to legacy
+            // visual-reversed page.Text rather than crashing the
+            // ingestion. The caller already logs the active path.
+            _logger.LogWarning(ex,
+                "PdfPigTextLayerExtractor: pdftotext binary not found on PATH; "
+                + "Hebrew text will be visual-reversed (pdf={PdfId} page={Page})",
+                pdfId, pageNumber);
+            return string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "PdfPigTextLayerExtractor: pdftotext invocation failed pdf={PdfId} page={Page}",
+                pdfId, pageNumber);
+            return string.Empty;
+        }
+        finally
+        {
+            try { File.Delete(outputPath); }
+            catch { /* best-effort cleanup */ }
         }
     }
 

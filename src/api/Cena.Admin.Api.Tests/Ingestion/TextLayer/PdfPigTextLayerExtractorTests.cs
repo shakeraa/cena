@@ -75,15 +75,17 @@ public sealed class PdfPigTextLayerExtractorTests
 
         var result = await sut.ExtractAsync(bytes, "pdf-corpus-35581");
 
-        // Hebrew preservation — page 1 (cover) MUST contain at least one of
-        // the cover-keyword forms (logical or visual-reversed). PdfPig
-        // surfaces visually-reversed Hebrew on InDesign-tagged content
-        // streams, so we accept either form.
+        // Hebrew preservation — page 1 (cover) MUST contain "הוראות"
+        // in LOGICAL order. PdfPigTextLayerExtractor routes per-page
+        // text through `pdftotext -layout` (subprocess) which produces
+        // logical-order Hebrew with proper bidi handling. Visual-
+        // reversed ("תוארוה") is a regression we explicitly reject —
+        // PdfPig's raw page.Text would surface visually-reversed Hebrew
+        // on InDesign-tagged content streams, and that's the bug the
+        // Poppler swap fixes.
         var page1Text = result.Pages[0].RawText;
-        var hasInstructions =
-            page1Text.Contains("הוראות", StringComparison.Ordinal) ||
-            page1Text.Contains("תוארוה", StringComparison.Ordinal);
-        Assert.True(hasInstructions, "Page 1 must surface the Hebrew 'instructions' word in some form");
+        Assert.Contains("הוראות", page1Text);
+        Assert.DoesNotContain("תוארוה", page1Text);
     }
 
     [Fact]

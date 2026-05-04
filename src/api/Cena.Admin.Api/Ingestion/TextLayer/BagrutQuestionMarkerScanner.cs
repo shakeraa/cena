@@ -41,11 +41,18 @@ internal static partial class BagrutQuestionMarkerScanner
     private const string HebrewQuestionLogical = "שאלה";   // logical order
     private const string HebrewQuestionVisual  = "הלאש";   // visual-reversed (PdfPig output)
 
-    // Numeric-only marker: whitespace, then NOT a digit and NOT a period
-    // (so we exclude "0.45" / "1.6" / ".4." cascading inside numbers), then
-    // a literal period, then a single digit 1-9, then whitespace OR period
-    // OR end-of-string. Captures the digit in group 1.
-    [GeneratedRegex(@"(?<=[^0-9.\p{L}])\.([1-9])(?=[\s.]|$)", RegexOptions.CultureInvariant)]
+    // Numeric-only marker: NOT preceded by digit/period/letter (rejects
+    // decimal continuations like "0.45" / "1.6"), then a literal period,
+    // a single digit 1-9, and NOT followed by another digit (rejects
+    // ".123"). Captures the digit in group 1.
+    //
+    // Negative lookahead `(?!\d)` (vs the earlier `(?=[\s.]|$)`) tolerates
+    // Unicode bidi-formatting chars (U+202A LRE, U+202C POP, U+200E LRM,
+    // …) immediately after the digit. Verified empirically against
+    // corpus/tests/35581-q.pdf page 2 where Poppler `pdftotext -layout`
+    // wraps each marker in LRE…POP pairs and the previous lookahead
+    // refused to match because POP is neither `\s`, `.`, nor `$`.
+    [GeneratedRegex(@"(?<![0-9.\p{L}])\.([1-9])(?!\d)", RegexOptions.CultureInvariant)]
     private static partial Regex NumericDotMarkerRegex();
 
     // Hebrew word + space + digit (1-9). Both logical and visual-reversed.
