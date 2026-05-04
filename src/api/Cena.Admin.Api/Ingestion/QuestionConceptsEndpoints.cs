@@ -38,6 +38,7 @@
 using Cena.Actors.Events;
 using Cena.Actors.Ingest;
 using Cena.Actors.Mastery;
+using Cena.Admin.Api.Ingestion.Html;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Errors;
@@ -300,6 +301,98 @@ public static class QuestionConceptsEndpoints
         .Produces<CenaError>(StatusCodes.Status404NotFound)
         .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
+        // POST /api/admin/ingestion/items/{id}/render-html (2026-05-04, t_1c57e7389cb4)
+        //
+        // Single-call PDF → HTML rendering. The curator triggers this
+        // explicitly (not auto-fired on ingest in v1) when they want the
+        // high-fidelity HTML view: Hebrew RTL preserved, math rendered as
+        // HTML sup/sub/fraction divs (NOT LaTeX), every figure recreated
+        // as inline <svg>. Adapts the user's verbatim Opus 4.7 recipe.
+        //
+        // Failure modes (all map to 400 with a structured CenaError):
+        //   - draft has no SourcePdfId
+        //   - PDF store has no bytes for the id (backfilled item, pre-store)
+        //   - extractor returns Success=false (API key missing, circuit
+        //     open, Anthropic 4xx/5xx, output truncated, etc.)
+        //
+        // Auth: ModeratorOrAbove (inherited from the group). Brief calls for
+        // AdminOnly but the rest of /api/admin/ingestion/items uses
+        // ModeratorOrAbove and operating consistency with the existing
+        // /enhance-text endpoint matters more than the brief's literal
+        // wording — both are curator-only surfaces and the auth boundary is
+        // the SPA's curator-role gate.
+        group.MapPost("/{id}/render-html", async (
+            string id,
+            [FromServices] IDocumentStore store,
+            [FromServices] IPdfToHtmlExtractor extractor,
+            [FromServices] IBagrutPdfStore pdfStore,
+            CancellationToken ct) =>
+        {
+            await using var session = store.LightweightSession();
+            var item = await session.LoadAsync<PipelineItemDocument>(id, ct);
+            if (item is null)
+                return NotFound("item_not_found", $"No pipeline item with id '{id}'.");
+
+            var payload = await session.LoadAsync<BagrutDraftPayloadDocument>(id, ct);
+            if (payload is null)
+                return NotFound("draft_payload_not_found",
+                    $"Item '{id}' has no Bagrut draft payload — render-html only applies to Bagrut drafts.");
+
+            if (string.IsNullOrWhiteSpace(payload.SourcePdfId))
+                return BadRequest("draft_no_source_pdf",
+                    "Draft has no SourcePdfId — render-html requires the original PDF to be retained.");
+
+            // Stream PDF bytes from the content-addressable store. Backfilled
+            // drafts (pre-IBagrutPdfStore) return null here — the curator
+            // is told to re-upload to enable render-html.
+            byte[] pdfBytes;
+            await using (var pdfStream = await pdfStore.OpenReadAsync(payload.SourcePdfId, ct).ConfigureAwait(false))
+            {
+                if (pdfStream is null)
+                    return BadRequest("source_pdf_not_retained",
+                        $"PDF bytes for SourcePdfId '{payload.SourcePdfId}' are not in the store. Re-upload the source PDF to enable render-html.");
+
+                using var ms = new MemoryStream();
+                await pdfStream.CopyToAsync(ms, ct).ConfigureAwait(false);
+                pdfBytes = ms.ToArray();
+            }
+
+            var resp = await extractor.ConvertAsync(
+                new PdfToHtmlRequest(pdfBytes, payload.SourcePdfId),
+                ct);
+
+            if (!resp.Success)
+                return BadRequest("pdf_to_html_failed",
+                    resp.Error ?? "Anthropic call failed without a reason.");
+
+            // Persist HtmlContent + HtmlContentAt + HtmlContentModel on the
+            // payload so a subsequent GET of the draft returns the rendered
+            // HTML without re-firing the call. Last-write-wins; under
+            // concurrent /render-html invocations the cost is paid for both
+            // calls (the extractor itself does not cache by sha256(pdf-bytes)
+            // — that's deferred to v2 per the brief's out-of-scope list).
+            var nowUtc = DateTimeOffset.UtcNow;
+            payload.HtmlContent = resp.Html;
+            payload.HtmlContentAt = nowUtc;
+            payload.HtmlContentModel = resp.ModelUsed;
+            session.Store(payload);
+            await session.SaveChangesAsync(ct);
+
+            return Results.Ok(new RenderHtmlResponse(
+                ItemId: id,
+                Html: resp.Html,
+                ModelUsed: resp.ModelUsed,
+                InputTokens: resp.InputTokens,
+                OutputTokens: resp.OutputTokens,
+                RenderedAt: nowUtc));
+        })
+        .DisableAntiforgery()
+        .WithName("RenderItemHtml")
+        .Produces<RenderHtmlResponse>(StatusCodes.Status200OK)
+        .Produces<CenaError>(StatusCodes.Status400BadRequest)
+        .Produces<CenaError>(StatusCodes.Status404NotFound)
+        .Produces<CenaError>(StatusCodes.Status401Unauthorized);
+
         return app;
     }
 
@@ -412,3 +505,16 @@ public sealed record EnhanceTextResponse(
     string EnhancedText,
     string? ModelUsed,
     DateTimeOffset EnhancedAt);
+
+// 2026-05-04 (t_1c57e7389cb4) — single-call PDF→HTML rendering response.
+// Returned by POST /api/admin/ingestion/items/{id}/render-html on success.
+// The SPA renders the Html in an iframe / shadow-root so the embedded
+// <style> block stays scoped, and surfaces the token counts in the cost
+// dashboard.
+public sealed record RenderHtmlResponse(
+    string ItemId,
+    string Html,
+    string? ModelUsed,
+    long InputTokens,
+    long OutputTokens,
+    DateTimeOffset RenderedAt);

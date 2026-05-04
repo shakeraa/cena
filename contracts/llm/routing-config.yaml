@@ -401,6 +401,21 @@ task_routing:
     max_tokens: 4096
     notes: "Single vision-LLM call per page; tool-use schema enforces JSON shape. Bagrut PDFs are Ministry-public so PII pre-scrubbing is trivially satisfied (no student data ever reaches the model)."
 
+  # 2026-05-04 (t_1c57e7389cb4): single-call PDF → HTML rendering. Curator-
+  # triggered via POST /api/admin/ingestion/items/{id}/render-html. The full
+  # PDF is sent to Opus 4.7 as a DocumentBlockParam in ONE call; the model
+  # returns a self-contained HTML document with HTML-native math and inline
+  # SVG figures. Tier opus because output fidelity is the entire reason for
+  # this surface (the Sonnet+image-block enhance path on bagrut_page_extraction
+  # / ocr_text_enhance still ships and is still useful for cheaper curator
+  # workflows). Temperature is omitted at the call site (Opus 4.7 rejects it).
+  pdf_to_html:
+    primary: claude_opus_4_7_alias
+    fallback_chain:
+      - claude_opus_4_6_alias
+    max_tokens: 32000
+    notes: "Single Opus 4.7 call per PDF; returns a self-contained HTML document with Hebrew RTL preserved, math as HTML sup/sub/fraction divs (NOT LaTeX), and inline SVG figures. Curator-triggered, not auto-fired on ingest."
+
 
 # ─────────────────────────────────────────────────────────────────────
 # 2B. PER-TASK DEFAULT MODEL (Cena.Admin.Api.AiSettings.ModelResolver)
@@ -438,6 +453,12 @@ default_model_by_task:
   quality_gate:           "claude-haiku-4-5-20251001"
   bagrut_segmentation:    "claude-haiku-4-5-20251001"
   bagrut_page_extraction: "gemini-2.0-flash"
+  # 2026-05-04 (t_1c57e7389cb4): default the new render-html surface to Opus
+  # 4.7 — the user validated this exact recipe against claude.ai and got the
+  # gold-standard output (Hebrew RTL preserved, math as HTML, inline SVG
+  # figures) on the first try. Curators can override via the per-task panel
+  # if they want to test cheaper Opus 4.6 / Sonnet output on a specific PDF.
+  pdf_to_html:            "claude-opus-4-7"
 
 global_default_model_id: "claude-sonnet-4-6"
 
@@ -585,6 +606,11 @@ feature_monthly_ceiling_usd:
   figure-generation:       800.00   # TODO(product): Kimi/Sonnet @ 1500 tokens × diagram volume
   content-segmentation:    600.00   # TODO(product): Kimi @ 4096 tokens × batch-ingest volume
   stuck-classification:    400.00   # TODO(product): Sonnet @ classification volume
+  # 2026-05-04 (t_1c57e7389cb4): single-call PDF → HTML rendering. Opus 4.7
+  # pricing is $15/$75 per Mtok; a typical 6-page Bagrut runs ~30k input
+  # tokens + ~15k output tokens ≈ $1.60/PDF. Ceiling here covers ~250 curator
+  # render-html clicks/month — adjust upward when curator workflow scales.
+  pdf-to-html:            400.00   # TODO(product): real curator-trigger volume
 
 
 # ─────────────────────────────────────────────────────────────────────

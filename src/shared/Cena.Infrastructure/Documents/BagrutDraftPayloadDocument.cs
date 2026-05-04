@@ -79,4 +79,29 @@ public sealed class BagrutDraftPayloadDocument
     /// (`enhancedInputHash !== currentInputHash`) hides the stale view.
     /// </summary>
     public string? EnhancedInputHash { get; set; }
+
+    // ── 2026-05-04 — Single-call PDF→HTML rendering (t_1c57e7389cb4) ────
+    // Curator-triggered POST /api/admin/ingestion/items/{id}/render-html
+    // runs the source PDF through PdfToHtmlOpusExtractor (Anthropic Opus
+    // 4.7, full PDF in one call → self-contained HTML with inline SVGs and
+    // HTML-native math). Persisted here so the SPA can prefer the high-
+    // fidelity HTML over the legacy Prompt + EnhancedText when present.
+
+    /// <summary>
+    /// 2026-05-04: full HTML rendering of the question, produced by
+    /// PdfToHtmlOpusExtractor. Null until /render-html has been hit.
+    /// SPA prefers this over the legacy Prompt + EnhancedText when present.
+    /// </summary>
+    public string? HtmlContent { get; set; }
+
+    /// <summary>UTC timestamp the HTML rendering was computed.</summary>
+    public DateTimeOffset? HtmlContentAt { get; set; }
+
+    /// <summary>
+    /// Anthropic model id that produced <see cref="HtmlContent"/> (e.g.
+    /// "claude-opus-4-7"). Surfaced in the SPA's "Rendered via LLM (model)"
+    /// badge so curators can see which model produced the view they are
+    /// reviewing — load-bearing when comparing fidelity across model runs.
+    /// </summary>
+    public string? HtmlContentModel { get; set; }
 }
