@@ -59,6 +59,21 @@ public sealed class OcrTextEnhancerCacheIntegrationTests
     }
 
     /// <summary>
+    /// Invoker that throws if reached. These tests pin paths that
+    /// short-circuit BEFORE the invoker (cache hit, no-API-key fall-out);
+    /// reaching the invoker indicates the test got past the assertion it
+    /// was supposed to make.
+    /// </summary>
+    private sealed class ThrowingEnhanceInvoker : IAnthropicEnhanceInvoker
+    {
+        public Task<(string? Text, long InputTokens, long OutputTokens)> InvokeAsync(
+            string apiKey, string modelId, string systemPrompt, string ocrText,
+            ReadOnlyMemory<byte>? sourcePagePng, int maxTokens, CancellationToken ct)
+            => throw new InvalidOperationException(
+                "Invoker reached unexpectedly — test should have short-circuited.");
+    }
+
+    /// <summary>
     /// In-memory replacement for IOcrEnhancementCache. Avoids mocking
     /// Marten's IQuerySession (which has overload-resolution friction
     /// with NSubstitute around the generic LoadAsync). The cache
@@ -141,6 +156,11 @@ public sealed class OcrTextEnhancerCacheIntegrationTests
         var meterFactory = new StubMeterFactory();
         var runtime = new AnthropicLlmRuntime(
             NullLogger<AnthropicLlmRuntime>.Instance, meterFactory);
+        // Stub invoker — these tests cover the cache-hit + no-API-key paths
+        // which never reach the invoker. A throwing fake makes that explicit:
+        // any test that DOES reach InvokeAsync would fail loudly instead of
+        // silently exercising a half-stubbed path.
+        var invoker = new ThrowingEnhanceInvoker();
         var enhancer = new OcrTextEnhancer(
             logger: NullLogger<OcrTextEnhancer>.Instance,
             configuration: configuration,
@@ -149,7 +169,8 @@ public sealed class OcrTextEnhancerCacheIntegrationTests
             cipher: new StubApiKeyCipher(),
             featureCost: cost,
             cache: cache,
-            runtime: runtime);
+            runtime: runtime,
+            invoker: invoker);
 
         return (enhancer, cache, store, cost, clock);
     }

@@ -28,22 +28,62 @@
 // question-generation also gates OCR-enhance and dashboards see one
 // cohesive series per (model, task_type). Cache-hit observability
 // (llm_cache_hits_total) stays here because it is OCR-enhance-specific.
+//
+// Vision-aware enhance (2026-05-04 — t_3401e9e79877)
+// --------------------------------------------------
+// User-reported defect on corpus/tests/35581-q.pdf page 2 Q1: source
+// `1/4 v² + 13/6 v + 10/3` was reconstructed as `10/3 v² + 13/4 v + 1/2`
+// — the LLM hallucinated when reading Poppler's two-line stacked-
+// fraction layout from text alone. The fix passes the SOURCE PAGE PNG
+// to Sonnet 4.6 as an ImageBlockParam so the model can use the visual
+// layout as ground truth. Wiring discipline:
+//   - request DTO carries optional SourcePdfId + SourcePage; older drafts
+//     leave both null and the enhancer behaves identically to the
+//     pre-vision implementation (text-only invoker path).
+//   - PNG resolution is cache-first: PdfPageRasterizer writes its output
+//     under {SourcePageStorageOptions.RootDirectory}/{pdfId}/page-{N:D3}.png.
+//     We try D3 then D2 then D1 padding to match the rasterizer's
+//     historical filename shapes.
+//   - On cache miss, we on-demand rasterize from the persisted PDF bytes
+//     (IBagrutPdfStore) so a curator who clicks Enhance on an item where
+//     the rasterizer hasn't run yet still gets the vision pass.
+//   - On any failure (rasterizer absent, store absent, IO error,
+//     pdftoppm missing) we drop to the legacy text-only invoker path
+//     and log a WARN. Fail-open is the right move: the pre-vision text-
+//     only enhance is still useful, and the rebuilt prompt at b55839f3
+//     gives the LLM a reasonable shot even without the image.
+//   - Cache key incorporates the PNG bytes hash when an image is
+//     attached, so a curator who re-uploads a different version of the
+//     same exam doesn't get a stale cached text-only result.
 // =============================================================================
 
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
-using Anthropic.Models.Messages;
+using System.Security.Cryptography;
+using System.Text;
 using Cena.Admin.Api.AiSettings;
+using Cena.Admin.Api.Ingestion.Vision;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Llm;
 using Marten;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Cena.Admin.Api.Ingestion;
 
 // ── ADR-0062 Phase 1.5 — OCR cleanup pass DTOs ──
-public sealed record EnhanceOcrTextRequest(string OcrText, string? SourceContext = null);
+//
+// SourcePdfId + SourcePage are OPTIONAL. When supplied, the enhancer
+// attempts to attach the rendered page PNG to the LLM call as an image
+// block (ADR-0062 Phase 1.5 vision-aware extension). Older drafts ingested
+// before SourcePdfId/SourcePage were captured leave both null; behaviour
+// in that path is identical to the pre-vision implementation.
+public sealed record EnhanceOcrTextRequest(
+    string OcrText,
+    string? SourceContext = null,
+    string? SourcePdfId = null,
+    int? SourcePage = null);
 
 public sealed record EnhanceOcrTextResponse(
     bool Success,
@@ -87,8 +127,18 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
     private readonly ILlmCostMetric _featureCost;
     private readonly IOcrEnhancementCache _cache;
     private readonly IAnthropicLlmRuntime _runtime;
+    private readonly IAnthropicEnhanceInvoker _invoker;
     private readonly IModelResolver? _modelResolver;
     private readonly IActivityPropagator? _activityPropagator;
+    // Vision-aware enhance — all three are OPTIONAL because:
+    //   - the rasterizer / PDF store are vision-extractor-branch wiring
+    //     that may be absent in a unit-test composition,
+    //   - the storage options are bound from configuration and may not be
+    //     wired in a minimal test scaffold.
+    // Any null collapses the vision attempt to the legacy text-only path.
+    private readonly IPdfPageRasterizer? _rasterizer;
+    private readonly IBagrutPdfStore? _pdfStore;
+    private readonly SourcePageStorageOptions? _pageStorageOptions;
 
     /// <summary>
     /// Last-resort model id used ONLY when no <see cref="IModelResolver"/>
@@ -117,8 +167,12 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         ILlmCostMetric featureCost,
         IOcrEnhancementCache cache,
         IAnthropicLlmRuntime runtime,
+        IAnthropicEnhanceInvoker invoker,
         IActivityPropagator? activityPropagator = null,
-        IModelResolver? modelResolver = null)
+        IModelResolver? modelResolver = null,
+        IPdfPageRasterizer? rasterizer = null,
+        IBagrutPdfStore? pdfStore = null,
+        IOptions<SourcePageStorageOptions>? pageStorageOptions = null)
     {
         _logger = logger;
         _configuration = configuration;
@@ -127,8 +181,12 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         _featureCost = featureCost;
         _cache = cache;
         _runtime = runtime;
+        _invoker = invoker ?? throw new ArgumentNullException(nameof(invoker));
         _modelResolver = modelResolver;
         _activityPropagator = activityPropagator;
+        _rasterizer = rasterizer;
+        _pdfStore = pdfStore;
+        _pageStorageOptions = pageStorageOptions?.Value;
 
         // Cache-hit counter on the same meter name as the runtime emits —
         // meter factories deduplicate by (name, version) so all the
@@ -146,11 +204,30 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         if (req is null || string.IsNullOrWhiteSpace(req.OcrText))
             return new EnhanceOcrTextResponse(false, "", null, "ocrText is required.");
 
+        // Resolve the source-page PNG up-front (best-effort). When this
+        // fails we fall through to the legacy text-only invoker shape; the
+        // cache key MUST reflect whether an image was attached so a stale
+        // text-only cached result doesn't serve a vision-eligible request.
+        ReadOnlyMemory<byte>? pagePng = null;
+        if (!string.IsNullOrWhiteSpace(req.SourcePdfId)
+            && req.SourcePage is int page && page >= 1)
+        {
+            pagePng = await TryResolvePagePngAsync(req.SourcePdfId!, page, ct)
+                .ConfigureAwait(false);
+        }
+
         // Cache lookup (sha256-keyed). Hits skip API-key resolution +
         // circuit breaker + LLM call entirely. The cache key is
         // surfaced on the response so the endpoint can persist it on
         // the draft alongside the enhanced text.
-        var inputHash = _cache.ComputeKey(req.OcrText);
+        //
+        // Key composition: when an image is attached, fold the PNG bytes
+        // into the hash so a curator re-uploading a different version of
+        // the same exam doesn't get a stale text-only result. When no
+        // image is attached, the key stays exactly sha256(text) — which
+        // preserves cache hits on every existing row written before this
+        // change.
+        var inputHash = ComputeCompositeKey(req.OcrText, pagePng);
         var cached = await _cache.TryGetAsync(inputHash, ct).ConfigureAwait(false);
         if (cached is not null)
         {
@@ -158,8 +235,8 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
                 new KeyValuePair<string, object?>("task_type", "ocr_text_enhance"),
                 new KeyValuePair<string, object?>("model_id", cached.ModelUsed));
             _logger.LogInformation(
-                "OcrTextEnhancer cache HIT (model={Model} computedAt={ComputedAt} hash={Hash})",
-                cached.ModelUsed, cached.ComputedAt, inputHash);
+                "OcrTextEnhancer cache HIT (model={Model} computedAt={ComputedAt} hash={Hash} hasImage={HasImage})",
+                cached.ModelUsed, cached.ComputedAt, inputHash, pagePng is not null);
             return new EnhanceOcrTextResponse(
                 Success: true,
                 EnhancedText: cached.EnhancedText,
@@ -213,7 +290,6 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
         var sw = Stopwatch.StartNew();
         try
         {
-            var client = _runtime.GetOrCreateClient(apiKey);
             var systemPrompt =
                 "You are an OCR-cleanup assistant for Israeli Bagrut math papers. " +
                 "Input: text extracted from a Bagrut question via Poppler `pdftotext -layout` " +
@@ -243,19 +319,6 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
                 "space is the variable's EXPONENT — emit v^2 not 'v 2 +'. The lone digit is " +
                 "NOT a free term; it's a superscript that the layout-mode pdftotext flattens " +
                 "to inline.";
-            var userPrompt = req.OcrText;
-
-            var createParams = new MessageCreateParams
-            {
-                Model = modelName,
-                MaxTokens = MaxEnhanceTokens,
-                Temperature = 0.0f,
-                System = new List<TextBlockParam> { new TextBlockParam { Text = systemPrompt } },
-                Messages = new List<MessageParam>
-                {
-                    new MessageParam { Role = "user", Content = userPrompt }
-                },
-            };
 
             var traceId = _activityPropagator?.GetTraceId();
             using var activity = _activityPropagator?.StartLlmActivity("ocr_text_enhance");
@@ -263,12 +326,18 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
             activity?.SetTag("task", "ocr_text_enhance");
             activity?.SetTag("tier", "tier3");
             activity?.SetTag("model_id", modelName);
+            activity?.SetTag("has_image", pagePng is not null);
 
-            var response = await client.Messages.Create(createParams);
+            var (text, inputTokens, outputTokens) = await _invoker.InvokeAsync(
+                apiKey: apiKey!,
+                modelId: modelName,
+                systemPrompt: systemPrompt,
+                ocrText: req.OcrText,
+                sourcePagePng: pagePng,
+                maxTokens: MaxEnhanceTokens,
+                ct: ct).ConfigureAwait(false);
             sw.Stop();
 
-            var inputTokens = response.Usage.InputTokens;
-            var outputTokens = response.Usage.OutputTokens;
             // Pricing per-call. The resolver may have returned Sonnet (default)
             // or any curator-overridden model; AnthropicSupportedModels maps the
             // chosen id back to its $/Mtok rates so the legacy meter stays
@@ -285,16 +354,6 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
                 inputTokens: inputTokens,
                 outputTokens: outputTokens);
 
-            string? text = null;
-            foreach (var block in response.Content)
-            {
-                if (block.TryPickText(out var t))
-                {
-                    text = t.Text;
-                    break;
-                }
-            }
-
             if (string.IsNullOrWhiteSpace(text))
             {
                 activity?.SetTag("outcome", "empty");
@@ -307,11 +366,11 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
             }
 
             activity?.SetTag("outcome", "success");
-            activity?.SetTag("input_tokens", (long)inputTokens);
-            activity?.SetTag("output_tokens", (long)outputTokens);
+            activity?.SetTag("input_tokens", inputTokens);
+            activity?.SetTag("output_tokens", outputTokens);
             _logger.LogInformation(
-                "OcrTextEnhancer OK (trace_id={TraceId} model={Model} input={Input} output={Output} duration={DurationMs}ms hash={Hash})",
-                traceId, modelName, inputTokens, outputTokens, sw.ElapsedMilliseconds, inputHash);
+                "OcrTextEnhancer OK (trace_id={TraceId} model={Model} input={Input} output={Output} duration={DurationMs}ms hash={Hash} hasImage={HasImage})",
+                traceId, modelName, inputTokens, outputTokens, sw.ElapsedMilliseconds, inputHash, pagePng is not null);
 
             _runtime.RecordSuccess(modelName);
             var enhanced = text!.Trim();
@@ -355,6 +414,183 @@ public sealed class OcrTextEnhancer : IOcrTextEnhancer
             _logger.LogError(ex, "OCR text enhancement failed for Anthropic");
             return new EnhanceOcrTextResponse(false, "", modelName, ex.Message);
         }
+    }
+
+    // ── Source-page PNG resolution ────────────────────────────────────────
+
+    /// <summary>
+    /// Best-effort resolve the page PNG bytes for a (pdfId, pageNumber) pair.
+    /// Fail-open: returns null on every error path so the caller drops to
+    /// the legacy text-only invoker shape. Logs at WARN for visibility but
+    /// does not propagate.
+    ///
+    /// Resolution order:
+    ///   1. Cache lookup under <see cref="SourcePageStorageOptions.RootDirectory"/>
+    ///      using the same SafeId / D3-D2-D1 padding fallback the visual-
+    ///      review GET endpoint already accepts (keeps shape parity).
+    ///   2. On miss, if both <see cref="IPdfPageRasterizer"/> and
+    ///      <see cref="IBagrutPdfStore"/> are wired, re-rasterize the
+    ///      whole PDF on demand (idempotent — the rasterizer no-ops when
+    ///      the destination directory already has files), then re-read
+    ///      the requested page.
+    /// </summary>
+    private async Task<ReadOnlyMemory<byte>?> TryResolvePagePngAsync(
+        string sourcePdfId, int pageNumber, CancellationToken ct)
+    {
+        // Cache lookup needs the storage root.
+        if (_pageStorageOptions is null)
+        {
+            _logger.LogDebug(
+                "OcrTextEnhancer: SourcePageStorageOptions not wired — skipping vision PNG attach (pdf={PdfId} page={Page})",
+                sourcePdfId, pageNumber);
+            return null;
+        }
+
+        var safeId = SafeIdSegment(sourcePdfId);
+        var pageDir = Path.Combine(_pageStorageOptions.RootDirectory, safeId);
+        var cachedPath = TryFindPagePngOnDisk(pageDir, pageNumber);
+        if (cachedPath is not null)
+        {
+            try
+            {
+                var bytes = await File.ReadAllBytesAsync(cachedPath, ct).ConfigureAwait(false);
+                return bytes;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "OcrTextEnhancer: cache PNG read failed (pdf={PdfId} page={Page} path={Path}) — falling through to on-demand rasterize",
+                    sourcePdfId, pageNumber, cachedPath);
+            }
+        }
+
+        // Cache miss (or unreadable cache file) — try on-demand rasterize.
+        if (_rasterizer is null || _pdfStore is null)
+        {
+            _logger.LogDebug(
+                "OcrTextEnhancer: rasterizer or pdfStore unwired — skipping vision PNG attach (pdf={PdfId} page={Page})",
+                sourcePdfId, pageNumber);
+            return null;
+        }
+
+        try
+        {
+            await using var pdfStream = await _pdfStore.OpenReadAsync(sourcePdfId, ct)
+                .ConfigureAwait(false);
+            if (pdfStream is null)
+            {
+                _logger.LogDebug(
+                    "OcrTextEnhancer: pdfStore has no bytes for pdf={PdfId} (backfilled item) — skipping vision PNG attach",
+                    sourcePdfId);
+                return null;
+            }
+            using var ms = new MemoryStream();
+            await pdfStream.CopyToAsync(ms, ct).ConfigureAwait(false);
+            var pdfBytes = ms.ToArray();
+
+            await _rasterizer.RasterizeAsync(pdfBytes, sourcePdfId, ct).ConfigureAwait(false);
+
+            var resolvedPath = TryFindPagePngOnDisk(pageDir, pageNumber);
+            if (resolvedPath is null)
+            {
+                _logger.LogWarning(
+                    "OcrTextEnhancer: rasterize succeeded but page {Page} not found under {Dir} — skipping vision PNG attach (pdf={PdfId})",
+                    pageNumber, pageDir, sourcePdfId);
+                return null;
+            }
+            var bytes = await File.ReadAllBytesAsync(resolvedPath, ct).ConfigureAwait(false);
+            return bytes;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "OcrTextEnhancer: on-demand rasterize failed (pdf={PdfId} page={Page}) — falling back to text-only enhance",
+                sourcePdfId, pageNumber);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Look for page-{N:D3}.png, page-{N:D2}.png, page-{N}.png in
+    /// <paramref name="pageDir"/>. Mirrors the resolver shape in
+    /// VisualReviewEndpoints so cache hits agree on filename.
+    /// </summary>
+    private static string? TryFindPagePngOnDisk(string pageDir, int pageNumber)
+    {
+        if (string.IsNullOrEmpty(pageDir) || !Directory.Exists(pageDir))
+            return null;
+
+        // Sandbox the resolved path: it must stay under pageDir. The pdfId
+        // is sanitised by SafeIdSegment, but defence-in-depth here matches
+        // the same check the GET /page/N.png endpoint applies.
+        var rootFull = Path.GetFullPath(pageDir);
+        foreach (var fileName in new[]
+        {
+            $"page-{pageNumber:D3}.png",
+            $"page-{pageNumber:D2}.png",
+            $"page-{pageNumber}.png",
+        })
+        {
+            var candidate = Path.GetFullPath(Path.Combine(pageDir, fileName));
+            if (!candidate.StartsWith(
+                    rootFull.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+            if (File.Exists(candidate))
+                return candidate;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Strict whitelist for path-segment use of pdfId. Mirrors
+    /// PdfPageRasterizer.SafeId / VisualReviewEndpoints.SafeIdSegment
+    /// so the rasteriser's directory and the enhancer's lookup agree.
+    /// </summary>
+    private static string SafeIdSegment(string id)
+    {
+        var span = id.AsSpan();
+        var buf = new char[span.Length];
+        int j = 0;
+        foreach (var ch in span)
+        {
+            var ok = (ch >= '0' && ch <= '9')
+                  || (ch >= 'a' && ch <= 'z')
+                  || (ch >= 'A' && ch <= 'Z')
+                  || ch == '-' || ch == '_';
+            if (ok) buf[j++] = ch;
+        }
+        return j == 0 ? "_" : new string(buf, 0, j).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Compose the cache key. When no PNG is attached, returns the same
+    /// sha256(text) the cache used before this change (preserves every
+    /// existing row). When a PNG IS attached, folds sha256(png) into the
+    /// key so a re-uploaded variant of the same exam doesn't get a stale
+    /// text-only cached result.
+    /// </summary>
+    private string ComputeCompositeKey(string ocrText, ReadOnlyMemory<byte>? pagePng)
+    {
+        if (pagePng is null)
+            return _cache.ComputeKey(ocrText);
+
+        // Prefix with a tag so the keyspace cannot collide with the legacy
+        // text-only key. The tag is part of the hash input, not the hash
+        // output, so the resulting key is still a 64-char lower-hex sha256.
+        Span<byte> textBytesStack = stackalloc byte[0];
+        var textBytes = Encoding.UTF8.GetBytes(ocrText);
+        var pngBytes = pagePng.Value.ToArray();
+
+        using var sha = SHA256.Create();
+        sha.TransformBlock(Encoding.ASCII.GetBytes("v1:img:"), 0, 7, null, 0);
+        sha.TransformBlock(textBytes, 0, textBytes.Length, null, 0);
+        sha.TransformBlock(Encoding.ASCII.GetBytes("|"), 0, 1, null, 0);
+        sha.TransformFinalBlock(pngBytes, 0, pngBytes.Length);
+        var hash = sha.Hash!;
+        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     // ── API-key resolution ───────────────────────────────────────────────
